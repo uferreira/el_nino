@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "el_nino"
+version = "0.1.0"
+description = "El Nino SST and sea level phase diagram analysis"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "scipy",
+    "pandas",
+    "requests",
+    "matplotlib",
+    "pyyaml",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,32 @@
+# Filter parameters (same as Fortran)
+filter:
+  HN1: 10.0   # low cutoff period (months)
+  HN2: 9.0    # high cutoff period (months)
+  NDOTS: 5    # interpolation points per month
+
+# SST data source
+sst:
+  local_file: "data/input/sst1950_1981.txt"
+  ano_inicio: 1975
+  noaa_url: "https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices"
+
+# Sea level stations (UHSLC)
+stations:
+  callao:
+    id: "093"
+    name: "Callao"
+    start_date: "1905-01-01"
+    xlim: [-300, 300]
+    ylim: [-60, 60]
+  honolulu:
+    id: "057"
+    name: "Honolulu"
+    start_date: "1905-01-01"
+    xlim: [-300, 300]
+    ylim: [-60, 60]
+  palau:
+    id: "007"
+    name: "Palau"
+    start_date: "1905-01-01"
+    xlim: [-380, 380]
+    ylim: [-100, 100]
