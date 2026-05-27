@@ -4,9 +4,10 @@ filter:
   HN2: 9.0    # high cutoff period (months)
   NDOTS: 5    # interpolation points per month
 
+
 # SST data source
 sst:
-  local_file: "data/input/sst1950_1981.txt"
+  local_file: "assets/data/sst1950_1981.txt"
   ano_inicio: 1975
   noaa_url: "https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices"
 
