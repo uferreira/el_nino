@@ -33,6 +33,19 @@ FILL_VALUE = -32767
 
 REQUEST_TIMEOUT = 60   # seconds; ERDDAP for long series can be slow
 
+# RAPID near-real-time URLs tried in order; {id} → zero-padded station_id.
+# URL 1: FD hourly CSV (same data as ERDDAP FD, different transport).
+# URL 2: Station RAPID stream (StationZero datum, GMT).
+# URL 3: ERDDAP Research Quality Data Set (RQDS) endpoint.
+_RAPID_URL_TEMPLATES = [
+    "https://uhslc.soest.hawaii.edu/data/csv/fast/hourly/h{id}.csv",
+    "http://uhslc.soest.hawaii.edu/stations/RAPID/{id}_mm_StationZero_GMT.csv",
+    (
+        "https://uhslc.soest.hawaii.edu/erddap/tabledap/global_hourly_rqds.csv"
+        "?sea_level%2Ctime&uhslc_id={id}"
+    ),
+]
+
 # Column order shared by both the local historical file and the NOAA online file.
 _SST_COLS = [
     "YR", "MON",
@@ -104,6 +117,190 @@ def _clean_obs(series: pd.Series) -> pd.Series:
     that missing hours do not drag down monthly means.
     """
     return pd.to_numeric(series, errors="coerce").replace(FILL_VALUE, np.nan)
+
+
+def _find_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
+    """Return the first column present in df that matches any candidate name."""
+    for cand in candidates:
+        if cand in df.columns:
+            return cand
+    return None
+
+
+def _parse_rapid_csv(text: str) -> pd.DataFrame | None:
+    """
+    Try multiple CSV parse strategies and return a normalised DataFrame.
+
+    Handles three source formats:
+    1. ERDDAP format: column names row + units row (skiprows=[1]).
+    2. Simple CSV with a single time column and a sea level column.
+    3. Year/Month/Day/Hour component columns (construct datetime).
+
+    Returns a DataFrame with columns ``time_utc`` and ``sl_mm``, or None
+    if no strategy produces usable data.
+    """
+    # ── Strategy 1: ERDDAP two-row header (column names + units) ─────────────
+    try:
+        df = pd.read_csv(StringIO(text), skiprows=[1])
+        df.columns = [c.split("(")[0].strip().lower() for c in df.columns]
+        t_col  = _find_col(df, ["time", "time_utc"])
+        sl_col = _find_col(df, ["sea_level", "obs", "observation", "sl_mm", "sl"])
+        if t_col and sl_col:
+            df["time_utc"] = pd.to_datetime(df[t_col], utc=True, errors="coerce")
+            df["sl_mm"]    = _clean_obs(df[sl_col])
+            out = df[["time_utc", "sl_mm"]].dropna()
+            if not out.empty:
+                return out.reset_index(drop=True)
+    except Exception:
+        pass
+
+    # ── Strategy 2: Plain CSV with a single datetime/time column ─────────────
+    try:
+        df = pd.read_csv(StringIO(text))
+        df.columns = [c.split("(")[0].strip().lower() for c in df.columns]
+        t_col  = _find_col(df, ["time", "time_utc", "datetime", "date_time",
+                                 "date", "timestamp"])
+        sl_col = _find_col(df, ["sea_level", "obs", "observation", "sl_mm",
+                                 "sl", "water_level", "level"])
+        if t_col and sl_col:
+            df["time_utc"] = pd.to_datetime(df[t_col], utc=True, errors="coerce")
+            df["sl_mm"]    = _clean_obs(df[sl_col])
+            out = df[["time_utc", "sl_mm"]].dropna()
+            if not out.empty:
+                return out.reset_index(drop=True)
+    except Exception:
+        pass
+
+    # ── Strategy 3: Year/Month/Day/Hour component columns ────────────────────
+    try:
+        df = pd.read_csv(StringIO(text))
+        df.columns = [c.strip().lower() for c in df.columns]
+        yr_col = _find_col(df, ["year", "yr"])
+        mo_col = _find_col(df, ["month", "mon"])
+        dy_col = _find_col(df, ["day"])
+        hr_col = _find_col(df, ["hour", "hr"])
+        sl_col = _find_col(df, ["sea_level", "obs", "observation", "sl_mm",
+                                 "sl", "water_level"])
+        if yr_col and mo_col and dy_col and hr_col and sl_col:
+            df["time_utc"] = pd.to_datetime(
+                {
+                    "year":  pd.to_numeric(df[yr_col],  errors="coerce"),
+                    "month": pd.to_numeric(df[mo_col], errors="coerce"),
+                    "day":   pd.to_numeric(df[dy_col],   errors="coerce"),
+                    "hour":  pd.to_numeric(df[hr_col],  errors="coerce"),
+                },
+                utc=True,
+                errors="coerce",
+            )
+            df["sl_mm"] = _clean_obs(df[sl_col])
+            out = df[["time_utc", "sl_mm"]].dropna()
+            if not out.empty:
+                return out.reset_index(drop=True)
+    except Exception:
+        pass
+
+    return None
+
+
+def _load_rapid(station_id: str) -> pd.DataFrame:
+    """
+    Attempt to download near-real-time sea level from UHSLC RAPID sources.
+
+    Tries each URL in ``_RAPID_URL_TEMPLATES`` in order, stopping at the
+    first that returns usable data.  All failures are silently swallowed so
+    that a RAPID outage never aborts the main pipeline; the caller checks
+    whether the returned DataFrame is empty.
+
+    Parameters
+    ----------
+    station_id : str
+        Zero-padded UHSLC station ID (e.g. "093").
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: ``time_utc`` (UTC-aware datetime), ``sl_mm`` (float).
+        Empty DataFrame if all URLs fail.
+    """
+    _empty = pd.DataFrame(columns=["time_utc", "sl_mm"])
+
+    for template in _RAPID_URL_TEMPLATES:
+        url = template.format(id=station_id)
+        try:
+            resp = requests.get(url, timeout=REQUEST_TIMEOUT)
+            if resp.status_code != 200:
+                continue
+            if not resp.text.strip():
+                continue
+
+            df = _parse_rapid_csv(resp.text)
+            if df is None or df.empty:
+                continue
+
+            # Apply the same ±5-minute snap used for FD data.
+            df["time_utc"] = _snap_to_hour(df["time_utc"])
+            df = (
+                df.dropna(subset=["sl_mm"])
+                  .sort_values("time_utc")
+                  .drop_duplicates(subset=["time_utc"], keep="last")
+                  .reset_index(drop=True)
+            )
+            if df.empty:
+                continue
+
+            print(
+                f"  RAPID: {len(df):,} records  "
+                f"({df['time_utc'].iloc[0]} → {df['time_utc'].iloc[-1]})"
+            )
+            return df
+
+        except Exception:
+            continue
+
+    print(f"  RAPID: all URLs failed, using FD only")
+    return _empty
+
+
+def _merge_fd_rapid(
+    df_fd: pd.DataFrame,
+    df_rapid: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Combine Fast Delivery and RAPID DataFrames, RAPID taking priority.
+
+    When the two sources overlap in time (same ``time_utc``), the RAPID
+    observation is kept and the FD observation is discarded.  This is done
+    by assigning a numeric priority (FD=1, RAPID=2), sorting by
+    (time_utc, priority), then keeping the last entry per timestamp.
+
+    Parameters
+    ----------
+    df_fd    : pd.DataFrame — columns time_utc, sl_mm  (Fast Delivery)
+    df_rapid : pd.DataFrame — columns time_utc, sl_mm  (RAPID)
+
+    Returns
+    -------
+    pd.DataFrame
+        Merged and deduplicated DataFrame with columns time_utc, sl_mm,
+        sorted by time_utc ascending.
+    """
+    if df_rapid.empty:
+        return df_fd.reset_index(drop=True)
+    if df_fd.empty:
+        return df_rapid.reset_index(drop=True)
+
+    fd_p    = df_fd.copy();    fd_p["_pri"]    = 1
+    rapid_p = df_rapid.copy(); rapid_p["_pri"] = 2
+
+    merged = (
+        pd.concat([fd_p, rapid_p], ignore_index=True)
+          .sort_values(["time_utc", "_pri"])
+          .drop_duplicates(subset=["time_utc"], keep="last")
+          .drop(columns=["_pri"])
+          .sort_values("time_utc")
+          .reset_index(drop=True)
+    )
+    return merged[["time_utc", "sl_mm"]]
 
 
 def _parse_sst_lines(lines: list[str], ano_inicio: int) -> pd.DataFrame:
@@ -257,7 +454,8 @@ def load_sea_level(
     start_date: str,
 ) -> dict:
     """
-    Download hourly sea level from UHSLC ERDDAP and aggregate to monthly means.
+    Download hourly sea level from UHSLC ERDDAP, extend with RAPID
+    near-real-time data, and aggregate to monthly means.
 
     Background
     ----------
@@ -268,38 +466,30 @@ def load_sea_level(
 
     The FD (Fast Delivery) product provides data within days to weeks of
     collection, making it suitable for near-real-time ENSO monitoring.
-    Data are reported in millimetres relative to station datum
-    (station zero), which may differ between stations but is internally
-    consistent within each record.
+    RAPID sources extend the record to within hours of the present,
+    but without the QC applied to the FD archive; they are therefore
+    appended only after the last FD timestamp to preserve archive integrity.
 
     Pipeline
     --------
-    1. Download hourly observations via ERDDAP for the requested station
+    1. Download hourly observations via ERDDAP FD for the requested station
        and date range.
     2. Parse the ERDDAP two-row header (column names + units row skipped).
-    3. Snap ±5-minute timestamp offsets to the exact clock hour.  UHSLC
-       commonly delivers 04:59:59 instead of 05:00:00; without correction
-       two observations land in the same resample bin, biasing the mean.
-    4. Replace the UHSLC fill sentinel −32767 with NaN so missing hours
-       are excluded from the monthly average rather than pulling it down
-       by ~32 metres.
+    3. Snap ±5-minute timestamp offsets to the exact clock hour.
+    4. Replace the UHSLC fill sentinel −32767 with NaN.
     5. Deduplicate on timestamp (keeping the last), drop NaN observations.
-    6. Aggregate hourly → monthly via resample("MS").mean().  Monthly
-       averaging matches the SST timescale and suppresses the tidal and
-       weather-band signals (periods < ~1 month) irrelevant to ENSO.
+    6. Attempt RAPID extension: try three near-real-time URLs in order;
+       append only observations strictly after the last FD timestamp.
+    7. Aggregate hourly → monthly via resample("MS").mean().
 
     Parameters
     ----------
     station_id : str
         UHSLC numeric station identifier, zero-padded to 3 digits.
-        Examples: "093" = Callao (Peru), "057" = Honolulu (Hawaii),
-        "007" = Malakal/Palau (western Pacific).
     station_name : str
         Human-readable station name used only in progress messages.
     start_date : str
         ISO 8601 date string for the start of the download window.
-        Pass "1905-01-01" to request the full available record; ERDDAP
-        returns only what exists and ignores dates before the first obs.
 
     Returns
     -------
@@ -313,8 +503,6 @@ def load_sea_level(
     RuntimeError
         If the ERDDAP download fails or returns no usable data.
     """
-    # Use UTC today as the end of the request window so we always get
-    # the most recent available data without hard-coding an end year.
     end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     url = (
@@ -367,7 +555,19 @@ def load_sea_level(
         f"({df['time_utc'].iloc[0]} → {df['time_utc'].iloc[-1]})"
     )
 
-    # Aggregate hourly → monthly mean.
+    # ── RAPID extension ───────────────────────────────────────────────────────
+    # Append only observations strictly after the last FD timestamp so that
+    # raw RAPID data never overwrites the quality-controlled FD archive.
+    df_rapid = _load_rapid(station_id)
+    if not df_rapid.empty:
+        fd_last    = df["time_utc"].max()
+        rapid_tail = df_rapid[df_rapid["time_utc"] > fd_last].copy()
+        if not rapid_tail.empty:
+            n_ext = len(rapid_tail)
+            df = _merge_fd_rapid(df, rapid_tail)
+            print(f"  Extended record with RAPID: {n_ext:,} additional hours")
+
+    # ── Aggregate hourly → monthly mean ───────────────────────────────────────
     # resample("MS") = month-start frequency; .mean() automatically skips NaN.
     # dropna() removes months with zero valid observations (e.g. instrument gaps).
     df = df.set_index("time_utc")
