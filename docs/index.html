@@ -312,6 +312,16 @@ footer a:hover { text-decoration:underline; }
 
   <div class="status-bar" id="s2-status"><span class="st-ready">Ready — set parameters and click Run</span></div>
   <canvas id="duff-canvas" class="phasecanvas" width="700" height="480"></canvas>
+  <div style="margin:.5rem 0 1rem;">
+    <input type="range" id="s2-scrubber" min="0" max="100" value="0"
+           style="width:100%;cursor:pointer;accent-color:var(--accent);"
+           title="Drag to scrub through time">
+    <div id="s2-time-display"
+         style="text-align:center;font-family:monospace;font-size:.82rem;
+                color:var(--muted);margin-top:.25rem;letter-spacing:.04em">
+      Jan 1975
+    </div>
+  </div>
 </div>
 </section>
 
@@ -895,6 +905,8 @@ const S2 = {
   t:0, X:0, Y:0, step:0,
   params:null, t_end:600, dt:0.1,
   spf:1, delay:30, startYear:1975,
+  startX:0, startY:0,
+  totalSteps:0, wasRunningBeforeScrub:false,
   tail:[], rafId:null,
   canvas:null, ctx:null, off:null, offCtx:null,
 };
@@ -905,6 +917,45 @@ function s2Init() {
   S2.off    = makeOff(S2_CW, S2_CH);
   S2.offCtx = S2.off.getContext('2d');
   s2DrawBg();
+
+  const scrubEl = document.getElementById('s2-scrubber');
+  if (scrubEl) {
+    scrubEl.addEventListener('mousedown', () => {
+      S2.wasRunningBeforeScrub = S2.running && !S2.paused;
+      if (S2.wasRunningBeforeScrub) {
+        S2.paused = true;
+        if (S2.rafId) cancelAnimationFrame(S2.rafId);
+        document.getElementById('s2-pause').innerHTML='&#9654; Resume';
+      }
+    });
+    scrubEl.addEventListener('input', function() {
+      if (!S2.running && S2.totalSteps === 0) return;
+      const step = Math.round(parseInt(this.value) / 100 * (S2.totalSteps - 1));
+      s2RedrawToFrame(step);
+    });
+    scrubEl.addEventListener('mouseup', function() {
+      if (S2.wasRunningBeforeScrub && S2.running) {
+        S2.paused = false;
+        document.getElementById('s2-pause').innerHTML='&#9646;&#9646; Pause';
+        S2.rafId = setTimeout(()=>requestAnimationFrame(s2Loop), S2.delay);
+      }
+      S2.wasRunningBeforeScrub = false;
+    });
+    scrubEl.addEventListener('touchstart', () => {
+      S2.wasRunningBeforeScrub = S2.running && !S2.paused;
+      if (S2.wasRunningBeforeScrub) {
+        S2.paused = true;
+        if (S2.rafId) cancelAnimationFrame(S2.rafId);
+      }
+    }, {passive:true});
+    scrubEl.addEventListener('touchend', function() {
+      if (S2.wasRunningBeforeScrub && S2.running) {
+        S2.paused = false;
+        S2.rafId = setTimeout(()=>requestAnimationFrame(s2Loop), S2.delay);
+      }
+      S2.wasRunningBeforeScrub = false;
+    });
+  }
 }
 
 function s2DrawBg() {
@@ -932,6 +983,10 @@ function s2Loop() {
   }
   s2Frame();
   s2Status();
+  const _s2scrub = document.getElementById('s2-scrubber');
+  if (_s2scrub && S2.totalSteps > 0) _s2scrub.value = Math.round(S2.step / S2.totalSteps * 100);
+  const _s2td = document.getElementById('s2-time-display');
+  if (_s2td) { const _s2t=S2.step*S2.dt; _s2td.textContent=MO_NAMES[Math.floor(_s2t)%12]+' '+(S2.startYear+Math.floor(_s2t/12)); }
   if (S2.running) S2.rafId = setTimeout(()=>requestAnimationFrame(s2Loop), S2.delay);
 }
 
@@ -945,9 +1000,15 @@ function s2Start() {
   S2.dt = 0.1; S2.t=0; S2.step=0;
   S2.X = parseFloat(document.getElementById('nb-X0').value)||0;
   S2.Y = parseFloat(document.getElementById('nb-Y0').value)||0;
+  S2.startX = S2.X; S2.startY = S2.Y;
+  S2.totalSteps = Math.round(S2.t_end / S2.dt);
   S2.tail = []; S2.running=true; S2.paused=false;
   S2.offCtx.clearRect(0,0,S2_CW,S2_CH);
   s2DrawBg();
+  const _s2scrub0 = document.getElementById('s2-scrubber');
+  if (_s2scrub0) { _s2scrub0.max=100; _s2scrub0.value=0; }
+  const _s2td0 = document.getElementById('s2-time-display');
+  if (_s2td0) _s2td0.textContent = 'Jan ' + S2.startYear;
   setBtn('s2-run',true); setBtn('s2-pause',false);
   document.getElementById('s2-pause').textContent='⏸ Pause';
   S2.rafId = setTimeout(()=>requestAnimationFrame(s2Loop), S2.delay);
@@ -968,9 +1029,13 @@ function s2Finish() {
   s2Status();
 }
 function s2Reset() {
-  s2Finish(); S2.t=0; S2.step=0; S2.X=0; S2.Y=0; S2.tail=[];
+  s2Finish(); S2.t=0; S2.step=0; S2.X=0; S2.Y=0; S2.tail=[]; S2.totalSteps=0;
   S2.offCtx.clearRect(0,0,S2_CW,S2_CH);
   s2DrawBg();
+  const _s2scrubR = document.getElementById('s2-scrubber');
+  if (_s2scrubR) _s2scrubR.value=0;
+  const _s2tdR = document.getElementById('s2-time-display');
+  if (_s2tdR) _s2tdR.textContent = 'Jan ' + (S2.startYear||1975);
   document.getElementById('s2-status').innerHTML='<span class="st-ready">Ready</span>';
 }
 function s2Status() {
@@ -979,6 +1044,40 @@ function s2Status() {
   const cls=S2.paused?'st-paused':(S2.running?'st-running':'st-done');
   const st=S2.paused?'&#9646;&#9646; Paused':(S2.running?'&#9654; Running':'&#9632; Done');
   el.innerHTML=`<span class="${cls}">${st}</span> &nbsp;·&nbsp; t=${S2.t.toFixed(1)} mo &nbsp;·&nbsp; <strong>${lbl}</strong>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// 5b. s2RedrawToFrame — replay S2 to a given step for scrubbing
+// ═══════════════════════════════════════════════════════
+function s2RedrawToFrame(targetStep) {
+  if (!S2.offCtx || S2.totalSteps === 0) return;
+  const p = S2.params || getParams();
+  const dt = S2.dt || 0.1;
+  const target = Math.max(0, Math.min(targetStep, S2.totalSteps - 1));
+
+  S2.offCtx.clearRect(0, 0, S2_CW, S2_CH);
+  let tail = [], X = S2.startX, Y = S2.startY, t = 0, step = 0;
+
+  for (let i = 0; i < target; i++) {
+    const s2t = step * dt;
+    const s = rk4Step(t, X, Y, p, dt);
+    X = s.X; Y = s.Y; t += dt; step++;
+    if (!isFinite(X) || Math.abs(X) > 200) break;
+    const s2Month = (Math.floor(s2t) % 12) + 1;
+    pushTail(tail, X, Y, s2Month, S2_TAIL, S2.offCtx, S2_PLT, S2_DOM);
+  }
+
+  S2.X = X; S2.Y = Y; S2.t = t; S2.step = step; S2.tail = tail;
+  s2DrawBg();
+  compositeFrame(S2.ctx, S2_CW, S2_CH, S2_PLT, S2_DOM, S2.off, S2.tail,
+    monthLabel(Math.floor(step * dt), S2.startYear));
+
+  const s2tNow = step * dt;
+  const _s2tdF = document.getElementById('s2-time-display');
+  if (_s2tdF) _s2tdF.textContent = MO_NAMES[Math.floor(s2tNow)%12] + ' ' + (S2.startYear + Math.floor(s2tNow/12));
+  const _s2scrubF = document.getElementById('s2-scrubber');
+  if (_s2scrubF && S2.totalSteps > 1) _s2scrubF.value = Math.round(target / (S2.totalSteps - 1) * 100);
+  s2Status();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1512,6 +1611,14 @@ linkSlider('sl-FA','nb-FA','lbl-FA',f4);
 linkSlider('sl-FF','nb-FF','lbl-FF',fDeg);
 linkSlider('sl-B', 'nb-B', 'lbl-B', f4);
 linkSlider('sl-tend','nb-tend','lbl-tend',fInt);
+// Reset s2 scrubber when integration time changes
+['sl-tend','nb-tend'].forEach(function(id){
+  const _tendEl=document.getElementById(id);
+  if(!_tendEl) return;
+  function _tendReset(){const scr=document.getElementById('s2-scrubber');if(scr)scr.value=0;S2.totalSteps=0;}
+  _tendEl.addEventListener('input',_tendReset);
+  _tendEl.addEventListener('change',_tendReset);
+});
 linkSlider('sl-spf',  'nb-spf',  'lbl-spf',   fInt);
 linkSlider('sl-delay','nb-delay','lbl-delay',  fInt);
 linkSlider('sl-styear','nb-styear','lbl-styear',fInt);
