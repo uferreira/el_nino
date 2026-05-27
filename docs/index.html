@@ -134,64 +134,69 @@ footer a:hover { text-decoration:underline; }
 </header>
 
 <!-- ══════════════════════════════════════════════════════
-     SECTION 1: Observed attractor (static Plotly)
+     SECTION 1: Observed ENSO Attractors — animated canvas
      ══════════════════════════════════════════════════════ -->
 <section id="observed">
 <div class="container">
-  <h2>Observed ENSO Attractor</h2>
+  <h2>Observed ENSO Attractors — SST and Sea Level</h2>
   <div class="science-box">
     <strong>What is a phase diagram?</strong>
-    The x-axis shows the Fourier-filtered NINO1+2 sea surface temperature (SST, °C)
-    and the y-axis shows its rate of change dT/dt (°C/month). Together they define a
-    2-D phase space in which the ENSO cycle traces a quasi-periodic closed loop —
-    the <em>strange attractor</em>. Colour goes from
-    <span style="color:#3388ff">blue (1975)</span> to
-    <span style="color:#ff5533">red (2026)</span>.<br><br>
-    <strong>Reading the diagram:</strong> trajectory moves clockwise. La Niña starts lower-left,
-    warming drives it right, El Niño peaks upper-right. Major events (1982–83, 1997–98, 2015–16)
-    show as large excursions. The loop never closes exactly — evidence of chaotic ENSO dynamics.
+    Both panels plot a climate variable T against its rate of change dT/dt.
+    Left: NINO1+2 sea surface temperature anomaly (°C, mean removed) — El Niño events appear
+    as large excursions to the right. Right: Callao tide-gauge sea level anomaly (mm) — sea
+    level rises sharply during El Niño as Kelvin waves suppress coastal upwelling.
+    Both variables trace the same ENSO strange attractor on the same calendar.
   </div>
-  <div class="quadrant-legend">
-    <div class="ql-item"><div class="phase warm">El Niño developing</div>upper-right: T high, rising</div>
-    <div class="ql-item"><div class="phase warm">El Niño peak / decay</div>upper-left: T high, falling</div>
-    <div class="ql-item"><div class="phase cold">La Niña developing</div>lower-left: T cold, falling</div>
-    <div class="ql-item"><div class="phase cold">La Niña peak / decay</div>lower-right: T cold, rising</div>
-  </div>
-  <div class="stats-bar">
-    <span>Data: <strong>NOAA CPC NINO1+2 SST</strong></span>
-    <span>Period: <strong>Jan 1970 – May 2026</strong></span>
-    <span>Filter: <strong>Fourier low-pass HN1=10 HN2=9 months</strong></span>
-    <span>Points: <strong>3,371</strong></span>
-  </div>
-  <div class="plot-box">
-    <div id="plot-observed" style="height:520px;"></div>
-  </div>
-</div>
-</section>
 
+  <div class="controls">
+    <div class="ctrl-head">Animation Speed</div>
+    <div class="param-grid">
+      <div class="param-row">
+        <label>Steps per frame <span id="obs1-lbl-spf">1</span></label>
+        <div class="param-inline">
+          <input type="range" id="obs1-sl-spf" min="1" max="20" step="1" value="1">
+        </div>
+      </div>
+      <div class="param-row">
+        <label>Frame delay ms <span id="obs1-lbl-delay">30</span></label>
+        <div class="param-inline">
+          <input type="range" id="obs1-sl-delay" min="0" max="200" step="5" value="30">
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button id="obs1-run" onclick="obs1Start()">&#9654; Run</button>
+      <button id="obs1-pause" class="secondary" onclick="obs1Pause()" disabled>&#9646;&#9646; Pause</button>
+      <button id="obs1-reset" class="danger" onclick="obs1Reset()">&#8635; Reset</button>
+    </div>
+  </div>
 
-<!-- ══════════════════════════════════════════════════════
-     SECTION 1b: Callao Sea Level Attractor (static Plotly)
-     ══════════════════════════════════════════════════════ -->
-<section id="callao">
-<div class="container">
-  <h2>Observed Sea Level SSH — Callao, Peru 1970–2026</h2>
-  <div class="science-box">
-    Callao (12°S, 77°W) is a tide-gauge station on the coast of Peru, directly in the path
-    of El Niño coastal warming. Sea level rises sharply during El Niño as downwelling Kelvin
-    waves suppress coastal upwelling and warm water piles up against the South American coast.
-    The phase diagram shows <strong>sea level anomaly</strong> (mm, mean removed) vs its rate
-    of change — compare with the SST attractor above to see how both variables trace the same
-    ENSO cycle with similar quasi-periodic structure.
+  <div class="status-bar" id="obs1-status"><span class="st-ready">Ready — click Run to animate the ENSO attractor</span></div>
+
+  <div class="two-col" style="margin-bottom:.6rem;">
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">
+        SST NINO1+2 anomaly (°C)
+      </div>
+      <canvas id="obs1-sst-canvas" class="phasecanvas" width="700" height="480"></canvas>
+    </div>
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">
+        Callao SSH anomaly (mm)
+      </div>
+      <canvas id="obs1-cal-canvas" class="phasecanvas" width="700" height="480"></canvas>
+    </div>
   </div>
-  <div class="stats-bar">
-    <span>Data: <strong>UHSLC station 093 (Callao, Peru)</strong></span>
-    <span>Period: <strong>Jan 1970 – Apr 2026</strong></span>
-    <span>Filter: <strong>Fourier low-pass HN1=10 HN2=9 months NDOTS=5</strong></span>
-    <span>Points: <strong>3,366</strong></span>
-  </div>
-  <div class="plot-box">
-    <div id="plot-callao" style="height:520px;"></div>
+
+  <div style="margin:.5rem 0 1rem;">
+    <input type="range" id="obs1-scrubber" min="0" max="100" value="0"
+           style="width:100%;cursor:pointer;accent-color:var(--accent);"
+           title="Drag to scrub through time">
+    <div id="obs1-time-display"
+         style="text-align:center;font-family:monospace;font-size:.82rem;
+                color:var(--muted);margin-top:.25rem;letter-spacing:.04em">
+      Jan 1975
+    </div>
   </div>
 </div>
 </section>
@@ -319,7 +324,7 @@ footer a:hover { text-decoration:underline; }
     <div id="s2-time-display"
          style="text-align:center;font-family:monospace;font-size:.82rem;
                 color:var(--muted);margin-top:.25rem;letter-spacing:.04em">
-      Jan 1975
+      t = 0.0 months
     </div>
   </div>
 </div>
@@ -650,18 +655,9 @@ const callaoMean = 1093.16;  // mean sea level mm — subtract for anomaly
 // month is the original monthly point when i % 5 === 0
 
 // Build hover and colour arrays for Plotly (Section 1 only)
-const obsHover = observedData.year.map(
-  (yr,i) => yr.toString().padStart(4,'0')+'/'+observedData.month[i].toString().padStart(2,'0')
-);
-const obsColor = Array.from({length:OBS_N}, (_,i) => i/(OBS_N-1));
-
 const MO_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 const Q_COLORS = ['#FF6B35','#4ECDC4','#45B7D1','#96CEB4'];
-const Q_NAMES  = ['Jan–Mar','Apr–Jun','Jul–Sep','Oct–Dec'];
-function seasonColor(month) {
-  return Q_COLORS[Math.floor((month-1)/3)];
-}
 function seasonColorAlpha(month, alpha) {
   const c = Q_COLORS[Math.floor((month-1)/3)];
   const r=parseInt(c.slice(1,3),16), g=parseInt(c.slice(3,5),16), b=parseInt(c.slice(5,7),16);
@@ -669,71 +665,230 @@ function seasonColorAlpha(month, alpha) {
 }
 
 // ═══════════════════════════════════════════════════════
-// 2. PLOTLY — Section 1 static chart only
+// 2. SECTION 1 — Observed attractors animated canvas
 // ═══════════════════════════════════════════════════════
-(function() {
-  const traces = [0,1,2,3].map(q => {
-    const xi=[],yi=[],txt=[];
-    for (let i=0;i<OBS_N;i++) {
-      if (Math.floor((observedData.month[i]-1)/3)===q) {
-        xi.push(observedData.x[i]); yi.push(observedData.y[i]); txt.push(obsHover[i]);
-      }
-    }
-    return {x:xi, y:yi, mode:'markers', type:'scatter',
-      marker:{size:2.8, color:Q_COLORS[q], opacity:0.82},
-      name:Q_NAMES[q], text:txt,
-      hovertemplate:'<b>%{text}</b><br>T=%{x:.2f}°C<br>dT/dt=%{y:.2f}°C/mo<extra></extra>'};
-  });
-  const layout = {
-    paper_bgcolor:'#1a1a28', plot_bgcolor:'#12121a', font:{color:'#888899'},
-    title:{text:'ENSO Attractor — NINO1+2 SST 1975–2026', font:{color:'#e8e8f0',size:13}, x:.04, xanchor:'left'},
-    xaxis:{title:'Temperature (°C)', range:[18.5,30.5], gridcolor:'#2a2a40', zerolinecolor:'#4a4a60', zerolinewidth:1.5},
-    yaxis:{title:'dT/dt (°C/month)',  range:[-2.0,2.5],  gridcolor:'#2a2a40', zerolinecolor:'#4a4a60', zerolinewidth:1.5},
-    margin:{l:58,r:20,t:44,b:52}, showlegend:true,
-    legend:{font:{color:'#888899',size:11}, bgcolor:'rgba(26,26,40,0.85)', x:0.01, y:0.99},
-    hovermode:'closest'
-  };
-  Plotly.newPlot('plot-observed', traces, layout, {responsive:true, displaylogo:false});
-})();
+const obsMean = observedData.x.reduce((a,b)=>a+b,0)/OBS_N;
 
-// Observed Sea Level SSH static phase diagram
-(function() {
-  const cxArr = callaoData.x.map(v => +(v - callaoMean).toFixed(2));
-  const traces = [0,1,2,3].map(q => {
-    const xi=[],yi=[],txt=[];
-    for (let i=0;i<CAL_N;i++) {
-      if (Math.floor((callaoData.month[i]-1)/3)===q) {
-        xi.push(cxArr[i]); yi.push(callaoData.y[i]);
-        txt.push(MO_NAMES[callaoData.month[i]-1]+' '+callaoData.year[i]+
-          '<br>SSH anom: '+cxArr[i].toFixed(1)+' mm<br>dSL/dt: '+callaoData.y[i].toFixed(2)+' mm/mo');
-      }
-    }
-    return {x:xi, y:yi, mode:'markers', type:'scatter',
-      marker:{size:2.5, color:Q_COLORS[q], opacity:0.80},
-      name:Q_NAMES[q], text:txt,
-      hovertemplate:'%{text}<extra></extra>'};
-  });
-  const layoutC = {
-    paper_bgcolor:'#12121a', plot_bgcolor:'#0a0a0e', font:{color:'#e8e8f0', size:12},
-    title:{text:'Observed Sea Level SSH — Callao, Peru 1970–2026', font:{color:'#e8e8f0',size:13}, x:.04, xanchor:'left'},
-    xaxis:{
-      title:{text:'SSH anomaly (mm)', font:{size:13}},
-      gridcolor:'#1e1e2e', zerolinecolor:'#333348', zerolinewidth:1.5,
-      range:[-300,300], color:'#888899', dtick:100
-    },
-    yaxis:{
-      title:{text:'dSL/dt (mm/month)', font:{size:13}},
-      gridcolor:'#1e1e2e', zerolinecolor:'#333348', zerolinewidth:1.5,
-      range:[-60,60], color:'#888899', dtick:20
-    },
-    margin:{l:62,r:20,t:44,b:52}, showlegend:true,
-    legend:{font:{color:'#888899',size:11}, bgcolor:'rgba(18,18,26,0.85)', x:0.01, y:0.99},
-    hovermode:'closest'
-  };
-  Plotly.newPlot('plot-callao', traces, layoutC, {responsive:true, displaylogo:false});
-})();
+const OBS1_CW=700, OBS1_CH=480;
+const OBS1_PLT={l:56,r:680,t:34,b:446};
+const OBS1_DOM_SST={xmin:-7.5,xmax:7.5,ymin:-2.5,ymax:2.5};
+const OBS1_DOM_CAL={xmin:-300, xmax:300, ymin:-60,  ymax:60};
+const OBS1_LABELS_SST={x:'SST anomaly (°C)', y:'dT/dt'};
+const OBS1_LABELS_CAL={x:'SSH anom (mm)',    y:'dSL/dt'};
+const CAL_SSH_TICKS={x:[-300,-200,-100,0,100,200,300],y:[-60,-40,-20,0,20,40,60]};
+const SST_ANOM_TICKS={x:[-6,-4,-2,0,2,4,6],y:[-2,-1,0,1,2]};
+const OBS1_TAIL=60;
 
-// ═══════════════════════════════════════════════════════
+const OBS1 = {
+  running:false, paused:false,
+  obsIdx:0, calIdx:0,
+  obsStartIdx:0, calStartIdx:0,
+  totalFrames:0,
+  wasRunningBeforeScrub:false,
+  spf:1, delay:30,
+  obsTail:[], calTail:[],
+  rafId:null,
+  sstCanvas:null, sstCtx:null, sstOff:null, sstOffCtx:null,
+  calCanvas:null, calCtx:null, calOff:null, calOffCtx:null,
+};
+
+function obs1DrawBgs() {
+  drawBg(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1_LABELS_SST, SST_ANOM_TICKS);
+  drawBg(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1_LABELS_CAL, CAL_SSH_TICKS);
+}
+
+function obs1Init() {
+  OBS1.sstCanvas = document.getElementById('obs1-sst-canvas');
+  OBS1.sstCtx    = OBS1.sstCanvas.getContext('2d');
+  OBS1.sstOff    = makeOff(OBS1_CW, OBS1_CH);
+  OBS1.sstOffCtx = OBS1.sstOff.getContext('2d');
+
+  OBS1.calCanvas = document.getElementById('obs1-cal-canvas');
+  OBS1.calCtx    = OBS1.calCanvas.getContext('2d');
+  OBS1.calOff    = makeOff(OBS1_CW, OBS1_CH);
+  OBS1.calOffCtx = OBS1.calOff.getContext('2d');
+
+  const cs = _cmpCommonStart();
+  OBS1.obsStartIdx = cs.obsStartIdx;
+  OBS1.calStartIdx = cs.calStartIdx;
+  OBS1.totalFrames = Math.min(OBS_N-cs.obsStartIdx, CAL_N-cs.calStartIdx);
+  OBS1.obsIdx = cs.obsStartIdx;
+  OBS1.calIdx = cs.calStartIdx;
+
+  obs1DrawBgs();
+
+  const slSpf   = document.getElementById('obs1-sl-spf');
+  const slDelay = document.getElementById('obs1-sl-delay');
+  if (slSpf)   slSpf.addEventListener('input',  ()=>{ OBS1.spf=parseInt(slSpf.value)||1;    document.getElementById('obs1-lbl-spf').textContent=slSpf.value; });
+  if (slDelay) slDelay.addEventListener('input', ()=>{ OBS1.delay=parseInt(slDelay.value)||0; document.getElementById('obs1-lbl-delay').textContent=slDelay.value; });
+
+  const scrubEl = document.getElementById('obs1-scrubber');
+  if (scrubEl) {
+    scrubEl.addEventListener('mousedown', () => {
+      OBS1.wasRunningBeforeScrub = OBS1.running && !OBS1.paused;
+      if (OBS1.wasRunningBeforeScrub) {
+        OBS1.paused = true;
+        if (OBS1.rafId) cancelAnimationFrame(OBS1.rafId);
+        document.getElementById('obs1-pause').innerHTML='&#9654; Resume';
+      }
+    });
+    scrubEl.addEventListener('input', function() {
+      if (!OBS1.running && OBS1.totalFrames === 0) return;
+      obs1RedrawToFrame(parseInt(this.value));
+    });
+    scrubEl.addEventListener('mouseup', function() {
+      if (OBS1.wasRunningBeforeScrub && OBS1.running) {
+        OBS1.paused = false;
+        document.getElementById('obs1-pause').innerHTML='&#9646;&#9646; Pause';
+        OBS1.rafId = setTimeout(()=>requestAnimationFrame(obs1Loop), OBS1.delay);
+      }
+      OBS1.wasRunningBeforeScrub = false;
+    });
+    scrubEl.addEventListener('touchstart', () => {
+      OBS1.wasRunningBeforeScrub = OBS1.running && !OBS1.paused;
+      if (OBS1.wasRunningBeforeScrub) {
+        OBS1.paused = true;
+        if (OBS1.rafId) cancelAnimationFrame(OBS1.rafId);
+      }
+    }, {passive:true});
+    scrubEl.addEventListener('touchend', function() {
+      if (OBS1.wasRunningBeforeScrub && OBS1.running) {
+        OBS1.paused = false;
+        OBS1.rafId = setTimeout(()=>requestAnimationFrame(obs1Loop), OBS1.delay);
+      }
+      OBS1.wasRunningBeforeScrub = false;
+    });
+  }
+}
+
+function obs1Loop() {
+  if (!OBS1.running || OBS1.paused) return;
+  const spf = OBS1.spf;
+  for (let i=0; i<spf; i++) {
+    if (OBS1.obsIdx >= OBS_N) { obs1Finish(); return; }
+    const ox = observedData.x[OBS1.obsIdx] - obsMean;
+    const oy = observedData.y[OBS1.obsIdx];
+    pushTail(OBS1.obsTail, ox, oy, observedData.month[OBS1.obsIdx], OBS1_TAIL, OBS1.sstOffCtx, OBS1_PLT, OBS1_DOM_SST);
+    OBS1.obsIdx++;
+    if (OBS1.calIdx < CAL_N) {
+      const cx = callaoData.x[OBS1.calIdx] - callaoMean;
+      const cy = callaoData.y[OBS1.calIdx];
+      pushTail(OBS1.calTail, cx, cy, callaoData.month[OBS1.calIdx], OBS1_TAIL, OBS1.calOffCtx, OBS1_PLT, OBS1_DOM_CAL);
+      OBS1.calIdx++;
+    }
+  }
+  const tIdx = Math.min(OBS1.obsIdx, OBS_N-1);
+  const dispStr = MO_NAMES[observedData.month[tIdx]-1] + ' ' + observedData.year[tIdx];
+  obs1DrawBgs();
+  compositeFrame(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1.sstOff, OBS1.obsTail, dispStr);
+  compositeFrame(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1.calOff, OBS1.calTail, null);
+  document.getElementById('obs1-time-display').textContent =
+    observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
+  const scrub = document.getElementById('obs1-scrubber');
+  if (scrub) scrub.value = OBS1.obsIdx - OBS1.obsStartIdx;
+  obs1Status();
+  if (OBS1.running) OBS1.rafId = setTimeout(()=>requestAnimationFrame(obs1Loop), OBS1.delay);
+}
+
+function obs1Status() {
+  const el = document.getElementById('obs1-status');
+  if (!el) return;
+  const f = OBS1.obsIdx - OBS1.obsStartIdx;
+  const pct = OBS1.totalFrames > 0 ? (f/OBS1.totalFrames*100).toFixed(1) : '0.0';
+  const cls = OBS1.paused?'st-paused':(OBS1.running?'st-running':'st-done');
+  const st  = OBS1.paused?'&#9646;&#9646; Paused':(OBS1.running?'&#9654; Running':'&#9632; Done');
+  el.innerHTML=`<span class="${cls}">${st}</span> &nbsp;·&nbsp; ${f}/${OBS1.totalFrames} pts (${pct}%)`;
+}
+
+function obs1Start() {
+  if (OBS1.running) return;
+  OBS1.spf   = parseInt(document.getElementById('obs1-sl-spf')?.value)||1;
+  OBS1.delay = parseInt(document.getElementById('obs1-sl-delay')?.value)||30;
+  const cs = _cmpCommonStart();
+  OBS1.obsStartIdx = cs.obsStartIdx; OBS1.calStartIdx = cs.calStartIdx;
+  OBS1.obsIdx = cs.obsStartIdx;      OBS1.calIdx = cs.calStartIdx;
+  OBS1.totalFrames = Math.min(OBS_N-cs.obsStartIdx, CAL_N-cs.calStartIdx);
+  OBS1.obsTail=[]; OBS1.calTail=[];
+  OBS1.running=true; OBS1.paused=false;
+  OBS1.sstOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
+  OBS1.calOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
+  obs1DrawBgs();
+  const scrub = document.getElementById('obs1-scrubber');
+  if (scrub) { scrub.max=OBS1.totalFrames-1; scrub.value=0; }
+  document.getElementById('obs1-time-display').textContent = 'Jan '+cs.startYear;
+  setBtn('obs1-run',true); setBtn('obs1-pause',false);
+  document.getElementById('obs1-pause').innerHTML='&#9646;&#9646; Pause';
+  OBS1.rafId = setTimeout(()=>requestAnimationFrame(obs1Loop), OBS1.delay);
+}
+
+function obs1Pause() {
+  if (!OBS1.running) return;
+  OBS1.paused = !OBS1.paused;
+  const btn = document.getElementById('obs1-pause');
+  if (OBS1.paused) {
+    cancelAnimationFrame(OBS1.rafId);
+    btn.innerHTML='&#9654; Resume';
+  } else {
+    btn.innerHTML='&#9646;&#9646; Pause';
+    OBS1.rafId = setTimeout(()=>requestAnimationFrame(obs1Loop), OBS1.delay);
+  }
+  obs1Status();
+}
+
+function obs1Finish() {
+  OBS1.running=false; OBS1.paused=false;
+  if (OBS1.rafId) cancelAnimationFrame(OBS1.rafId);
+  setBtn('obs1-run',false); setBtn('obs1-pause',true);
+  document.getElementById('obs1-pause').innerHTML='&#9646;&#9646; Pause';
+  obs1Status();
+}
+
+function obs1Reset() {
+  obs1Finish();
+  const cs = _cmpCommonStart();
+  OBS1.obsIdx = cs.obsStartIdx; OBS1.calIdx = cs.calStartIdx;
+  OBS1.obsTail=[]; OBS1.calTail=[];
+  OBS1.sstOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
+  OBS1.calOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
+  obs1DrawBgs();
+  const scrub = document.getElementById('obs1-scrubber');
+  if (scrub) scrub.value=0;
+  document.getElementById('obs1-time-display').textContent = 'Jan 1975';
+  document.getElementById('obs1-status').innerHTML='<span class="st-ready">Ready</span>';
+}
+
+function obs1RedrawToFrame(targetFrame) {
+  if (!OBS1.sstOffCtx) return;
+  const frame = Math.max(0, Math.min(targetFrame, OBS1.totalFrames-1));
+  const obsStart = OBS1.obsStartIdx, calStart = OBS1.calStartIdx;
+  OBS1.sstOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
+  OBS1.calOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
+  let obsTail=[], calTail=[];
+  for (let f=0; f<frame; f++) {
+    const oi=obsStart+f, ci=calStart+f;
+    if (oi<OBS_N) {
+      const ox=observedData.x[oi]-obsMean, oy=observedData.y[oi];
+      pushTail(obsTail, ox, oy, observedData.month[oi], OBS1_TAIL, OBS1.sstOffCtx, OBS1_PLT, OBS1_DOM_SST);
+    }
+    if (ci<CAL_N) {
+      const cx=callaoData.x[ci]-callaoMean, cy=callaoData.y[ci];
+      pushTail(calTail, cx, cy, callaoData.month[ci], OBS1_TAIL, OBS1.calOffCtx, OBS1_PLT, OBS1_DOM_CAL);
+    }
+  }
+  OBS1.obsIdx=obsStart+frame; OBS1.calIdx=calStart+frame;
+  OBS1.obsTail=obsTail; OBS1.calTail=calTail;
+  const tIdx=Math.min(OBS1.obsIdx, OBS_N-1);
+  const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
+  obs1DrawBgs();
+  compositeFrame(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1.sstOff, OBS1.obsTail, dispStr);
+  compositeFrame(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1.calOff, OBS1.calTail, null);
+  document.getElementById('obs1-time-display').textContent =
+    observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
+  const scrub = document.getElementById('obs1-scrubber');
+  if (scrub) scrub.value = frame;
+  obs1Status();
+}
+
 // 3. RK4 STEP — exact translation of NL3System.java / DoubleWell.java
 // ═══════════════════════════════════════════════════════
 const W_ANN = 2 * Math.PI / 12;
@@ -777,20 +932,25 @@ function monthLabel(step, startYear) {
  *  DOMAIN = {xmin,xmax,ymin,ymax}
  *  labels = {x:string, y:string}
  */
-function drawBg(ctx, CW, CH, PLT, DOM, labels) {
+function drawBg(ctx, CW, CH, PLT, DOM, labels, ticks) {
   const mx = x => PLT.l + (x-DOM.xmin)/(DOM.xmax-DOM.xmin)*(PLT.r-PLT.l);
   const my = y => PLT.b - (y-DOM.ymin)/(DOM.ymax-DOM.ymin)*(PLT.b-PLT.t);
 
   ctx.fillStyle = '#0a0a0e';
   ctx.fillRect(0, 0, CW, CH);
 
-  // Grid
+  // Grid — use explicit ticks if provided, else every integer
   ctx.strokeStyle = '#1a1a2a'; ctx.lineWidth = 0.5;
-  for (let x=Math.ceil(DOM.xmin); x<=Math.floor(DOM.xmax); x++) {
-    ctx.beginPath(); ctx.moveTo(mx(x),PLT.t); ctx.lineTo(mx(x),PLT.b); ctx.stroke();
-  }
-  for (let y=Math.ceil(DOM.ymin); y<=Math.floor(DOM.ymax); y++) {
-    ctx.beginPath(); ctx.moveTo(PLT.l,my(y)); ctx.lineTo(PLT.r,my(y)); ctx.stroke();
+  if (ticks) {
+    ticks.x.forEach(x => { ctx.beginPath(); ctx.moveTo(mx(x),PLT.t); ctx.lineTo(mx(x),PLT.b); ctx.stroke(); });
+    ticks.y.forEach(y => { ctx.beginPath(); ctx.moveTo(PLT.l,my(y)); ctx.lineTo(PLT.r,my(y)); ctx.stroke(); });
+  } else {
+    for (let x=Math.ceil(DOM.xmin); x<=Math.floor(DOM.xmax); x++) {
+      ctx.beginPath(); ctx.moveTo(mx(x),PLT.t); ctx.lineTo(mx(x),PLT.b); ctx.stroke();
+    }
+    for (let y=Math.ceil(DOM.ymin); y<=Math.floor(DOM.ymax); y++) {
+      ctx.beginPath(); ctx.moveTo(PLT.l,my(y)); ctx.lineTo(PLT.r,my(y)); ctx.stroke();
+    }
   }
 
   // Zero axes (dashed)
@@ -806,8 +966,12 @@ function drawBg(ctx, CW, CH, PLT, DOM, labels) {
 
   // X tick labels
   ctx.fillStyle='#555568'; ctx.font='10px monospace'; ctx.textAlign='center';
-  for (let x=Math.ceil(DOM.xmin); x<=Math.floor(DOM.xmax); x+=2) {
-    ctx.fillText(x, mx(x), PLT.b+14);
+  if (ticks) {
+    ticks.x.forEach(x => ctx.fillText(x, mx(x), PLT.b+14));
+  } else {
+    for (let x=Math.ceil(DOM.xmin); x<=Math.floor(DOM.xmax); x+=2) {
+      ctx.fillText(x, mx(x), PLT.b+14);
+    }
   }
   ctx.fillStyle='#3a3a50';
   ctx.fillText(labels.x, (PLT.l+PLT.r)/2, CH-3);
@@ -815,8 +979,12 @@ function drawBg(ctx, CW, CH, PLT, DOM, labels) {
   // Y tick labels
   ctx.textAlign='right';
   ctx.fillStyle='#555568';
-  for (let y=Math.ceil(DOM.ymin); y<=Math.floor(DOM.ymax); y++) {
-    ctx.fillText(y.toFixed(0), PLT.l-5, my(y)+4);
+  if (ticks) {
+    ticks.y.forEach(y => ctx.fillText(y.toFixed(0), PLT.l-5, my(y)+4));
+  } else {
+    for (let y=Math.ceil(DOM.ymin); y<=Math.floor(DOM.ymax); y++) {
+      ctx.fillText(y.toFixed(0), PLT.l-5, my(y)+4);
+    }
   }
   ctx.save();
   ctx.fillStyle='#3a3a50';
@@ -1035,7 +1203,7 @@ function s2Reset() {
   const _s2scrubR = document.getElementById('s2-scrubber');
   if (_s2scrubR) _s2scrubR.value=0;
   const _s2tdR = document.getElementById('s2-time-display');
-  if (_s2tdR) _s2tdR.textContent = 'Jan ' + (S2.startYear||1975);
+  if (_s2tdR) _s2tdR.textContent = 't = 0.0 months';
   document.getElementById('s2-status').innerHTML='<span class="st-ready">Ready</span>';
 }
 function s2Status() {
@@ -1181,7 +1349,7 @@ function cmpInit() {
 
 function cmpDrawBgs() {
   drawBg(CMP.obsCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_OBS, CMP_LABELS_OBS);
-  drawBg(CMP.calCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_CAL, CMP_LABELS_CAL);
+  drawBg(CMP.calCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_CAL, CMP_LABELS_CAL, CAL_SSH_TICKS);
   drawBg(CMP.modCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_MOD, CMP_LABELS_MOD);
 }
 
@@ -1332,7 +1500,7 @@ function cmpLoop() {
   drawBg(CMP.obsCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_OBS, CMP_LABELS_OBS);
   compositeFrame(CMP.obsCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_OBS, CMP.obsOff, CMP.obsTail, dispStr);
 
-  drawBg(CMP.calCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_CAL, CMP_LABELS_CAL);
+  drawBg(CMP.calCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_CAL, CMP_LABELS_CAL, CAL_SSH_TICKS);
   compositeFrame(CMP.calCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_CAL, CMP.calOff, CMP.calTail, null);
 
   drawBg(CMP.modCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_MOD, CMP_LABELS_MOD);
@@ -1743,6 +1911,7 @@ function init3D() {
 // 9. INITIALISE ON PAGE LOAD
 // ═══════════════════════════════════════════════════════
 window.addEventListener('load', () => {
+  obs1Init();
   s2Init();
   cmpInit();
   updateEffSpeed();
