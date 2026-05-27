@@ -312,6 +312,17 @@ footer a:hover { text-decoration:underline; }
     </div>
   </div>
 
+  <div style="margin:.5rem 0 1rem;">
+    <input type="range" id="cmp-scrubber" min="0" max="100" value="0"
+           style="width:100%;cursor:pointer;accent-color:var(--accent);"
+           title="Drag to scrub through time">
+    <div id="cmp-time-display"
+         style="text-align:center;font-family:monospace;font-size:.82rem;
+                color:var(--muted);margin-top:.25rem;letter-spacing:.04em">
+      1975 / 01
+    </div>
+  </div>
+
   <div class="poin-wrap">
     <h3 class="sec-sub">Poincaré Section — Strange Attractor Cross-Section</h3>
     <div class="poin-label">
@@ -353,14 +364,14 @@ footer a:hover { text-decoration:underline; }
 <div class="container">
   <h2>Strange Attractor in 3D — Phase Space × Time</h2>
   <div class="science-box">
-    <strong>Poincaré spiral:</strong> instead of plotting every point of the trajectory, we sample
-    the phase space at four fixed calendar phases per year — March, June, September, December.
-    Each dot is the system's position (T, dT/dt) exactly once per year at that month.
-    In a perfectly periodic system all dots in one column would stack on top of each other.
-    The <em>vertical scatter</em> within each column is a direct measure of chaos: the more
-    spread out the dots, the more the ENSO cycle differs from year to year at that phase.
-    Compare the observed SST columns (wide scatter — chaotic) with the Duffing Equation columns
-    (tighter — the model is less chaotic than the real climate system).
+    Each dot represents the state of the system at the start of one calendar month, colored by
+    month of year (Jan–Dec). The vertical axis is time — each year appears as a ring of 12 colored
+    dots stacked above the previous year. A perfectly periodic system would produce
+    <strong>12 vertical straight lines</strong>, one per month. The irregular drift and scatter
+    of these columns reveals the <em>chaotic, non-repeating</em> nature of ENSO: each El Niño event
+    visits a different region of phase space, and no two annual cycles are identical. Compare the
+    observed SST columns (wide scatter — strongly chaotic) with the Duffing Equation columns
+    (tighter — the model captures the geometry but is less chaotic than the real climate system).
   </div>
   <div class="two-col">
     <div class="plot-box">
@@ -771,6 +782,10 @@ const CMP = {
   running:false, paused:false,
   obsIdx:0,           // SST data index (0..OBS_N-1)
   calIdx:0,           // Callao data index (0..CAL_N-1)
+  obsStartIdx:0,      // aligned start index in observedData
+  calStartIdx:0,      // aligned start index in callaoData
+  totalFrames:0,      // min(OBS_N-obsStartIdx, CAL_N-calStartIdx)
+  wasRunningBeforeScrub:false,
   // model state
   modStep:0,          // integer step counter (t_mod = modStep * 0.2)
   modX:0, modY:0,
@@ -804,12 +819,145 @@ function cmpInit() {
 
   cmpDrawBgs();
   poincareInit();
+
+  // Scrubber — drag to jump to any frame
+  const scrubEl = document.getElementById('cmp-scrubber');
+  if (scrubEl) {
+    scrubEl.addEventListener('mousedown', () => {
+      CMP.wasRunningBeforeScrub = CMP.running && !CMP.paused;
+      if (CMP.wasRunningBeforeScrub) {
+        CMP.paused = true;
+        if (CMP.rafId) cancelAnimationFrame(CMP.rafId);
+        document.getElementById('cmp-pause').innerHTML='&#9654; Resume';
+      }
+    });
+    scrubEl.addEventListener('input', function() {
+      if (!CMP.running && CMP.totalFrames === 0) return;
+      redrawToFrame(parseInt(this.value));
+      cmpStatus();
+    });
+    scrubEl.addEventListener('mouseup', function() {
+      if (CMP.wasRunningBeforeScrub && CMP.running) {
+        CMP.paused = false;
+        document.getElementById('cmp-pause').innerHTML='&#9646;&#9646; Pause';
+        const d = parseInt(document.getElementById('nb-delay').value);
+        CMP.rafId = setTimeout(()=>requestAnimationFrame(cmpLoop), d);
+      }
+      CMP.wasRunningBeforeScrub = false;
+    });
+    // Touch support
+    scrubEl.addEventListener('touchstart', () => {
+      CMP.wasRunningBeforeScrub = CMP.running && !CMP.paused;
+      if (CMP.wasRunningBeforeScrub) {
+        CMP.paused = true;
+        if (CMP.rafId) cancelAnimationFrame(CMP.rafId);
+      }
+    }, {passive:true});
+    scrubEl.addEventListener('touchend', function() {
+      if (CMP.wasRunningBeforeScrub && CMP.running) {
+        CMP.paused = false;
+        const d = parseInt(document.getElementById('nb-delay').value);
+        CMP.rafId = setTimeout(()=>requestAnimationFrame(cmpLoop), d);
+      }
+      CMP.wasRunningBeforeScrub = false;
+    });
+  }
 }
 
 function cmpDrawBgs() {
   drawBg(CMP.obsCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_OBS, CMP_LABELS_OBS);
   drawBg(CMP.calCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_CAL, CMP_LABELS_CAL);
   drawBg(CMP.modCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_MOD, CMP_LABELS_MOD);
+}
+
+// Find the common aligned start for the comparison animation.
+// Returns { startYear, startMonth, obsStartIdx, calStartIdx }.
+// SST starts 1975/01, Callao starts 1970/01 → common = 1975/01.
+function _cmpCommonStart() {
+  const obsYM = observedData.year[0]*12 + observedData.month[0];
+  const calYM = callaoData.year[0]  *12 + callaoData.month[0];
+  const common = Math.max(obsYM, calYM);
+  let obsIdx=0;
+  while (obsIdx<OBS_N && observedData.year[obsIdx]*12+observedData.month[obsIdx]<common) obsIdx++;
+  let calIdx=0;
+  while (calIdx<CAL_N && callaoData.year[calIdx]*12+callaoData.month[calIdx]<common)   calIdx++;
+  return {
+    startYear:  observedData.year[obsIdx],
+    startMonth: observedData.month[obsIdx],
+    obsStartIdx: obsIdx,
+    calStartIdx: calIdx,
+  };
+}
+
+// Replay all three canvases from aligned start to targetFrame.
+// Slower than the incremental approach but correct for scrubbing.
+function redrawToFrame(targetFrame) {
+  if (!CMP.obsOffCtx) return;
+  const frame = Math.max(0, Math.min(targetFrame, CMP.totalFrames-1));
+  const p = CMP.params || getParams();
+  const DT_MOD = 0.2;
+  const obsStart = CMP.obsStartIdx;
+  const calStart = CMP.calStartIdx;
+
+  CMP.obsOffCtx.clearRect(0,0,CMP_CW,CMP_CH);
+  CMP.calOffCtx.clearRect(0,0,CMP_CW,CMP_CH);
+  CMP.modOffCtx.clearRect(0,0,CMP_CW,CMP_CH);
+  CMP.poiObs=[]; CMP.poiCal=[]; CMP.poiMod=[];
+  poincareReset();
+
+  let obsTail=[], calTail=[], modTail=[];
+  let modX=0, modY=0, modStep=0;
+
+  for (let f=0; f<frame; f++) {
+    const oi=obsStart+f, ci=calStart+f;
+
+    if (oi<OBS_N) {
+      const ox=observedData.x[oi], oy=observedData.y[oi];
+      pushTail(obsTail, ox, oy, observedData.month[oi], CMP_TAIL, CMP.obsOffCtx, CMP_PLT, CMP_DOM_OBS);
+      if (observedData.irest[oi]===0 && observedData.month[oi]===CMP.selectedMonth) {
+        CMP.poiObs.push({x:ox, y:oy, year:observedData.year[oi]});
+        poincareAddDot(ox, oy, observedData.year[oi], CMP_DOM_OBS, 'obs');
+      }
+    }
+    if (ci<CAL_N) {
+      const cx=callaoData.x[ci]-callaoMean, cy=callaoData.y[ci];
+      pushTail(calTail, cx, cy, callaoData.month[ci], CMP_TAIL, CMP.calOffCtx, CMP_PLT, CMP_DOM_CAL);
+      if (callaoData.irest[ci]===0 && callaoData.month[ci]===CMP.selectedMonth) {
+        CMP.poiCal.push({x:cx, y:cy, year:callaoData.year[ci]});
+        poincareAddDot(cx, cy, callaoData.year[ci], CMP_DOM_CAL, 'cal');
+      }
+    }
+    const prevMonthFloor=Math.floor(modStep/5);
+    const prevModT=modStep*DT_MOD;
+    const s=rk4Step(prevModT,modX,modY,p,DT_MOD);
+    modX=s.X; modY=s.Y; modStep++;
+    const modMonth=(Math.floor(prevModT)%12)+1;
+    pushTail(modTail, modX, modY, modMonth, CMP_TAIL, CMP.modOffCtx, CMP_PLT, CMP_DOM_MOD);
+    const currMonthFloor=Math.floor(modStep/5);
+    if (currMonthFloor>prevMonthFloor) {
+      const monthIdx=currMonthFloor%12;
+      if (monthIdx===CMP.selectedMonth-1) {
+        const yr=CMP.startYear+Math.floor(currMonthFloor/12);
+        CMP.poiMod.push({x:modX,y:modY,year:yr});
+        poincareAddDot(modX,modY,yr,CMP_DOM_MOD,'mod');
+      }
+    }
+  }
+
+  CMP.obsIdx=obsStart+frame; CMP.calIdx=calStart+frame;
+  CMP.modStep=modStep; CMP.modX=modX; CMP.modY=modY;
+  CMP.obsTail=obsTail; CMP.calTail=calTail; CMP.modTail=modTail;
+
+  const tIdx=Math.min(CMP.obsIdx,OBS_N-1);
+  const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
+  cmpDrawBgs();
+  compositeFrame(CMP.obsCtx,CMP_CW,CMP_CH,CMP_PLT,CMP_DOM_OBS,CMP.obsOff,CMP.obsTail,dispStr);
+  compositeFrame(CMP.calCtx,CMP_CW,CMP_CH,CMP_PLT,CMP_DOM_CAL,CMP.calOff,CMP.calTail,null);
+  compositeFrame(CMP.modCtx,CMP_CW,CMP_CH,CMP_PLT,CMP_DOM_MOD,CMP.modOff,CMP.modTail,null);
+  document.getElementById('cmp-timelabel').textContent=dispStr;
+  document.getElementById('cmp-time-display').textContent=
+    observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
+  cmpStatus();
 }
 
 function cmpLoop() {
@@ -825,7 +973,7 @@ function cmpLoop() {
     const ox = observedData.x[CMP.obsIdx];
     const oy = observedData.y[CMP.obsIdx];
     pushTail(CMP.obsTail, ox, oy, observedData.month[CMP.obsIdx], CMP_TAIL, CMP.obsOffCtx, CMP_PLT, CMP_DOM_OBS);
-    if (CMP.obsIdx % 5 === 0 && observedData.month[CMP.obsIdx] === CMP.selectedMonth) {
+    if (observedData.irest[CMP.obsIdx] === 0 && observedData.month[CMP.obsIdx] === CMP.selectedMonth) {
       CMP.poiObs.push({x:ox, y:oy, year:observedData.year[CMP.obsIdx]});
       poincareAddDot(ox, oy, observedData.year[CMP.obsIdx], CMP_DOM_OBS, 'obs');
     }
@@ -876,6 +1024,10 @@ function cmpLoop() {
   compositeFrame(CMP.modCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_MOD, CMP.modOff, CMP.modTail, null);
 
   document.getElementById('cmp-timelabel').textContent = dispStr;
+  document.getElementById('cmp-time-display').textContent =
+    observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
+  const scrub = document.getElementById('cmp-scrubber');
+  if (scrub) scrub.value = CMP.obsIdx - CMP.obsStartIdx;
   cmpStatus();
 
   const delay = parseInt(document.getElementById('nb-delay').value);
@@ -884,10 +1036,18 @@ function cmpLoop() {
 
 function cmpStart() {
   if (CMP.running) return;
-  CMP.params     = getParams();
-  CMP.startYear  = parseInt(document.getElementById('nb-styear').value)||1975;
+  CMP.params    = getParams();
   CMP.selectedMonth = parseInt(document.getElementById('sel-month').value);
-  CMP.obsIdx=0; CMP.calIdx=0; CMP.modStep=0; CMP.modX=0; CMP.modY=0;
+
+  // Align both datasets to their common start date
+  const cs = _cmpCommonStart();
+  CMP.obsStartIdx = cs.obsStartIdx;
+  CMP.calStartIdx = cs.calStartIdx;
+  CMP.startYear   = cs.startYear;
+  CMP.obsIdx=cs.obsStartIdx; CMP.calIdx=cs.calStartIdx;
+  CMP.modStep=0; CMP.modX=0; CMP.modY=0;
+  CMP.totalFrames = Math.min(OBS_N-cs.obsStartIdx, CAL_N-cs.calStartIdx);
+
   CMP.obsTail=[]; CMP.calTail=[]; CMP.modTail=[];
   CMP.poiObs=[]; CMP.poiCal=[]; CMP.poiMod=[];
   CMP.running=true; CMP.paused=false;
@@ -896,6 +1056,13 @@ function cmpStart() {
   CMP.modOffCtx.clearRect(0,0,CMP_CW,CMP_CH);
   cmpDrawBgs();
   poincareReset();
+
+  // Configure scrubber
+  const scrub = document.getElementById('cmp-scrubber');
+  if (scrub) { scrub.max=CMP.totalFrames-1; scrub.value=0; }
+  document.getElementById('cmp-time-display').textContent =
+    cs.startYear+' / '+String(cs.startMonth).padStart(2,'0');
+
   setBtn('cmp-run',true); setBtn('cmp-pause',false);
   document.getElementById('cmp-pause').innerHTML='&#9646;&#9646; Pause';
   const delay = parseInt(document.getElementById('nb-delay').value);
@@ -930,7 +1097,10 @@ function cmpReset() {
   CMP.modOffCtx.clearRect(0,0,CMP_CW,CMP_CH);
   cmpDrawBgs();
   poincareReset();
-  document.getElementById('cmp-timelabel').textContent = 'Jan 1975';
+  const _cs = _cmpCommonStart();
+  document.getElementById('cmp-timelabel').textContent = MO_NAMES[_cs.startMonth-1]+' '+_cs.startYear;
+  document.getElementById('cmp-time-display').textContent =
+    _cs.startYear+' / '+String(_cs.startMonth).padStart(2,'0');
   document.getElementById('cmp-status').innerHTML='<span class="st-ready">Ready — uses speed controls from Section 2.</span>';
 }
 function cmpStatus() {
@@ -1148,47 +1318,40 @@ function resetParams() {
 
 
 // ═══════════════════════════════════════════════════════
-// 8b. SECTION 5 — 3D Strange Attractor (Poincaré Spiral)
+// 8b. SECTION 5 — 3D Strange Attractor (Poincaré Spiral, 12 months/year)
 // ═══════════════════════════════════════════════════════
 //
-// Instead of a continuous spiral (all 3000+ points), we sample the
-// trajectory at four fixed calendar phases per year: March, June,
-// September, December.  Each phase produces a distinct trace.
+// Sample the phase trajectory at the start of every calendar month:
+//   - SST observed: irest===0 gives exactly 12 dots per year.
+//   - Duffing model: sample every 25 RK4 steps (= 1 month at dt=0.04).
 //
-// For the observed SST the z-axis is the fractional calendar year
-// (year + (month-1)/12), so each trace forms a vertical column at
-// the phase-space positions visited every year at that calendar month.
-// Vertical scatter within a column is evidence of chaos: a perfectly
-// periodic oscillation would stack on a single point per column.
-//
-// For the Duffing Equation the z-axis is t (months from t=0).  The
-// same four phases (t mod 12 ∈ {3,6,9,12}) are sampled.  The model
-// columns are typically much tighter than the observed ones — a
-// reminder that the Duffing oscillator is only a qualitative analogy
-// for the true chaotic attractor.
-//
-// Sampling months: 3=Mar, 6=Jun, 9=Sep, 12=Dec
-// ~200 dots per plot (50 years × 4 phases × 1 dot each).
+// 12 Plotly traces, one per month.  Vertical scatter in each column
+// reveals chaos: a perfectly periodic system would produce 12 vertical
+// straight lines.
 function init3D() {
-  const POI_MONTHS = [3,6,9,12];
-  const POI_NAMES  = ['March','June','September','December'];
-  // Use the same 4 season colours mapped to the 4 sampling months
-  const POI_COLORS = ['#FF6B35','#4ECDC4','#45B7D1','#96CEB4'];
+  const MON_NAMES_3D = ['Jan','Feb','Mar','Apr','May','Jun',
+                        'Jul','Aug','Sep','Oct','Nov','Dec'];
+  // 12 perceptually distinct colors — one per calendar month
+  const MON_COLORS_12 = [
+    '#e41a1c','#f46d43','#fdae61','#fee08b',
+    '#a6d96a','#66c2a5','#3288bd','#5e4fa2',
+    '#984ea3','#f781bf','#b2df8a','#999999',
+  ];
 
-  // ── SST observed Poincaré spiral ──────────────────────────────────
-  const traces3dObs = POI_MONTHS.map((mo, mi) => {
-    const xi=[],yi=[],zi=[];
-    for (let i=0;i<OBS_N;i++) {
-      if (observedData.irest[i]===0 && observedData.month[i]===mo) {
+  // ── SST observed: 12 monthly traces ──────────────────────────────
+  const obsTraces = MON_NAMES_3D.map((name, mi) => {
+    const xi=[], yi=[], zi=[];
+    for (let i=0; i<OBS_N; i++) {
+      if (observedData.irest[i]===0 && observedData.month[i]===(mi+1)) {
         xi.push(observedData.x[i]);
         yi.push(observedData.y[i]);
-        zi.push(observedData.year[i] + (mo-1)/12);
+        zi.push(observedData.year[i] + mi/12);
       }
     }
     return {type:'scatter3d', mode:'markers',
       x:xi, y:yi, z:zi,
-      marker:{size:6, color:POI_COLORS[mi], opacity:0.88},
-      name:POI_NAMES[mi], showlegend:true};
+      marker:{size:5, color:MON_COLORS_12[mi], opacity:0.88},
+      name:name, showlegend:true};
   });
   const layout3dObs = {
     paper_bgcolor:'#0a0a0e',
@@ -1200,43 +1363,39 @@ function init3D() {
       camera:{eye:{x:1.5,y:1.5,z:0.8}}
     },
     font:{color:'#e8e8f0'},
-    title:{text:'Poincaré Spiral — SST NINO1+2 · 4 phases per year (Mar/Jun/Sep/Dec)',
+    title:{text:'Poincaré Spiral — SST NINO1+2 · monthly sampling (12 points/year)',
            font:{color:'#e8e8f0',size:13}},
     margin:{l:0,r:0,t:44,b:0},
     showlegend:true,
-    legend:{font:{color:'#888899',size:11}, bgcolor:'rgba(10,10,14,0.8)'}
+    legend:{font:{color:'#888899',size:10}, bgcolor:'rgba(10,10,14,0.8)',
+            orientation:'v', x:1.02, y:1}
   };
-  Plotly.newPlot('plot-3d-obs', traces3dObs, layout3dObs, {responsive:true, displaylogo:false});
+  Plotly.newPlot('plot-3d-obs', obsTraces, layout3dObs, {responsive:true, displaylogo:false});
 
-  // ── Duffing Equation Poincaré spiral ─────────────────────────────
+  // ── Duffing Equation: 12 monthly traces ──────────────────────────
   const p3d = {K0:0, K1:0.121847, K2:0, K3:-0.03046, K4:0, K5:0,
                FA:0.4873, FF:-60, FA2:0, FF2:0, B:-0.35465};
-  // Integrate 600 months with fine dt=0.04 (25 steps/month) so monthly
-  // phases land accurately.  We sample exactly where the integer-month
-  // counter matches the target month.
-  const DT3D=0.04, STEPS3D=Math.round(600/DT3D);
-  // Pre-bucket by sampling month into 4 traces
-  const modBuckets = POI_MONTHS.map(() => ({xi:[],yi:[],zi:[]}));
+  // dt=0.04 → 25 steps per month; 600 months total
+  const DT3D=0.04, STEPS3D=Math.round(600/DT3D);  // 15000 steps
+  const STEPS_PER_MON = Math.round(1/DT3D);        // 25
+  const modBuckets = MON_NAMES_3D.map(() => ({xi:[],yi:[],zi:[]}));
   let X3=0, Y3=0, t3=0;
-  for (let s=0;s<STEPS3D;s++) {
-    const mo3 = (Math.floor(t3)%12)+1;
-    // sample at the exact integer-month boundary (irest equivalent: t3 mod 1 < DT3D)
-    if (t3 % 1 < DT3D) {
-      const idx = POI_MONTHS.indexOf(mo3);
-      if (idx >= 0) {
-        modBuckets[idx].xi.push(X3);
-        modBuckets[idx].yi.push(Y3);
-        modBuckets[idx].zi.push(t3);
-      }
+  for (let s=0; s<STEPS3D; s++) {
+    // Sample at the start of each integer-valued month
+    if (s % STEPS_PER_MON === 0) {
+      const mi = (Math.floor(t3) % 12);  // 0-11
+      modBuckets[mi].xi.push(X3);
+      modBuckets[mi].yi.push(Y3);
+      modBuckets[mi].zi.push(t3);
     }
     const st=rk4Step(t3,X3,Y3,p3d,DT3D);
     X3=st.X; Y3=st.Y; t3+=DT3D;
   }
-  const traces3dMod = modBuckets.map((b,mi) => ({
+  const modTraces = modBuckets.map((b, mi) => ({
     type:'scatter3d', mode:'markers',
     x:b.xi, y:b.yi, z:b.zi,
-    marker:{size:6, color:POI_COLORS[mi], opacity:0.88},
-    name:POI_NAMES[mi], showlegend:true
+    marker:{size:5, color:MON_COLORS_12[mi], opacity:0.88},
+    name:MON_NAMES_3D[mi], showlegend:true
   }));
   const layout3dMod = {
     paper_bgcolor:'#0a0a0e',
@@ -1248,13 +1407,14 @@ function init3D() {
       camera:{eye:{x:1.5,y:1.5,z:0.8}}
     },
     font:{color:'#e8e8f0'},
-    title:{text:'Poincaré Spiral — Duffing Equation · 4 phases per year (Mar/Jun/Sep/Dec)',
+    title:{text:'Poincaré Spiral — Duffing Equation · monthly sampling (12 points/year)',
            font:{color:'#e8e8f0',size:13}},
     margin:{l:0,r:0,t:44,b:0},
     showlegend:true,
-    legend:{font:{color:'#888899',size:11}, bgcolor:'rgba(10,10,14,0.8)'}
+    legend:{font:{color:'#888899',size:10}, bgcolor:'rgba(10,10,14,0.8)',
+            orientation:'v', x:1.02, y:1}
   };
-  Plotly.newPlot('plot-3d-mod', traces3dMod, layout3dMod, {responsive:true, displaylogo:false});
+  Plotly.newPlot('plot-3d-mod', modTraces, layout3dMod, {responsive:true, displaylogo:false});
 }
 // ═══════════════════════════════════════════════════════
 // 9. INITIALISE ON PAGE LOAD
