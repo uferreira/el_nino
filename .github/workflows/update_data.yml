@@ -3,7 +3,7 @@ name: Update ENSO data
 on:
   schedule:
     # 1st of every month at 06:00 UTC
-    - cron: '0 6 1 * *'
+    - cron: '0 6 1,15 * *'
   workflow_dispatch:
     inputs:
       sst_only:
