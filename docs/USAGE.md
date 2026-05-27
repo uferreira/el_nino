@@ -499,7 +499,56 @@ data/output/
 
 ---
 
-## 9. The Fortran Verification Test
+## 9. Updating the Website
+
+To update all data and regenerate the website with the latest observations:
+
+```bash
+python scripts/update_website.py
+```
+
+This single command:
+1. Downloads the latest SST from NOAA CPC (updated monthly)
+2. Downloads the latest sea level from UHSLC + RAPID near-real-time (extends
+   to within days of today)
+3. Re-runs the Fourier filter on all updated series
+4. Re-embeds the fresh data arrays in `docs/index.html`
+5. Reports how many new months were added
+
+Then push to GitHub to update the live website:
+
+```bash
+git add docs/index.html
+git commit -m "Update data through $(date +%Y-%m)"
+git push
+```
+
+The website at **https://uferreira.github.io/el_nino/** will update within
+2 minutes of the push.
+
+### Automatic monthly updates
+
+A GitHub Actions workflow (`.github/workflows/update_data.yml`) runs
+automatically on the 1st of every month at 06:00 UTC. It downloads fresh
+data, regenerates the website, and pushes the update — no manual intervention
+needed.
+
+To trigger a manual update from GitHub:
+1. Go to https://github.com/uferreira/el_nino/actions
+2. Click **Update ENSO data**
+3. Click **Run workflow**
+
+### Options
+
+```bash
+python scripts/update_website.py --sst-only   # SST only, skip sea level
+python scripts/update_website.py --dry-run    # compute but write nothing
+python scripts/update_website.py --no-push    # update HTML but skip git push
+```
+
+---
+
+## 10. The Fortran Verification Test
 
 The original analysis was written in Fortran 77. The Python package is a
 faithful translation of `filterfouriergr197501_202502.f`. Numerical
@@ -532,7 +581,7 @@ rounding it before writing.
 
 ---
 
-## 10. Variable Reference
+## 11. Variable Reference
 
 | Variable | Physical meaning | Units | Where set |
 |----------|-----------------|-------|-----------|
@@ -563,7 +612,7 @@ rounding it before writing.
 
 ---
 
-## 11. Common Recipes
+## 12. Common Recipes
 
 ### Recipe 1 — Plot phase diagram for a specific year range
 

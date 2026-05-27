@@ -167,6 +167,22 @@ downloaded automatically from NOAA CPC at runtime.
 
 ---
 
+## Live Website
+
+The interactive phase diagram and Duffing equation simulator are live at:
+
+**https://uferreira.github.io/el_nino/**
+
+The website shows:
+- Observed ENSO attractor (SST NINO1+2, 1975–2026)
+- Observed sea level attractor (Callao, Peru, 1970–2026)
+- Interactive Duffing equation simulator
+- Synchronized comparison animation with timeline scrubber
+- Poincaré section (3 datasets)
+- 3D strange attractor (12 monthly samples per year)
+
+---
+
 ## Quick Start
 
 **1. Run the SST pipeline and plot the phase diagram**
