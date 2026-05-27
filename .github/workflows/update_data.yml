@@ -1,0 +1,60 @@
+name: Update ENSO data
+
+on:
+  schedule:
+    # 1st of every month at 06:00 UTC
+    - cron: '0 6 1 * *'
+  workflow_dispatch:
+    inputs:
+      sst_only:
+        description: 'Update SST only (skip Callao sea level)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Make data/input directory and copy historical SST file
+        # assets/data/sst1950_1981.txt is tracked in the repo;
+        # pipeline.run_sst reads from data/input/ (gitignored).
+        run: |
+          mkdir -p data/input
+          cp assets/data/sst1950_1981.txt data/input/sst1950_1981.txt
+
+      - name: Run update script
+        run: |
+          FLAG=""
+          if [ "${{ github.event.inputs.sst_only }}" = "true" ]; then
+            FLAG="--sst-only"
+          fi
+          python scripts/update_website.py --no-push $FLAG
+
+      - name: Commit and push if HTML changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html
+          if git diff --cached --quiet; then
+            echo "No changes — docs/index.html is already up to date."
+          else
+            MONTH=$(date -u '+%Y-%m')
+            git commit -m "data: update ENSO arrays through ${MONTH} [auto]"
+            git push
+          fi
