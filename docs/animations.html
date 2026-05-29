@@ -577,6 +577,8 @@ function seasonColorAlpha(month, alpha) {
   return 'rgba('+r+','+g+','+b+','+alpha+')';
 }
 
+const CAL_SSH_TICKS={x:[-300,-200,-100,0,100,200,300],y:[-60,-40,-20,0,20,40,60]};
+
 // 3. RK4 STEP — exact translation of NL3System.java / DoubleWell.java
 // ═══════════════════════════════════════════════════════
 const W_ANN = 2 * Math.PI / 12;
