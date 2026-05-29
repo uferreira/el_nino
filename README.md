@@ -9,7 +9,7 @@ interpolated onto a fine grid so that the derivative dT/dt can be computed
 analytically. The resulting phase-space trajectory (T vs dT/dt) traces the
 ENSO attractor — the recurring loop that the coupled ocean–atmosphere system
 follows as it oscillates between El Niño warm events and La Niña cold events.
-The same trajectory can be animated as a rotating strange attractor to reveal
+The same trajectory can be animated as a rotating familiar attractor to reveal
 the quasi-periodic, low-dimensional structure of ENSO dynamics.
 
 ---
@@ -179,7 +179,7 @@ The website shows:
 - Interactive Duffing equation simulator
 - Synchronized comparison animation with timeline scrubber
 - Poincaré section (3 datasets)
-- 3D strange attractor (12 monthly samples per year)
+- 3D familiar attractor (12 monthly samples per year)
 
 ---
 

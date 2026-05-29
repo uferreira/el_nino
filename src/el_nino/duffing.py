@@ -186,7 +186,7 @@ def solve_duffing(
 
     The default time span (600 months = 50 years) is long enough for the
     transient initial conditions to decay and the trajectory to settle
-    onto the strange attractor.  For visual comparisons with NOAA data
+    onto the familiar attractor.  For visual comparisons with NOAA data
     (1975–present, ~600 months), set t_end to match the data length.
 
     Parameters
@@ -215,6 +215,7 @@ def solve_duffing(
         y : ndarray — Y = dX/dt trajectory
     """
     t_eval = np.arange(t_start, t_end + dt * 0.5, dt)
+    t_eval = np.clip(t_eval, t_start, t_end)  # guard against float accumulation in arange
 
     sol = solve_ivp(
         fun=duffing_rhs,
@@ -236,6 +237,88 @@ def solve_duffing(
         "x": sol.y[0],
         "y": sol.y[1],
     }
+
+
+# ---------------------------------------------------------------------------
+# Calendar alignment
+# ---------------------------------------------------------------------------
+
+def calendar_t0(target_peak_month: int = 3) -> float:
+    """
+    Return t_offset (months) that aligns the Duffing X-peak with
+    ``target_peak_month`` (1 = Jan, …, 12 = Dec; default 3 = March).
+
+    The convention is t_calendar = 0 → January of the first data year
+    (1975).  Passing ``t_start=calendar_t0()`` to ``solve_duffing`` and
+    then using the returned t array directly as calendar time means that
+    X peaks in March, matching the observed ENSO SST maximum.
+
+    Algorithm
+    ---------
+    Grid search over t_offset ∈ [0, 12) at 0.1-month step (120 candidates).
+    For each candidate the ODE is integrated for 200 months starting at
+    t_start = t_offset; the first 100 months are discarded as transient.
+    Local maxima of X are detected in the steady-state segment and their
+    calendar months are averaged using circular statistics.  The offset
+    with the smallest circular distance to ``target_peak_month`` is
+    returned.
+
+    Parameters
+    ----------
+    target_peak_month : int
+        Calendar month (1–12) at which X should peak.
+
+    Returns
+    -------
+    float
+        t_offset in months, in the range [0, 12).
+    """
+    params = default_params()
+    target_frac = (target_peak_month - 1.0) / 12.0  # fraction of year, 0..1
+
+    best_t_off = 0.0
+    best_err   = float("inf")
+
+    for k in range(120):
+        t_off = round(k * 0.1, 10)
+        sol   = solve_duffing(params, x0=0.0, y0=0.0,
+                              t_start=t_off, t_end=t_off + 200.0, dt=0.1)
+        t_arr = sol["t"]
+        x_arr = sol["x"]
+
+        # Steady-state segment: drop first 100 months of transient.
+        mask = t_arr >= t_off + 100.0
+        t_ss = t_arr[mask]
+        x_ss = x_arr[mask]
+        if len(x_ss) < 5:
+            continue
+
+        # Detect local maxima.
+        idxs = [i for i in range(1, len(x_ss) - 1)
+                if x_ss[i] >= x_ss[i - 1] and x_ss[i] >= x_ss[i + 1]]
+        if not idxs:
+            idxs = [int(np.argmax(x_ss))]
+
+        # Calendar fraction of year for each peak.
+        fracs = (t_ss[idxs] % 12.0) / 12.0
+
+        # Circular mean via unit-vector averaging.
+        s = float(np.sin(2.0 * math.pi * fracs).mean())
+        c = float(np.cos(2.0 * math.pi * fracs).mean())
+        mean_frac = math.atan2(s, c) / (2.0 * math.pi)
+        if mean_frac < 0.0:
+            mean_frac += 1.0
+
+        # Circular distance to target.
+        err = abs(mean_frac - target_frac)
+        if err > 0.5:
+            err = 1.0 - err
+
+        if err < best_err:
+            best_err   = err
+            best_t_off = t_off
+
+    return best_t_off
 
 
 # ---------------------------------------------------------------------------
@@ -440,6 +523,54 @@ def _self_test() -> None:
         f"FAIL 4: attractor not stable — amplitude ratio = {ratio:.3f}"
     )
     print(f"  PASS 4: attractor stable  (amp ratio second/first half = {ratio:.3f})")
+
+    # 5. calendar_t0 aligns X-peak with March, dX/dt-peak with Dec/Jan.
+    t_off = calendar_t0(target_peak_month=3)
+    sol5  = solve_duffing(params, x0=0.0, y0=0.0,
+                          t_start=t_off, t_end=t_off + 300.0, dt=0.1)
+    t5, x5, y5 = sol5["t"], sol5["x"], sol5["y"]
+    # Steady-state segment.
+    mask5 = t5 >= t_off + 150.0
+    t_ss5, x_ss5, y_ss5 = t5[mask5], x5[mask5], y5[mask5]
+
+    # X peak months.
+    x_idx = [i for i in range(1, len(x_ss5) - 1)
+              if x_ss5[i] >= x_ss5[i - 1] and x_ss5[i] >= x_ss5[i + 1]]
+    if not x_idx:
+        x_idx = [int(np.argmax(x_ss5))]
+    x_peak_months = [int((t_ss5[i] % 12.0) // 1.0) + 1 for i in x_idx]
+    _xs = sum(math.sin(2 * math.pi * (m - 1) / 12) for m in x_peak_months) / len(x_peak_months)
+    _xc = sum(math.cos(2 * math.pi * (m - 1) / 12) for m in x_peak_months) / len(x_peak_months)
+    x_peak_circular = int(round((math.atan2(_xs, _xc) / (2 * math.pi) * 12 + 12) % 12)) + 1
+
+    # Y peak months (dX/dt peaks ~ 3 months before X peak → Dec/Jan).
+    y_idx = [i for i in range(1, len(y_ss5) - 1)
+              if y_ss5[i] >= y_ss5[i - 1] and y_ss5[i] >= y_ss5[i + 1]]
+    if not y_idx:
+        y_idx = [int(np.argmax(y_ss5))]
+    y_peak_months = [int((t_ss5[i] % 12.0) // 1.0) + 1 for i in y_idx]
+    _ys = sum(math.sin(2 * math.pi * (m - 1) / 12) for m in y_peak_months) / len(y_peak_months)
+    _yc = sum(math.cos(2 * math.pi * (m - 1) / 12) for m in y_peak_months) / len(y_peak_months)
+    y_peak_circular = int(round((math.atan2(_ys, _yc) / (2 * math.pi) * 12 + 12) % 12)) + 1
+
+    print(f"  calendar_t0 = {t_off:.1f} months")
+    print(f"  X-peak calendar month  = {x_peak_circular}  (target: 3 = March)")
+    print(f"  dX/dt-peak calendar month = {y_peak_circular}  (expected: 12 or 1 = Dec/Jan)")
+
+    # X must peak within ±1 month of March (3).
+    def _circ_dist(a: int, b: int) -> int:
+        d = abs(a - b) % 12
+        return d if d <= 6 else 12 - d
+
+    assert _circ_dist(x_peak_circular, 3) <= 1, (
+        f"FAIL 5: X peaks in month {x_peak_circular}, expected March (3) ±1"
+    )
+    # dX/dt must peak within ±2 months of December (12) / January (1).
+    assert min(_circ_dist(y_peak_circular, 12), _circ_dist(y_peak_circular, 1)) <= 2, (
+        f"FAIL 5: dX/dt peaks in month {y_peak_circular}, expected Dec(12)/Jan(1) ±2"
+    )
+    print(f"  PASS 5: calendar_t0={t_off:.1f} -> X peaks month {x_peak_circular} (Mar±1), "
+          f"dX/dt peaks month {y_peak_circular} (Dec/Jan±2)")
 
     print("\nAll tests passed.")
 

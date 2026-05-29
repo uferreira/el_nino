@@ -463,6 +463,97 @@ def run_all(config_path: str = "config.yaml") -> dict:
     return result
 
 
+def accel_from_raw(
+    raw: np.ndarray,
+    MES: np.ndarray,
+    HN1: float,
+    HN2: float,
+    NDOTS: int,
+) -> np.ndarray:
+    """
+    Compute the exact second derivative d²T/dt² from raw monthly data.
+
+    Runs the full filter pipeline via _run_pipeline_steps and returns the
+    AST (acceleration) array produced analytically by deri_fourier.  The
+    result is numerically identical to the AST field returned by
+    _run_pipeline_steps — no separate numerical differentiation is needed.
+
+    Parameters
+    ----------
+    raw   : float64 array (NT,)  — raw monthly observations
+    MES   : int32 array (NT,)    — month indices 1..12
+    HN1   : float — long-period filter edge (months)
+    HN2   : float — short-period filter edge (months)
+    NDOTS : int   — sub-divisions per monthly interval
+
+    Returns
+    -------
+    accel : float64 array (NTD,) — second derivative d²T/dt²
+              where NTD = (NT-1)*NDOTS + 1
+    """
+    _, _, _, accel, _, _ = _run_pipeline_steps(raw, MES, HN1, HN2, NDOTS)
+    return accel
+
+
+def accel_from_output(data: dict) -> np.ndarray:
+    """
+    Estimate d²T/dt² by numerically differentiating the dT/dt column.
+
+    Fallback for when only a .dat output file is available and no raw
+    monthly data can be provided.  Uses numpy.gradient (second-order
+    central differences) on data["dT"] with step size 1/NDOTS months.
+    NDOTS is inferred from max(data["irest"]) + 1.
+
+    Parameters
+    ----------
+    data : dict from load_output() — must contain keys "dT" and "irest"
+
+    Returns
+    -------
+    accel : float64 array of the same length as data["dT"]
+    """
+    NDOTS = int(data["irest"].max()) + 1
+    dt    = 1.0 / NDOTS
+    return np.gradient(data["dT"], dt)
+
+
+def load_with_accel(
+    output_file: str,
+    raw: np.ndarray | None = None,
+    MES: np.ndarray | None = None,
+    HN1: float = 10.0,
+    HN2: float = 9.0,
+    NDOTS: int = 5,
+) -> dict:
+    """
+    Load a .dat file and augment the result with d²T/dt².
+
+    If raw monthly data (raw, MES) are supplied, uses accel_from_raw for
+    the analytically exact second derivative.  Otherwise falls back to
+    accel_from_output (numerical differentiation of the dT column).
+
+    Parameters
+    ----------
+    output_file : str — path to a .dat file from run_sst or run_sea_level
+    raw  : float64 array (NT,) or None — raw monthly observations
+    MES  : int32 array (NT,) or None   — month indices 1..12
+    HN1  : float — long-period filter cutoff (months); used only with raw
+    HN2  : float — short-period filter cutoff (months); used only with raw
+    NDOTS: int   — sub-divisions per month; used only with raw
+
+    Returns
+    -------
+    dict — all keys from load_output() plus:
+        d2T : float64 array (NTD,) — second derivative d²T/dt²
+    """
+    data = load_output(output_file)
+    if raw is not None and MES is not None:
+        data["d2T"] = accel_from_raw(raw, MES, HN1, HN2, NDOTS)
+    else:
+        data["d2T"] = accel_from_output(data)
+    return data
+
+
 def load_output(output_file: str) -> dict:
     """
     Read a previously written .dat file back into NumPy arrays.
@@ -602,6 +693,19 @@ def _self_test() -> None:
     )
     print(f"  PASS 4: VST changes sign  "
           f"(min = {VST.min():.4f}, max = {VST.max():.4f})")
+
+    # --- 5. accel_from_raw matches _run_pipeline_steps AST exactly ---
+    accel = accel_from_raw(SST_s, MES_s, HN1=10.0, HN2=9.0, NDOTS=NDOTS)
+    assert len(accel) == NTD, (
+        f"FAIL 5: accel_from_raw length = {len(accel)}, expected {NTD}"
+    )
+    assert np.allclose(accel, AST, rtol=0, atol=0), (
+        "FAIL 5: accel_from_raw does not match _run_pipeline_steps AST"
+    )
+    print(
+        f"  PASS 5: accel_from_raw == AST exactly  "
+        f"(max diff = {float(np.max(np.abs(accel - AST))):.2e})"
+    )
 
     print("\nAll tests passed.")
 

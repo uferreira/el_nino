@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>El Niño Familiar Attractor — Phase Diagrams</title>
+<title>El Niño Familiar Attractor — Familiar Attractor</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 :root {
@@ -136,76 +137,80 @@ footer a:hover { text-decoration:underline; }
     <h1>El Niño Familiar Attractor</h1>
     <p class="subtitle">Observed ENSO dynamics vs Duffing double-well model &nbsp;·&nbsp; NINO1+2 SST 1975–2026 &nbsp;·&nbsp; Callao SL 1970–2026</p>
     <nav class="site-nav">
-  <a href="index.html" class="nav-link active">Phase Diagrams</a>
+  <a href="index.html" class="nav-link">Phase Diagrams</a>
   <a href="animations.html" class="nav-link">Animations</a>
-  <a href="familiar_attractor.html" class="nav-link">Familiar Attractor</a>
+  <a href="familiar_attractor.html" class="nav-link active">Familiar Attractor</a>
 </nav>
   </div>
 </header>
 
 <!-- ══════════════════════════════════════════════════════
-     SECTION 1: Observed ENSO Attractors — animated canvas
+     FAMILIAR ATTRACTOR — 3D Phase Space (static figures)
      ══════════════════════════════════════════════════════ -->
-<section id="observed">
+<section id="phase3d-static">
 <div class="container">
-  <h2>Observed ENSO Attractors — SST and Sea Level</h2>
+  <h2>Familiar Attractor — 3D Phase Space</h2>
   <div class="science-box">
-    <strong>What is a phase diagram?</strong>
-    Both panels plot a climate variable T against its rate of change dT/dt.
-    Left: NINO1+2 sea surface temperature anomaly (°C, mean removed) — El Niño events appear
-    as large excursions to the right. Right: Callao tide-gauge sea level anomaly (mm) — sea
-    level rises sharply during El Niño as Kelvin waves suppress coastal upwelling.
-    Both variables trace the same ENSO familiar attractor on the same calendar.
+    These four static figures embed the ENSO trajectory in three dimensions.
+    The z-axis is either the exact second derivative d²T/dt² (computed analytically
+    from the Fourier pipeline) or the annual forcing phase θ ∈ [0, 2π) — the position
+    of each month on the trade-wind forcing cycle.  Color runs blue (earliest) → red
+    (most recent).  The green overlay is the Duffing model trajectory, time-shifted by
+    <code>calendar_t0 = 3.0 months</code> so its X-peak aligns with March, matching the
+    observed ENSO SST maximum.
   </div>
-
-  <div class="controls">
-    <div class="ctrl-head">Animation Speed</div>
-    <div class="param-grid">
-      <div class="param-row">
-        <label>Steps per frame <span id="obs1-lbl-spf">1</span></label>
-        <div class="param-inline">
-          <input type="range" id="obs1-sl-spf" min="1" max="20" step="1" value="1">
-        </div>
-      </div>
-      <div class="param-row">
-        <label>Frame delay ms <span id="obs1-lbl-delay">30</span></label>
-        <div class="param-inline">
-          <input type="range" id="obs1-sl-delay" min="0" max="200" step="5" value="30">
-        </div>
-      </div>
+  <div class="two-col">
+    <div class="plot-box">
+      <img src="images/phase3d_SST_accel.png" alt="SST 3D phase (acceleration)"
+           style="width:100%;border-radius:6px;">
+      <p style="text-align:center;color:var(--muted);font-size:.82rem;margin-top:.4rem">
+        SST NINO1+2 — z = d²T/dt² &nbsp;(green = Duffing model)</p>
     </div>
-    <div class="btn-row">
-      <button id="obs1-run" onclick="obs1Start()">&#9654; Run</button>
-      <button id="obs1-pause" class="secondary" onclick="obs1Pause()" disabled>&#9646;&#9646; Pause</button>
-      <button id="obs1-reset" class="danger" onclick="obs1Reset()">&#8635; Reset</button>
+    <div class="plot-box">
+      <img src="images/phase3d_Callao_accel.png" alt="Callao 3D phase (acceleration)"
+           style="width:100%;border-radius:6px;">
+      <p style="text-align:center;color:var(--muted);font-size:.82rem;margin-top:.4rem">
+        Callao sea level — z = d²η/dt²</p>
     </div>
   </div>
-
-  <div class="status-bar" id="obs1-status"><span class="st-ready">Ready — click Run to animate the ENSO attractor</span></div>
-
-  <div class="two-col" style="margin-bottom:.6rem;">
-    <div>
-      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">
-        SST NINO1+2 anomaly (°C)
-      </div>
-      <canvas id="obs1-sst-canvas" class="phasecanvas" width="700" height="480"></canvas>
+  <div class="two-col" style="margin-top:1.5rem;">
+    <div class="plot-box">
+      <img src="images/phase3d_SST_phase.png" alt="SST 3D phase (forcing phase)"
+           style="width:100%;border-radius:6px;">
+      <p style="text-align:center;color:var(--muted);font-size:.82rem;margin-top:.4rem">
+        SST NINO1+2 — z = annual forcing phase θ</p>
     </div>
-    <div>
-      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">
-        Callao SSH anomaly (mm)
-      </div>
-      <canvas id="obs1-cal-canvas" class="phasecanvas" width="700" height="480"></canvas>
+    <div class="plot-box">
+      <img src="images/phase3d_Callao_phase.png" alt="Callao 3D phase (forcing phase)"
+           style="width:100%;border-radius:6px;">
+      <p style="text-align:center;color:var(--muted);font-size:.82rem;margin-top:.4rem">
+        Callao sea level — z = annual forcing phase θ</p>
     </div>
   </div>
-
-  <div style="margin:.5rem 0 1rem;">
-    <input type="range" id="obs1-scrubber" min="0" max="100" value="0"
-           style="width:100%;cursor:pointer;accent-color:var(--accent);"
-           title="Drag to scrub through time">
-    <div id="obs1-time-display"
-         style="text-align:center;font-family:monospace;font-size:.82rem;
-                color:var(--muted);margin-top:.25rem;letter-spacing:.04em">
-      Jan 1975
+</div>
+</section>
+<!-- ══════════════════════════════════════════════════════
+     SECTION 5: 3D Familiar Attractor
+     ══════════════════════════════════════════════════════ -->
+<section id="attractor3d">
+<div class="container">
+  <h2>Familiar Attractor in 3D — Phase Space × Time</h2>
+  <div class="science-box">
+    Each dot represents the state of the system at the start of one calendar month, colored by
+    month of year (Jan–Dec). The vertical axis is time — each year appears as a ring of 12 colored
+    dots stacked above the previous year. A perfectly periodic system would produce
+    <strong>12 vertical straight lines</strong>, one per month. The irregular drift and scatter
+    of these columns reveals the <em>chaotic, non-repeating</em> nature of ENSO: each El Niño event
+    visits a different region of phase space, and no two annual cycles are identical. Compare the
+    observed SST columns (wide scatter — strongly chaotic) with the Duffing Equation columns
+    (tighter — the model captures the geometry but is less chaotic than the real climate system).
+  </div>
+  <div class="two-col">
+    <div class="plot-box">
+      <div id="plot-3d-obs" style="height:500px;"></div>
+    </div>
+    <div class="plot-box">
+      <div id="plot-3d-mod" style="height:500px;"></div>
     </div>
   </div>
 </div>
@@ -417,378 +422,124 @@ function seasonColorAlpha(month, alpha) {
   return 'rgba('+r+','+g+','+b+','+alpha+')';
 }
 
+// 3. RK4 STEP — exact translation of NL3System.java / DoubleWell.java
 // ═══════════════════════════════════════════════════════
-// 2. SECTION 1 — Observed attractors animated canvas
-// ═══════════════════════════════════════════════════════
-const obsMean = observedData.x.reduce((a,b)=>a+b,0)/OBS_N;
+const W_ANN = 2 * Math.PI / 12;
 
-const OBS1_CW=700, OBS1_CH=480;
-const OBS1_PLT={l:56,r:680,t:34,b:446};
-const OBS1_DOM_SST={xmin:-7.5,xmax:7.5,ymin:-2.5,ymax:2.5};
-const OBS1_DOM_CAL={xmin:-300, xmax:300, ymin:-60,  ymax:60};
-const OBS1_LABELS_SST={x:'SST anomaly (°C)', y:'dT/dt'};
-const OBS1_LABELS_CAL={x:'SSH anom (mm)',    y:'dSL/dt'};
-const CAL_SSH_TICKS={x:[-300,-200,-100,0,100,200,300],y:[-60,-40,-20,0,20,40,60]};
-const SST_ANOM_TICKS={x:[-6,-4,-2,0,2,4,6],y:[-2,-1,0,1,2]};
-const OBS1_TAIL=60;
-
-const OBS1 = {
-  running:false, paused:false,
-  obsIdx:0, calIdx:0,
-  obsStartIdx:0, calStartIdx:0,
-  totalFrames:0,
-  wasRunningBeforeScrub:false,
-  spf:1, delay:30,
-  obsTail:[], calTail:[],
-  rafId:null,
-  sstCanvas:null, sstCtx:null, sstOff:null, sstOffCtx:null,
-  calCanvas:null, calCtx:null, calOff:null, calOffCtx:null,
-};
-
-function obs1DrawBgs() {
-  drawBg(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1_LABELS_SST, SST_ANOM_TICKS);
-  drawBg(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1_LABELS_CAL, CAL_SSH_TICKS);
-}
-
-function obs1Init() {
-  OBS1.sstCanvas = document.getElementById('obs1-sst-canvas');
-  OBS1.sstCtx    = OBS1.sstCanvas.getContext('2d');
-  OBS1.sstOff    = makeOff(OBS1_CW, OBS1_CH);
-  OBS1.sstOffCtx = OBS1.sstOff.getContext('2d');
-
-  OBS1.calCanvas = document.getElementById('obs1-cal-canvas');
-  OBS1.calCtx    = OBS1.calCanvas.getContext('2d');
-  OBS1.calOff    = makeOff(OBS1_CW, OBS1_CH);
-  OBS1.calOffCtx = OBS1.calOff.getContext('2d');
-
-  const cs = _cmpCommonStart();
-  OBS1.obsStartIdx = cs.obsStartIdx;
-  OBS1.calStartIdx = cs.calStartIdx;
-  OBS1.totalFrames = Math.min(OBS_N-cs.obsStartIdx, CAL_N-cs.calStartIdx);
-  OBS1.obsIdx = cs.obsStartIdx;
-  OBS1.calIdx = cs.calStartIdx;
-
-  obs1DrawBgs();
-
-  const slSpf   = document.getElementById('obs1-sl-spf');
-  const slDelay = document.getElementById('obs1-sl-delay');
-  if (slSpf)   slSpf.addEventListener('input',  ()=>{ OBS1.spf=parseInt(slSpf.value)||1;    document.getElementById('obs1-lbl-spf').textContent=slSpf.value; });
-  if (slDelay) slDelay.addEventListener('input', ()=>{ OBS1.delay=parseInt(slDelay.value)||0; document.getElementById('obs1-lbl-delay').textContent=slDelay.value; });
-
-  const scrubEl = document.getElementById('obs1-scrubber');
-  if (scrubEl) {
-    scrubEl.addEventListener('mousedown', () => {
-      OBS1.wasRunningBeforeScrub = OBS1.running && !OBS1.paused;
-      if (OBS1.wasRunningBeforeScrub) {
-        OBS1.paused = true;
-        if (OBS1.rafId) cancelAnimationFrame(OBS1.rafId);
-        document.getElementById('obs1-pause').innerHTML='&#9654; Resume';
-      }
-    });
-    scrubEl.addEventListener('input', function() {
-      if (!OBS1.running && OBS1.totalFrames === 0) return;
-      obs1RedrawToFrame(parseInt(this.value));
-    });
-    scrubEl.addEventListener('mouseup', function() {
-      if (OBS1.wasRunningBeforeScrub && OBS1.running) {
-        OBS1.paused = false;
-        document.getElementById('obs1-pause').innerHTML='&#9646;&#9646; Pause';
-        OBS1.rafId = setTimeout(()=>requestAnimationFrame(obs1Loop), OBS1.delay);
-      }
-      OBS1.wasRunningBeforeScrub = false;
-    });
-    scrubEl.addEventListener('touchstart', () => {
-      OBS1.wasRunningBeforeScrub = OBS1.running && !OBS1.paused;
-      if (OBS1.wasRunningBeforeScrub) {
-        OBS1.paused = true;
-        if (OBS1.rafId) cancelAnimationFrame(OBS1.rafId);
-      }
-    }, {passive:true});
-    scrubEl.addEventListener('touchend', function() {
-      if (OBS1.wasRunningBeforeScrub && OBS1.running) {
-        OBS1.paused = false;
-        OBS1.rafId = setTimeout(()=>requestAnimationFrame(obs1Loop), OBS1.delay);
-      }
-      OBS1.wasRunningBeforeScrub = false;
-    });
+function rk4Step(t, X, Y, p, h) {
+  const FFr  = p.FF  * Math.PI / 180;
+  const FF2r = p.FF2 * Math.PI / 180;
+  function rhs(tt, xx, yy) {
+    return (p.K0 + p.K1*xx + p.K2*xx*xx + p.K3*xx*xx*xx
+          + p.K4*xx*xx*xx*xx + p.K5*xx*xx*xx*xx*xx
+          + p.FA *Math.cos(FFr) *Math.cos(W_ANN*tt)
+          + p.FA *Math.sin(FFr) *Math.sin(W_ANN*tt)
+          + p.FA2*Math.cos(FF2r)*Math.cos(2*W_ANN*tt)
+          + p.FA2*Math.sin(FF2r)*Math.sin(2*W_ANN*tt)
+          + p.B*yy);
   }
-}
-
-function obs1Loop() {
-  if (!OBS1.running || OBS1.paused) return;
-  const spf = OBS1.spf;
-  for (let i=0; i<spf; i++) {
-    if (OBS1.obsIdx >= OBS_N) { obs1Finish(); return; }
-    const ox = observedData.x[OBS1.obsIdx] - obsMean;
-    const oy = observedData.y[OBS1.obsIdx];
-    pushTail(OBS1.obsTail, ox, oy, observedData.month[OBS1.obsIdx], OBS1_TAIL, OBS1.sstOffCtx, OBS1_PLT, OBS1_DOM_SST);
-    OBS1.obsIdx++;
-    if (OBS1.calIdx < CAL_N) {
-      const cx = callaoData.x[OBS1.calIdx] - callaoMean;
-      const cy = callaoData.y[OBS1.calIdx];
-      pushTail(OBS1.calTail, cx, cy, callaoData.month[OBS1.calIdx], OBS1_TAIL, OBS1.calOffCtx, OBS1_PLT, OBS1_DOM_CAL);
-      OBS1.calIdx++;
-    }
-  }
-  const tIdx = Math.min(OBS1.obsIdx, OBS_N-1);
-  const dispStr = MO_NAMES[observedData.month[tIdx]-1] + ' ' + observedData.year[tIdx];
-  obs1DrawBgs();
-  compositeFrame(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1.sstOff, OBS1.obsTail, dispStr);
-  compositeFrame(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1.calOff, OBS1.calTail, null);
-  document.getElementById('obs1-time-display').textContent =
-    observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
-  const scrub = document.getElementById('obs1-scrubber');
-  if (scrub) scrub.value = OBS1.obsIdx - OBS1.obsStartIdx;
-  obs1Status();
-  if (OBS1.running) OBS1.rafId = setTimeout(()=>requestAnimationFrame(obs1Loop), OBS1.delay);
-}
-
-function obs1Status() {
-  const el = document.getElementById('obs1-status');
-  if (!el) return;
-  const f = OBS1.obsIdx - OBS1.obsStartIdx;
-  const pct = OBS1.totalFrames > 0 ? (f/OBS1.totalFrames*100).toFixed(1) : '0.0';
-  const cls = OBS1.paused?'st-paused':(OBS1.running?'st-running':'st-done');
-  const st  = OBS1.paused?'&#9646;&#9646; Paused':(OBS1.running?'&#9654; Running':'&#9632; Done');
-  el.innerHTML=`<span class="${cls}">${st}</span> &nbsp;·&nbsp; ${f}/${OBS1.totalFrames} pts (${pct}%)`;
-}
-
-function obs1Start() {
-  if (OBS1.running) return;
-  OBS1.spf   = parseInt(document.getElementById('obs1-sl-spf')?.value)||1;
-  OBS1.delay = parseInt(document.getElementById('obs1-sl-delay')?.value)||30;
-  const cs = _cmpCommonStart();
-  OBS1.obsStartIdx = cs.obsStartIdx; OBS1.calStartIdx = cs.calStartIdx;
-  OBS1.obsIdx = cs.obsStartIdx;      OBS1.calIdx = cs.calStartIdx;
-  OBS1.totalFrames = Math.min(OBS_N-cs.obsStartIdx, CAL_N-cs.calStartIdx);
-  OBS1.obsTail=[]; OBS1.calTail=[];
-  OBS1.running=true; OBS1.paused=false;
-  OBS1.sstOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
-  OBS1.calOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
-  obs1DrawBgs();
-  const scrub = document.getElementById('obs1-scrubber');
-  if (scrub) { scrub.max=OBS1.totalFrames-1; scrub.value=0; }
-  document.getElementById('obs1-time-display').textContent = 'Jan '+cs.startYear;
-  setBtn('obs1-run',true); setBtn('obs1-pause',false);
-  document.getElementById('obs1-pause').innerHTML='&#9646;&#9646; Pause';
-  OBS1.rafId = setTimeout(()=>requestAnimationFrame(obs1Loop), OBS1.delay);
-}
-
-function obs1Pause() {
-  if (!OBS1.running) return;
-  OBS1.paused = !OBS1.paused;
-  const btn = document.getElementById('obs1-pause');
-  if (OBS1.paused) {
-    cancelAnimationFrame(OBS1.rafId);
-    btn.innerHTML='&#9654; Resume';
-  } else {
-    btn.innerHTML='&#9646;&#9646; Pause';
-    OBS1.rafId = setTimeout(()=>requestAnimationFrame(obs1Loop), OBS1.delay);
-  }
-  obs1Status();
-}
-
-function obs1Finish() {
-  OBS1.running=false; OBS1.paused=false;
-  if (OBS1.rafId) cancelAnimationFrame(OBS1.rafId);
-  setBtn('obs1-run',false); setBtn('obs1-pause',true);
-  document.getElementById('obs1-pause').innerHTML='&#9646;&#9646; Pause';
-  obs1Status();
-}
-
-function obs1Reset() {
-  obs1Finish();
-  const cs = _cmpCommonStart();
-  OBS1.obsIdx = cs.obsStartIdx; OBS1.calIdx = cs.calStartIdx;
-  OBS1.obsTail=[]; OBS1.calTail=[];
-  OBS1.sstOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
-  OBS1.calOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
-  obs1DrawBgs();
-  const scrub = document.getElementById('obs1-scrubber');
-  if (scrub) scrub.value=0;
-  document.getElementById('obs1-time-display').textContent = 'Jan 1975';
-  document.getElementById('obs1-status').innerHTML='<span class="st-ready">Ready</span>';
-}
-
-function obs1RedrawToFrame(targetFrame) {
-  if (!OBS1.sstOffCtx) return;
-  const frame = Math.max(0, Math.min(targetFrame, OBS1.totalFrames-1));
-  const obsStart = OBS1.obsStartIdx, calStart = OBS1.calStartIdx;
-  OBS1.sstOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
-  OBS1.calOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
-  let obsTail=[], calTail=[];
-  for (let f=0; f<frame; f++) {
-    const oi=obsStart+f, ci=calStart+f;
-    if (oi<OBS_N) {
-      const ox=observedData.x[oi]-obsMean, oy=observedData.y[oi];
-      pushTail(obsTail, ox, oy, observedData.month[oi], OBS1_TAIL, OBS1.sstOffCtx, OBS1_PLT, OBS1_DOM_SST);
-    }
-    if (ci<CAL_N) {
-      const cx=callaoData.x[ci]-callaoMean, cy=callaoData.y[ci];
-      pushTail(calTail, cx, cy, callaoData.month[ci], OBS1_TAIL, OBS1.calOffCtx, OBS1_PLT, OBS1_DOM_CAL);
-    }
-  }
-  OBS1.obsIdx=obsStart+frame; OBS1.calIdx=calStart+frame;
-  OBS1.obsTail=obsTail; OBS1.calTail=calTail;
-  const tIdx=Math.min(OBS1.obsIdx, OBS_N-1);
-  const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
-  obs1DrawBgs();
-  compositeFrame(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1.sstOff, OBS1.obsTail, dispStr);
-  compositeFrame(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1.calOff, OBS1.calTail, null);
-  document.getElementById('obs1-time-display').textContent =
-    observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
-  const scrub = document.getElementById('obs1-scrubber');
-  if (scrub) scrub.value = frame;
-  obs1Status();
-}
-
-// 4. CANVAS DRAWING UTILITIES  (shared by S2 and CMP)
-// ═══════════════════════════════════════════════════════
-
-function monthLabel(step, startYear) {
-  // step = integer, t = step * dt.  dt=0.1 for S2, dt=0.2 for CMP model.
-  // For S2: months elapsed = step * 0.1  but we pass Math.floor(t)
-  const mo = step % 12;
-  const yr = startYear + Math.floor(step / 12);
-  return MO_NAMES[mo] + ' ' + yr;
-}
-
-/** Draw background (black + grid + zero-axes + border + tick labels) onto ctx.
- *  PLT = {l,r,t,b}  plot area in canvas pixels.
- *  DOMAIN = {xmin,xmax,ymin,ymax}
- *  labels = {x:string, y:string}
- */
-function drawBg(ctx, CW, CH, PLT, DOM, labels, ticks) {
-  const mx = x => PLT.l + (x-DOM.xmin)/(DOM.xmax-DOM.xmin)*(PLT.r-PLT.l);
-  const my = y => PLT.b - (y-DOM.ymin)/(DOM.ymax-DOM.ymin)*(PLT.b-PLT.t);
-
-  ctx.fillStyle = '#0a0a0e';
-  ctx.fillRect(0, 0, CW, CH);
-
-  // Grid — use explicit ticks if provided, else every integer
-  ctx.strokeStyle = '#1a1a2a'; ctx.lineWidth = 0.5;
-  if (ticks) {
-    ticks.x.forEach(x => { ctx.beginPath(); ctx.moveTo(mx(x),PLT.t); ctx.lineTo(mx(x),PLT.b); ctx.stroke(); });
-    ticks.y.forEach(y => { ctx.beginPath(); ctx.moveTo(PLT.l,my(y)); ctx.lineTo(PLT.r,my(y)); ctx.stroke(); });
-  } else {
-    for (let x=Math.ceil(DOM.xmin); x<=Math.floor(DOM.xmax); x++) {
-      ctx.beginPath(); ctx.moveTo(mx(x),PLT.t); ctx.lineTo(mx(x),PLT.b); ctx.stroke();
-    }
-    for (let y=Math.ceil(DOM.ymin); y<=Math.floor(DOM.ymax); y++) {
-      ctx.beginPath(); ctx.moveTo(PLT.l,my(y)); ctx.lineTo(PLT.r,my(y)); ctx.stroke();
-    }
-  }
-
-  // Zero axes (dashed)
-  ctx.strokeStyle='#363650'; ctx.lineWidth=1.2;
-  ctx.setLineDash([5,4]);
-  ctx.beginPath(); ctx.moveTo(mx(0),PLT.t); ctx.lineTo(mx(0),PLT.b); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(PLT.l,my(0)); ctx.lineTo(PLT.r,my(0)); ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Border
-  ctx.strokeStyle='#363650'; ctx.lineWidth=1;
-  ctx.strokeRect(PLT.l,PLT.t,PLT.r-PLT.l,PLT.b-PLT.t);
-
-  // X tick labels
-  ctx.fillStyle='#555568'; ctx.font='10px monospace'; ctx.textAlign='center';
-  if (ticks) {
-    ticks.x.forEach(x => ctx.fillText(x, mx(x), PLT.b+14));
-  } else {
-    for (let x=Math.ceil(DOM.xmin); x<=Math.floor(DOM.xmax); x+=2) {
-      ctx.fillText(x, mx(x), PLT.b+14);
-    }
-  }
-  ctx.fillStyle='#3a3a50';
-  ctx.fillText(labels.x, (PLT.l+PLT.r)/2, CH-3);
-
-  // Y tick labels
-  ctx.textAlign='right';
-  ctx.fillStyle='#555568';
-  if (ticks) {
-    ticks.y.forEach(y => ctx.fillText(y.toFixed(0), PLT.l-5, my(y)+4));
-  } else {
-    for (let y=Math.ceil(DOM.ymin); y<=Math.floor(DOM.ymax); y++) {
-      ctx.fillText(y.toFixed(0), PLT.l-5, my(y)+4);
-    }
-  }
-  ctx.save();
-  ctx.fillStyle='#3a3a50';
-  ctx.translate(11,(PLT.t+PLT.b)/2); ctx.rotate(-Math.PI/2);
-  ctx.textAlign='center'; ctx.font='10px monospace';
-  ctx.fillText(labels.y, 0, 0);
-  ctx.restore();
-}
-
-/** Composite one phase-diagram frame.
- *  offCanvas = offscreen canvas holding gray history.
- *  tail      = array of {x,y} recent points.
- *  curX/curY = current position (may differ slightly from tail tip due to float).
- *  timeStr   = string to display top-left ("Jan 1975") or null.
- */
-function compositeFrame(ctx, CW, CH, PLT, DOM, offCanvas, tail, timeStr) {
-  const mx = x => PLT.l + (x-DOM.xmin)/(DOM.xmax-DOM.xmin)*(PLT.r-PLT.l);
-  const my = y => PLT.b - (y-DOM.ymin)/(DOM.ymax-DOM.ymin)*(PLT.b-PLT.t);
-
-  // Gray history from offscreen
-  ctx.drawImage(offCanvas, 0, 0);
-
-  // Red tail — per-segment brightness gradient
-  const n = tail.length;
-  for (let i=1; i<n; i++) {
-    const f = i/n;
-    ctx.beginPath();
-    ctx.strokeStyle = `rgba(255,${Math.round(80*(1-f))},${Math.round(40*(1-f))},${(0.25+0.75*f).toFixed(2)})`;
-    ctx.lineWidth = 0.7 + 1.5*f;
-    ctx.moveTo(mx(tail[i-1].x), my(tail[i-1].y));
-    ctx.lineTo(mx(tail[i].x),   my(tail[i].y));
-    ctx.stroke();
-  }
-
-  // Blue dot + glow at tail tip
-  if (n > 0) {
-    const cx=mx(tail[n-1].x), cy=my(tail[n-1].y);
-    ctx.beginPath(); ctx.arc(cx,cy,9,0,2*Math.PI);
-    ctx.fillStyle='rgba(51,136,255,0.12)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx,cy,5,0,2*Math.PI);
-    ctx.fillStyle='#3388ff'; ctx.fill();
-    ctx.strokeStyle='#88ccff'; ctx.lineWidth=1.2; ctx.stroke();
-  }
-
-  // Time label top-left
-  if (timeStr) {
-    ctx.fillStyle='rgba(10,10,14,0.70)';
-    ctx.fillRect(PLT.l+4, PLT.t+4, 82, 22);
-    ctx.fillStyle='#e8e8f0'; ctx.font='bold 12px monospace'; ctx.textAlign='left';
-    ctx.fillText(timeStr, PLT.l+8, PLT.t+20);
-  }
-}
-
-function addToOff(offCtx, x1, y1, x2, y2, month, PLT, DOM) {
-  const mx = x => PLT.l + (x-DOM.xmin)/(DOM.xmax-DOM.xmin)*(PLT.r-PLT.l);
-  const my = y => PLT.b - (y-DOM.ymin)/(DOM.ymax-DOM.ymin)*(PLT.b-PLT.t);
-  offCtx.beginPath();
-  offCtx.strokeStyle=seasonColorAlpha(month, 0.35); offCtx.lineWidth=0.9;
-  offCtx.moveTo(mx(x1),my(y1)); offCtx.lineTo(mx(x2),my(y2)); offCtx.stroke();
-}
-
-function pushTail(tail, x, y, month, tailLen, offCtx, PLT, DOM) {
-  tail.push({x, y, month});
-  if (tail.length > tailLen) {
-    addToOff(offCtx, tail[0].x, tail[0].y, tail[1].x, tail[1].y, tail[0].month, PLT, DOM);
-    tail.shift();
-  }
-}
-
-function makeOff(w, h) {
-  const c = document.createElement('canvas');
-  c.width=w; c.height=h; return c;
+  const k1x=h*Y,             k1y=h*rhs(t,X,Y);
+  const k2x=h*(Y+k1y/2),    k2y=h*rhs(t+h/2,X+k1x/2,Y+k1y/2);
+  const k3x=h*(Y+k2y/2),    k3y=h*rhs(t+h/2,X+k2x/2,Y+k2y/2);
+  const k4x=h*(Y+k3y),      k4y=h*rhs(t+h,  X+k3x,  Y+k3y);
+  return {
+    X: X+(k1x+2*k2x+2*k3x+k4x)/6,
+    Y: Y+(k1y+2*k2y+2*k3y+k4y)/6
+  };
 }
 
 // ═══════════════════════════════════════════════════════
+function init3D() {
+  const MON_NAMES_3D = ['Jan','Feb','Mar','Apr','May','Jun',
+                        'Jul','Aug','Sep','Oct','Nov','Dec'];
+  // 12 perceptually distinct colors — one per calendar month
+  const MON_COLORS_12 = [
+    '#e41a1c','#f46d43','#fdae61','#fee08b',
+    '#a6d96a','#66c2a5','#3288bd','#5e4fa2',
+    '#984ea3','#f781bf','#b2df8a','#999999',
+  ];
+
+  // ── SST observed: 12 monthly traces ──────────────────────────────
+  const obsTraces = MON_NAMES_3D.map((name, mi) => {
+    const xi=[], yi=[], zi=[];
+    for (let i=0; i<OBS_N; i++) {
+      if (observedData.irest[i]===0 && observedData.month[i]===(mi+1)) {
+        xi.push(observedData.x[i]);
+        yi.push(observedData.y[i]);
+        zi.push(observedData.year[i] + mi/12);
+      }
+    }
+    return {type:'scatter3d', mode:'markers',
+      x:xi, y:yi, z:zi,
+      marker:{size:5, color:MON_COLORS_12[mi], opacity:0.88},
+      name:name, showlegend:true};
+  });
+  const layout3dObs = {
+    paper_bgcolor:'#0a0a0e',
+    scene:{
+      bgcolor:'#0a0a0e',
+      xaxis:{color:'#888899', gridcolor:'#2a2a40', title:'T (°C)'},
+      yaxis:{color:'#888899', gridcolor:'#2a2a40', title:'dT/dt (°C/mo)'},
+      zaxis:{color:'#888899', gridcolor:'#2a2a40', title:'Year'},
+      camera:{eye:{x:1.5,y:1.5,z:0.8}}
+    },
+    font:{color:'#e8e8f0'},
+    title:{text:'Poincaré Spiral — SST NINO1+2 · monthly sampling (12 points/year)',
+           font:{color:'#e8e8f0',size:13}},
+    margin:{l:0,r:0,t:44,b:0},
+    showlegend:true,
+    legend:{font:{color:'#888899',size:10}, bgcolor:'rgba(10,10,14,0.8)',
+            orientation:'v', x:1.02, y:1}
+  };
+  Plotly.newPlot('plot-3d-obs', obsTraces, layout3dObs, {responsive:true, displaylogo:false});
+
+  // ── Duffing Equation: 12 monthly traces ──────────────────────────
+  const p3d = {K0:0, K1:0.121847, K2:0, K3:-0.03046, K4:0, K5:0,
+               FA:0.4873, FF:-60, FA2:0, FF2:0, B:-0.35465};
+  // dt=0.04 → 25 steps per month; 600 months total
+  const DT3D=0.04, STEPS3D=Math.round(600/DT3D);  // 15000 steps
+  const STEPS_PER_MON = Math.round(1/DT3D);        // 25
+  const modBuckets = MON_NAMES_3D.map(() => ({xi:[],yi:[],zi:[]}));
+  let X3=0, Y3=0, t3=0;
+  for (let s=0; s<STEPS3D; s++) {
+    // Sample at the start of each integer-valued month
+    if (s % STEPS_PER_MON === 0) {
+      const mi = (Math.floor(t3) % 12);  // 0-11
+      modBuckets[mi].xi.push(X3);
+      modBuckets[mi].yi.push(Y3);
+      modBuckets[mi].zi.push(t3);
+    }
+    const st=rk4Step(t3,X3,Y3,p3d,DT3D);
+    X3=st.X; Y3=st.Y; t3+=DT3D;
+  }
+  const modTraces = modBuckets.map((b, mi) => ({
+    type:'scatter3d', mode:'markers',
+    x:b.xi, y:b.yi, z:b.zi,
+    marker:{size:5, color:MON_COLORS_12[mi], opacity:0.88},
+    name:MON_NAMES_3D[mi], showlegend:true
+  }));
+  const layout3dMod = {
+    paper_bgcolor:'#0a0a0e',
+    scene:{
+      bgcolor:'#0a0a0e',
+      xaxis:{color:'#888899', gridcolor:'#2a2a40', title:'X'},
+      yaxis:{color:'#888899', gridcolor:'#2a2a40', title:'dX/dt'},
+      zaxis:{color:'#888899', gridcolor:'#2a2a40', title:'t (months)'},
+      camera:{eye:{x:1.5,y:1.5,z:0.8}}
+    },
+    font:{color:'#e8e8f0'},
+    title:{text:'Poincaré Spiral — Duffing Equation · monthly sampling (12 points/year)',
+           font:{color:'#e8e8f0',size:13}},
+    margin:{l:0,r:0,t:44,b:0},
+    showlegend:true,
+    legend:{font:{color:'#888899',size:10}, bgcolor:'rgba(10,10,14,0.8)',
+            orientation:'v', x:1.02, y:1}
+  };
+  Plotly.newPlot('plot-3d-mod', modTraces, layout3dMod, {responsive:true, displaylogo:false});
+}
 
 window.addEventListener('load', () => {
-  obs1Init();
+  init3D();
 });
 
 // ═══════════════════════════════════════════════════════

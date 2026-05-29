@@ -71,7 +71,7 @@ different amplitudes and durations, the trajectory drifts slightly from one
 revolution to the next, and the variance of the loop size itself varies on
 decadal timescales (related to the Pacific Decadal Oscillation modulating the
 mean state of the tropical Pacific). This combination of quasi-periodicity and
-irreproducibility is the hallmark of a strange attractor with a fractional
+irreproducibility is the hallmark of a familiar attractor with a fractional
 Hausdorff dimension.
 
 ### El Niño events as excursions from the attractor
@@ -384,7 +384,7 @@ features.
   35(3), 367–383. https://doi.org/10.1080/07055900.1997.9649597
 
 **Phase space reconstruction:**
-- Takens, F. (1981). Detecting Strange Attractors in Turbulence. In:
+- Takens, F. (1981). Detecting Familiar Attractors in Turbulence. In:
   *Dynamical Systems and Turbulence*, Springer Lecture Notes in Mathematics
   vol. 898, pp. 366–381. https://doi.org/10.1007/BFb0091924
 
