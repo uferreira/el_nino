@@ -445,6 +445,11 @@ const OBS1 = {
   calCanvas:null, calCtx:null, calOff:null, calOffCtx:null,
 };
 
+function setBtn(id, disabled) {
+  const el = document.getElementById(id);
+  if (el) el.disabled = disabled;
+}
+
 function obs1DrawBgs() {
   drawBg(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1_LABELS_SST, SST_ANOM_TICKS);
   drawBg(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1_LABELS_CAL, CAL_SSH_TICKS);

@@ -151,41 +151,42 @@ footer a:hover { text-decoration:underline; }
 <div class="container">
   <h2>Familiar Attractor — 3D Phase Space</h2>
   <div class="science-box">
-    These four static figures embed the ENSO trajectory in three dimensions.
-    The z-axis is either the exact second derivative d²T/dt² (computed analytically
-    from the Fourier pipeline) or the annual forcing phase θ ∈ [0, 2π) — the position
-    of each month on the trade-wind forcing cycle.  Color runs blue (earliest) → red
-    (most recent).  The green overlay is the Duffing model trajectory, time-shifted by
-    <code>calendar_t0 = 3.0 months</code> so its X-peak aligns with March, matching the
-    observed ENSO SST maximum.
+    Four interactive 3D phase space plots of the ENSO trajectory.
+    The z-axis is either the second derivative d²T/dt² (numerical acceleration)
+    or the annual forcing phase &theta; &isin; [0,&thinsp;2&pi;) &mdash;
+    the position within the seasonal cycle.
+    Color runs blue (earliest year) &rarr; red (most recent year).
+    Click <strong>Animate All</strong> to build the trajectory point by point.
+  </div>
+
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.8rem;">
+    <button id="ps-run">&#9654; Animate All</button>
+    <button id="ps-pause" disabled>&#9646;&#9646; Pause</button>
+    <button id="ps-reset">&#8635; Reset</button>
+    <label style="display:flex;align-items:center;gap:.4rem;font-size:.85rem;">
+      Delay (ms):
+      <input type="range" id="ps-delay" min="0" max="200" value="30"
+             style="width:80px;accent-color:var(--accent);">
+      <span id="ps-delay-lbl" style="font-family:monospace;min-width:3em">30 ms</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:.4rem;font-size:.85rem;">
+      Steps/frame:
+      <input type="range" id="ps-sl-spf" min="1" max="30" value="5"
+             style="width:80px;accent-color:var(--accent);">
+      <span id="ps-lbl-spf" style="font-family:monospace;min-width:2em">5</span>
+    </label>
+    <span id="ps-year-label"
+          style="font-family:monospace;font-size:.82rem;color:var(--accent);letter-spacing:.04em;">
+      &mdash;
+    </span>
   </div>
   <div class="two-col">
-    <div class="plot-box">
-      <img src="images/phase3d_SST_accel.png" alt="SST 3D phase (acceleration)"
-           style="width:100%;border-radius:6px;">
-      <p style="text-align:center;color:var(--muted);font-size:.82rem;margin-top:.4rem">
-        SST NINO1+2 — z = d²T/dt² &nbsp;(green = Duffing model)</p>
-    </div>
-    <div class="plot-box">
-      <img src="images/phase3d_Callao_accel.png" alt="Callao 3D phase (acceleration)"
-           style="width:100%;border-radius:6px;">
-      <p style="text-align:center;color:var(--muted);font-size:.82rem;margin-top:.4rem">
-        Callao sea level — z = d²η/dt²</p>
-    </div>
+    <div class="plot-box"><div id="plot-static-sst-accel-anim" style="height:480px;"></div></div>
+    <div class="plot-box"><div id="plot-static-cal-accel-anim" style="height:480px;"></div></div>
   </div>
-  <div class="two-col" style="margin-top:1.5rem;">
-    <div class="plot-box">
-      <img src="images/phase3d_SST_phase.png" alt="SST 3D phase (forcing phase)"
-           style="width:100%;border-radius:6px;">
-      <p style="text-align:center;color:var(--muted);font-size:.82rem;margin-top:.4rem">
-        SST NINO1+2 — z = annual forcing phase θ</p>
-    </div>
-    <div class="plot-box">
-      <img src="images/phase3d_Callao_phase.png" alt="Callao 3D phase (forcing phase)"
-           style="width:100%;border-radius:6px;">
-      <p style="text-align:center;color:var(--muted);font-size:.82rem;margin-top:.4rem">
-        Callao sea level — z = annual forcing phase θ</p>
-    </div>
+  <div class="two-col" style="margin-top:1.2rem;">
+    <div class="plot-box"><div id="plot-static-sst-phase-anim" style="height:480px;"></div></div>
+    <div class="plot-box"><div id="plot-static-cal-phase-anim" style="height:480px;"></div></div>
   </div>
 </div>
 </section>
@@ -478,11 +479,31 @@ function rk4Step(t, X, Y, p, h) {
 }
 
 // ═══════════════════════════════════════════════════════
+
+// ─── Numerical acceleration (second derivative of y) ─────────────────────
+function gradientAccel(yArr) {
+  const N = yArr.length, dt = 1.0 / 5;
+  const a = new Float64Array(N);
+  a[0]   = (yArr[1]   - yArr[0])   / dt;
+  a[N-1] = (yArr[N-1] - yArr[N-2]) / dt;
+  for (let i = 1; i < N-1; i++)
+    a[i] = (yArr[i+1] - yArr[i-1]) / (2 * dt);
+  return a;
+}
+const obsMean  = observedData.x.reduce((a,b) => a+b, 0) / OBS_N;
+const obsAccel = gradientAccel(observedData.y);
+const calAccel = gradientAccel(callaoData.y);
+
 const FA3D = {
   running:false, paused:false, yearIdx:0, rafId:null,
-  delay:400,
-  obsYearLoops:null, calYearLoops:null,
-  obsAnimLayout:null, calAnimLayout:null,
+  delay:30,
+  obsYearLoops:null,    calYearLoops:null,
+  obsAnimLayout:null,   calAnimLayout:null,
+  // phase3d-static animated plots (accel and phase)
+  obsAccelLayout:null,  calAccelLayout:null,
+  obsPhaseLayout:null,  calPhaseLayout:null,
+  psRunning:false, psPaused:false, psRafId:null,
+  obsIdx:0, calIdx:0, spf:5,
 };
 
 function init3D() {
@@ -496,7 +517,7 @@ function init3D() {
     return `hsl(${hue},80%,55%)`;
   }
 
-  // ── Common dark 3D layout with month z-axis ───────────────────────────
+  // ── Layout factory (month z-axis — for the attractor3d section) ────────
   function makeLayout(title, xTitle, yTitle) {
     return {
       paper_bgcolor:'#0a0a0e',
@@ -518,9 +539,232 @@ function init3D() {
     };
   }
 
-  // ── SST observed: 12 monthly traces, each point colored by its year ────
+  // ── Layout factory with custom z-axis — for phase3d-static section ────
+  function makeLayoutZ(title, xTitle, yTitle, zCfg) {
+    return {
+      paper_bgcolor:'#0a0a0e',
+      scene:{
+        bgcolor:'#0a0a0e',
+        xaxis:{color:'#888899', gridcolor:'#2a2a40', title:xTitle},
+        yaxis:{color:'#888899', gridcolor:'#2a2a40', title:yTitle},
+        zaxis:Object.assign({color:'#888899', gridcolor:'#2a2a40'}, zCfg),
+        camera:{eye:{x:1.8,y:0.8,z:0.5}}
+      },
+      font:{color:'#e8e8f0'},
+      title:{text:title, font:{color:'#e8e8f0',size:13}},
+      margin:{l:0,r:0,t:44,b:0},
+      showlegend:false,
+    };
+  }
+
+  // ── Year ranges ────────────────────────────────────────────────────────
   const obsMinY = Math.min(...observedData.year);
   const obsMaxY = Math.max(...observedData.year);
+  const calMinY = Math.min(...callaoData.year);
+  const calMaxY = Math.max(...callaoData.year);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // PHASE3D-STATIC SECTION — accel and annual-phase z-axes
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const TWO_PI = 2 * Math.PI;
+
+  // Z-axis configs
+  const zCfgAccelSST = {title:'d²T/dt²'};
+  const zCfgAccelCal = {title:'d²SL/dt²'};
+  const zCfgPhase = {
+    title:'Annual phase θ (rad)',
+    range:[0, TWO_PI],
+    tickvals:[0, Math.PI/2, Math.PI, 3*Math.PI/2, TWO_PI],
+    ticktext:['Jan','Apr','Jul','Oct','Jan']
+  };
+
+  // Anomaly x-arrays and per-point year colors
+  const obsXanom  = observedData.x.map(v => v - obsMean);
+  const calXanom  = callaoData.x.map(v => v - callaoMean);
+  const obsYrClrs = observedData.year.map(y => yearColor(y, obsMinY, obsMaxY));
+  const calYrClrs = callaoData.year.map(y => yearColor(y, calMinY, calMaxY));
+
+  // Phase z-values
+  const obsPhaseZ = Array.from({length:OBS_N}, (_, i) =>
+    TWO_PI * ((observedData.month[i]-1) + observedData.irest[i]/5) / 12);
+  const calPhaseZ = Array.from({length:CAL_N}, (_, i) =>
+    TWO_PI * ((callaoData.month[i]-1) + callaoData.irest[i]/5) / 12);
+
+  FA3D.obsAccelLayout = makeLayoutZ('SST NINO1+2 — animated · d²T/dt²',
+    'SST anomaly (°C)', 'dT/dt (°C/mo)', zCfgAccelSST);
+  FA3D.calAccelLayout = makeLayoutZ('Callao SSH — animated · d²SL/dt²',
+    'SSH anomaly (mm)', 'dSL/dt (mm/mo)', zCfgAccelCal);
+  FA3D.obsPhaseLayout = makeLayoutZ('SST NINO1+2 — animated · annual phase',
+    'SST anomaly (°C)', 'dT/dt (°C/mo)', zCfgPhase);
+  FA3D.calPhaseLayout = makeLayoutZ('Callao SSH — animated · annual phase',
+    'SSH anomaly (mm)', 'dSL/dt (mm/mo)', zCfgPhase);
+
+  // 3-trace init: history (gray line), tail (red), dot (blue)
+  const TAIL_N = 60;
+  function mkInitTraces() {
+    const e = (col, mode, lw, ms) => ({
+      type:'scatter3d', mode,
+      x:[], y:[], z:[],
+      line:{color:col, width:lw||1},
+      marker:{size:ms||3, color:col, opacity:0.9},
+      showlegend:false, hoverinfo:'skip'
+    });
+    return [
+      e('rgba(90,90,90,0.55)', 'lines',          1, 2),
+      e('#ff5533',             'lines+markers',   2, 3),
+      e('#3388ff',             'markers',         1, 8),
+    ];
+  }
+  Plotly.newPlot('plot-static-sst-accel-anim', mkInitTraces(), FA3D.obsAccelLayout,
+    {responsive:true, displaylogo:false});
+  Plotly.newPlot('plot-static-cal-accel-anim', mkInitTraces(), FA3D.calAccelLayout,
+    {responsive:true, displaylogo:false});
+  Plotly.newPlot('plot-static-sst-phase-anim', mkInitTraces(), FA3D.obsPhaseLayout,
+    {responsive:true, displaylogo:false});
+  Plotly.newPlot('plot-static-cal-phase-anim', mkInitTraces(), FA3D.calPhaseLayout,
+    {responsive:true, displaylogo:false});
+
+  // ── Point-by-point smooth animation for phase3d-static ────────────────
+  function psClear() {
+    const empty = mkInitTraces();
+    Plotly.react('plot-static-sst-accel-anim', empty, FA3D.obsAccelLayout);
+    Plotly.react('plot-static-cal-accel-anim', mkInitTraces(), FA3D.calAccelLayout);
+    Plotly.react('plot-static-sst-phase-anim', mkInitTraces(), FA3D.obsPhaseLayout);
+    Plotly.react('plot-static-cal-phase-anim', mkInitTraces(), FA3D.calPhaseLayout);
+  }
+  function psFrame() {
+    if (!FA3D.psRunning || FA3D.psPaused) return;
+    const spf = FA3D.spf;
+    const sl = (arr, a, b) => {
+      if (arr instanceof Float64Array) return Array.from(arr.subarray(a, b));
+      return arr.slice(a, b);
+    };
+
+    // ── Collect new obs points ──
+    const oExt = {x:[[]], y:[[]], z_a:[[]], z_p:[[]]};
+    for (let s = 0; s < spf && FA3D.obsIdx < OBS_N; s++, FA3D.obsIdx++) {
+      const i = FA3D.obsIdx;
+      oExt.x[0].push(obsXanom[i]);
+      oExt.y[0].push(observedData.y[i]);
+      oExt.z_a[0].push(obsAccel[i]);
+      oExt.z_p[0].push(obsPhaseZ[i]);
+    }
+    // ── Collect new cal points ──
+    const cExt = {x:[[]], y:[[]], z_a:[[]], z_p:[[]]};
+    for (let s = 0; s < spf && FA3D.calIdx < CAL_N; s++, FA3D.calIdx++) {
+      const i = FA3D.calIdx;
+      cExt.x[0].push(calXanom[i]);
+      cExt.y[0].push(callaoData.y[i]);
+      cExt.z_a[0].push(calAccel[i]);
+      cExt.z_p[0].push(calPhaseZ[i]);
+    }
+
+    // ── Extend history (trace 0) ──
+    if (oExt.x[0].length) {
+      Plotly.extendTraces('plot-static-sst-accel-anim', {x:oExt.x, y:oExt.y, z:oExt.z_a}, [0]);
+      Plotly.extendTraces('plot-static-sst-phase-anim', {x:oExt.x, y:oExt.y, z:oExt.z_p}, [0]);
+    }
+    if (cExt.x[0].length) {
+      Plotly.extendTraces('plot-static-cal-accel-anim', {x:cExt.x, y:cExt.y, z:cExt.z_a}, [0]);
+      Plotly.extendTraces('plot-static-cal-phase-anim', {x:cExt.x, y:cExt.y, z:cExt.z_p}, [0]);
+    }
+
+    // ── Update tail (trace 1) and dot (trace 2) ──
+    const oi = FA3D.obsIdx - 1;
+    if (oi >= 0 && oi < OBS_N) {
+      const ts = Math.max(0, oi - TAIL_N + 1);
+      const ox  = sl(obsXanom,       ts, oi+1);
+      const oy  = sl(observedData.y, ts, oi+1);
+      const oac = sl(obsAccel,       ts, oi+1);
+      const oph = sl(obsPhaseZ,      ts, oi+1);
+      Plotly.restyle('plot-static-sst-accel-anim', {x:[ox], y:[oy], z:[oac]}, [1]);
+      Plotly.restyle('plot-static-sst-accel-anim',
+        {x:[[ox[ox.length-1]]], y:[[oy[oy.length-1]]], z:[[oac[oac.length-1]]]}, [2]);
+      Plotly.restyle('plot-static-sst-phase-anim', {x:[ox], y:[oy], z:[oph]}, [1]);
+      Plotly.restyle('plot-static-sst-phase-anim',
+        {x:[[ox[ox.length-1]]], y:[[oy[oy.length-1]]], z:[[oph[oph.length-1]]]}, [2]);
+    }
+    const ci2 = FA3D.calIdx - 1;
+    if (ci2 >= 0 && ci2 < CAL_N) {
+      const ts = Math.max(0, ci2 - TAIL_N + 1);
+      const cx  = sl(calXanom,       ts, ci2+1);
+      const cy  = sl(callaoData.y,   ts, ci2+1);
+      const cac = sl(calAccel,       ts, ci2+1);
+      const cph = sl(calPhaseZ,      ts, ci2+1);
+      Plotly.restyle('plot-static-cal-accel-anim', {x:[cx], y:[cy], z:[cac]}, [1]);
+      Plotly.restyle('plot-static-cal-accel-anim',
+        {x:[[cx[cx.length-1]]], y:[[cy[cy.length-1]]], z:[[cac[cac.length-1]]]}, [2]);
+      Plotly.restyle('plot-static-cal-phase-anim', {x:[cx], y:[cy], z:[cph]}, [1]);
+      Plotly.restyle('plot-static-cal-phase-anim',
+        {x:[[cx[cx.length-1]]], y:[[cy[cy.length-1]]], z:[[cph[cph.length-1]]]}, [2]);
+    }
+
+    // ── Label ──
+    if (oi >= 0 && oi < OBS_N) {
+      const lbl = document.getElementById('ps-year-label');
+      if (lbl) lbl.textContent =
+        MO_NAMES[observedData.month[oi]-1] + ' ' + observedData.year[oi];
+    }
+
+    // ── Continue or stop ──
+    if (FA3D.obsIdx >= OBS_N && FA3D.calIdx >= CAL_N) {
+      FA3D.psRunning = false;
+      document.getElementById('ps-run').disabled  = false;
+      document.getElementById('ps-pause').disabled = true;
+      return;
+    }
+    FA3D.psRafId = setTimeout(() => requestAnimationFrame(psFrame), FA3D.delay);
+  }
+  function psRun() {
+    if (FA3D.psRunning && !FA3D.psPaused) return;
+    if (FA3D.psPaused) {
+      FA3D.psPaused = false;
+    } else {
+      FA3D.obsIdx = 0; FA3D.calIdx = 0; FA3D.psRunning = true;
+      psClear();
+    }
+    document.getElementById('ps-run').disabled  = true;
+    document.getElementById('ps-pause').disabled = false;
+    requestAnimationFrame(psFrame);
+  }
+  function psPause() {
+    FA3D.psPaused = true;
+    if (FA3D.psRafId) { clearTimeout(FA3D.psRafId); FA3D.psRafId = null; }
+    document.getElementById('ps-run').disabled  = false;
+    document.getElementById('ps-pause').disabled = true;
+  }
+  function psReset() {
+    FA3D.psRunning = false; FA3D.psPaused = false;
+    FA3D.obsIdx = 0; FA3D.calIdx = 0;
+    if (FA3D.psRafId) { clearTimeout(FA3D.psRafId); FA3D.psRafId = null; }
+    psClear();
+    const lbl = document.getElementById('ps-year-label');
+    if (lbl) lbl.textContent = '—';
+    document.getElementById('ps-run').disabled  = false;
+    document.getElementById('ps-pause').disabled = true;
+  }
+  document.getElementById('ps-run').addEventListener('click', psRun);
+  document.getElementById('ps-pause').addEventListener('click', psPause);
+  document.getElementById('ps-reset').addEventListener('click', psReset);
+  const psDelaySl  = document.getElementById('ps-delay');
+  const psDelayLbl = document.getElementById('ps-delay-lbl');
+  psDelaySl.addEventListener('input', () => {
+    FA3D.delay = +psDelaySl.value;
+    psDelayLbl.textContent = psDelaySl.value + ' ms';
+  });
+  const slSpf  = document.getElementById('ps-sl-spf');
+  const lblSpf = document.getElementById('ps-lbl-spf');
+  slSpf.addEventListener('input', () => {
+    FA3D.spf = +slSpf.value;
+    lblSpf.textContent = slSpf.value;
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ATTRACTOR3D SECTION — month z-axis (UNCHANGED from previous version)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ── SST observed: 12 monthly traces, each point colored by its year ────
   const obsTraces = MON_NAMES_3D.map((name, mi) => {
     const xi=[], yi=[], zi=[], ci=[];
     for (let i=0; i<OBS_N; i++) {
@@ -546,7 +790,7 @@ function init3D() {
                FA:0.4873, FF:-60, FA2:0, FF2:0, B:-0.35465};
   const DT3D=0.04, STEPS3D=Math.round(600/DT3D);
   const STEPS_PER_MON = Math.round(1/DT3D);
-  const MOD_YEARS = Math.floor(600/12) - 1;  // 49 (0..49)
+  const MOD_YEARS = Math.floor(600/12) - 1;
   const modBuckets = MON_NAMES_3D.map(() => ({xi:[],yi:[],zi:[],ci:[]}));
   let X3=0, Y3=0, t3=0;
   for (let s=0; s<STEPS3D; s++) {
@@ -571,11 +815,8 @@ function init3D() {
                'X', 'dX/dt'),
     {responsive:true, displaylogo:false});
 
-  // ── Pre-compute year loops for animation (irest===0 monthly samples) ──
-  const calMinY = Math.min(...callaoData.year);
-  const calMaxY = Math.max(...callaoData.year);
+  // ── Pre-compute year loops for attractor3d animated plots ────────────
   const obsYearMap = {}, calYearMap = {};
-
   for (let i=0; i<OBS_N; i++) {
     if (observedData.irest[i]!==0) continue;
     const yr = observedData.year[i];
@@ -609,7 +850,6 @@ function init3D() {
     name:String(yr), showlegend:false
   }));
 
-  // ── Animated plot layouts ─────────────────────────────────────────────
   FA3D.obsAnimLayout = makeLayout(
     'SST NINO1+2 — animated by year', 'T (°C)', 'dT/dt (°C/mo)');
   FA3D.calAnimLayout = makeLayout(
@@ -620,7 +860,7 @@ function init3D() {
   Plotly.newPlot('plot-3d-cal-anim', [], FA3D.calAnimLayout,
     {responsive:true, displaylogo:false});
 
-  // ── Animation: one year per frame ────────────────────────────────────
+  // ── attractor3d animation (month z-axis) ──────────────────────────────
   function fa3dFrame() {
     if (!FA3D.running || FA3D.paused) return;
     const i = FA3D.yearIdx;
@@ -638,14 +878,12 @@ function init3D() {
     FA3D.yearIdx++;
     FA3D.rafId = setTimeout(fa3dFrame, FA3D.delay);
   }
-
   function fa3dRun() {
     if (FA3D.running && !FA3D.paused) return;
     if (FA3D.paused) {
       FA3D.paused = false;
     } else {
-      FA3D.yearIdx = 0;
-      FA3D.running = true;
+      FA3D.yearIdx = 0; FA3D.running = true;
       Plotly.react('plot-3d-obs-anim', [], FA3D.obsAnimLayout);
       Plotly.react('plot-3d-cal-anim', [], FA3D.calAnimLayout);
     }
@@ -653,14 +891,12 @@ function init3D() {
     document.getElementById('fa3d-pause').disabled = false;
     fa3dFrame();
   }
-
   function fa3dPause() {
     FA3D.paused = true;
     if (FA3D.rafId) { clearTimeout(FA3D.rafId); FA3D.rafId = null; }
     document.getElementById('fa3d-run').disabled = false;
     document.getElementById('fa3d-pause').disabled = true;
   }
-
   function fa3dReset() {
     FA3D.running = false; FA3D.paused = false; FA3D.yearIdx = 0;
     if (FA3D.rafId) { clearTimeout(FA3D.rafId); FA3D.rafId = null; }
@@ -671,8 +907,6 @@ function init3D() {
     document.getElementById('fa3d-run').disabled = false;
     document.getElementById('fa3d-pause').disabled = true;
   }
-
-  // ── Wire controls ─────────────────────────────────────────────────────
   document.getElementById('fa3d-run').addEventListener('click', fa3dRun);
   document.getElementById('fa3d-pause').addEventListener('click', fa3dPause);
   document.getElementById('fa3d-reset').addEventListener('click', fa3dReset);
