@@ -194,23 +194,52 @@ footer a:hover { text-decoration:underline; }
      ══════════════════════════════════════════════════════ -->
 <section id="attractor3d">
 <div class="container">
-  <h2>Familiar Attractor in 3D — Phase Space × Time</h2>
+  <h2>Familiar Attractor in 3D — Phase Space × Month of Year</h2>
   <div class="science-box">
-    Each dot represents the state of the system at the start of one calendar month, colored by
-    month of year (Jan–Dec). The vertical axis is time — each year appears as a ring of 12 colored
-    dots stacked above the previous year. A perfectly periodic system would produce
-    <strong>12 vertical straight lines</strong>, one per month. The irregular drift and scatter
-    of these columns reveals the <em>chaotic, non-repeating</em> nature of ENSO: each El Niño event
-    visits a different region of phase space, and no two annual cycles are identical. Compare the
-    observed SST columns (wide scatter — strongly chaotic) with the Duffing Equation columns
-    (tighter — the model captures the geometry but is less chaotic than the real climate system).
+    Each dot represents the state of the system at the start of one calendar month.
+    The vertical axis is the <strong>month of year</strong> (1 = January, 12 = December),
+    so all January points from every year stack at z = 1 and all December points stack at
+    z = 12. Color runs blue (earliest year) → red (most recent year), revealing how the
+    attractor's shape has evolved over decades. A perfectly periodic system would produce a
+    single, sharply-defined ring; the drift and scatter of points across the ring reveals the
+    <em>chaotic, non-repeating</em> nature of ENSO.
   </div>
+
+  <h3 style="margin:1.2rem 0 .4rem;font-size:1rem;color:var(--muted)">Static (all years at once)</h3>
   <div class="two-col">
     <div class="plot-box">
       <div id="plot-3d-obs" style="height:500px;"></div>
     </div>
     <div class="plot-box">
       <div id="plot-3d-mod" style="height:500px;"></div>
+    </div>
+  </div>
+  <p style="color:#888;font-size:.85rem;text-align:center;margin:.6rem 0 1.4rem">
+    Blue = earliest year &nbsp;&middot;&nbsp; Red = most recent year
+  </p>
+
+  <h3 style="margin:1.2rem 0 .4rem;font-size:1rem;color:var(--muted)">Animated — year by year (SST + Callao)</h3>
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.8rem;">
+    <label style="display:flex;align-items:center;gap:.4rem;font-size:.85rem;">
+      Delay (ms):
+      <input type="range" id="fa3d-delay" min="0" max="1000" value="400"
+             style="width:100px;accent-color:var(--accent);">
+      <span id="fa3d-delay-lbl" style="font-family:monospace;min-width:3.5em">400 ms</span>
+    </label>
+    <button id="fa3d-run">&#9654; Animate</button>
+    <button id="fa3d-pause" disabled>&#9646;&#9646; Pause</button>
+    <button id="fa3d-reset">&#8635; Reset</button>
+    <span id="fa3d-year-label"
+          style="font-family:monospace;font-size:.82rem;color:var(--accent);letter-spacing:.04em;">
+      Year: —
+    </span>
+  </div>
+  <div class="two-col">
+    <div class="plot-box">
+      <div id="plot-3d-obs-anim" style="height:500px;"></div>
+    </div>
+    <div class="plot-box">
+      <div id="plot-3d-cal-anim" style="height:500px;"></div>
     </div>
   </div>
 </div>
@@ -449,93 +478,210 @@ function rk4Step(t, X, Y, p, h) {
 }
 
 // ═══════════════════════════════════════════════════════
+const FA3D = {
+  running:false, paused:false, yearIdx:0, rafId:null,
+  delay:400,
+  obsYearLoops:null, calYearLoops:null,
+  obsAnimLayout:null, calAnimLayout:null,
+};
+
 function init3D() {
   const MON_NAMES_3D = ['Jan','Feb','Mar','Apr','May','Jun',
                         'Jul','Aug','Sep','Oct','Nov','Dec'];
-  // 12 perceptually distinct colors — one per calendar month
-  const MON_COLORS_12 = [
-    '#e41a1c','#f46d43','#fdae61','#fee08b',
-    '#a6d96a','#66c2a5','#3288bd','#5e4fa2',
-    '#984ea3','#f781bf','#b2df8a','#999999',
-  ];
 
-  // ── SST observed: 12 monthly traces ──────────────────────────────
+  // ── Year color: blue (earliest) → red (most recent) via HSL hue ───────
+  function yearColor(yr, minY, maxY) {
+    const f = (maxY === minY) ? 0 : (yr - minY) / (maxY - minY);
+    const hue = Math.round((1 - f) * 240);
+    return `hsl(${hue},80%,55%)`;
+  }
+
+  // ── Common dark 3D layout with month z-axis ───────────────────────────
+  function makeLayout(title, xTitle, yTitle) {
+    return {
+      paper_bgcolor:'#0a0a0e',
+      scene:{
+        bgcolor:'#0a0a0e',
+        xaxis:{color:'#888899', gridcolor:'#2a2a40', title:xTitle},
+        yaxis:{color:'#888899', gridcolor:'#2a2a40', title:yTitle},
+        zaxis:{color:'#888899', gridcolor:'#2a2a40', title:'Month',
+               range:[1,12],
+               tickvals:[1,2,3,4,5,6,7,8,9,10,11,12],
+               ticktext:['Jan','Feb','Mar','Apr','May','Jun',
+                         'Jul','Aug','Sep','Oct','Nov','Dec']},
+        camera:{eye:{x:1.8,y:0.8,z:0.5}}
+      },
+      font:{color:'#e8e8f0'},
+      title:{text:title, font:{color:'#e8e8f0',size:13}},
+      margin:{l:0,r:0,t:44,b:0},
+      showlegend:false,
+    };
+  }
+
+  // ── SST observed: 12 monthly traces, each point colored by its year ────
+  const obsMinY = Math.min(...observedData.year);
+  const obsMaxY = Math.max(...observedData.year);
   const obsTraces = MON_NAMES_3D.map((name, mi) => {
-    const xi=[], yi=[], zi=[];
+    const xi=[], yi=[], zi=[], ci=[];
     for (let i=0; i<OBS_N; i++) {
       if (observedData.irest[i]===0 && observedData.month[i]===(mi+1)) {
         xi.push(observedData.x[i]);
         yi.push(observedData.y[i]);
-        zi.push(observedData.year[i] + mi/12);
+        zi.push(mi + 1);
+        ci.push(yearColor(observedData.year[i], obsMinY, obsMaxY));
       }
     }
     return {type:'scatter3d', mode:'markers',
       x:xi, y:yi, z:zi,
-      marker:{size:5, color:MON_COLORS_12[mi], opacity:0.88},
-      name:name, showlegend:true};
+      marker:{size:5, color:ci, opacity:0.88, showscale:false},
+      showlegend:false};
   });
-  const layout3dObs = {
-    paper_bgcolor:'#0a0a0e',
-    scene:{
-      bgcolor:'#0a0a0e',
-      xaxis:{color:'#888899', gridcolor:'#2a2a40', title:'T (°C)'},
-      yaxis:{color:'#888899', gridcolor:'#2a2a40', title:'dT/dt (°C/mo)'},
-      zaxis:{color:'#888899', gridcolor:'#2a2a40', title:'Year'},
-      camera:{eye:{x:1.5,y:1.5,z:0.8}}
-    },
-    font:{color:'#e8e8f0'},
-    title:{text:'Poincaré Spiral — SST NINO1+2 · monthly sampling (12 points/year)',
-           font:{color:'#e8e8f0',size:13}},
-    margin:{l:0,r:0,t:44,b:0},
-    showlegend:true,
-    legend:{font:{color:'#888899',size:10}, bgcolor:'rgba(10,10,14,0.8)',
-            orientation:'v', x:1.02, y:1}
-  };
-  Plotly.newPlot('plot-3d-obs', obsTraces, layout3dObs, {responsive:true, displaylogo:false});
+  Plotly.newPlot('plot-3d-obs', obsTraces,
+    makeLayout('SST NINO1+2 — Phase Space × Month of Year',
+               'T (°C)', 'dT/dt (°C/mo)'),
+    {responsive:true, displaylogo:false});
 
-  // ── Duffing Equation: 12 monthly traces ──────────────────────────
+  // ── Duffing Equation: 12 monthly traces, colored by simulated year ────
   const p3d = {K0:0, K1:0.121847, K2:0, K3:-0.03046, K4:0, K5:0,
                FA:0.4873, FF:-60, FA2:0, FF2:0, B:-0.35465};
-  // dt=0.04 → 25 steps per month; 600 months total
-  const DT3D=0.04, STEPS3D=Math.round(600/DT3D);  // 15000 steps
-  const STEPS_PER_MON = Math.round(1/DT3D);        // 25
-  const modBuckets = MON_NAMES_3D.map(() => ({xi:[],yi:[],zi:[]}));
+  const DT3D=0.04, STEPS3D=Math.round(600/DT3D);
+  const STEPS_PER_MON = Math.round(1/DT3D);
+  const MOD_YEARS = Math.floor(600/12) - 1;  // 49 (0..49)
+  const modBuckets = MON_NAMES_3D.map(() => ({xi:[],yi:[],zi:[],ci:[]}));
   let X3=0, Y3=0, t3=0;
   for (let s=0; s<STEPS3D; s++) {
-    // Sample at the start of each integer-valued month
     if (s % STEPS_PER_MON === 0) {
-      const mi = (Math.floor(t3) % 12);  // 0-11
+      const mi = Math.floor(t3) % 12;
       modBuckets[mi].xi.push(X3);
       modBuckets[mi].yi.push(Y3);
-      modBuckets[mi].zi.push(t3);
+      modBuckets[mi].zi.push(mi + 1);
+      modBuckets[mi].ci.push(yearColor(Math.floor(t3/12), 0, MOD_YEARS));
     }
-    const st=rk4Step(t3,X3,Y3,p3d,DT3D);
+    const st = rk4Step(t3, X3, Y3, p3d, DT3D);
     X3=st.X; Y3=st.Y; t3+=DT3D;
   }
-  const modTraces = modBuckets.map((b, mi) => ({
+  const modTraces = modBuckets.map((b) => ({
     type:'scatter3d', mode:'markers',
     x:b.xi, y:b.yi, z:b.zi,
-    marker:{size:5, color:MON_COLORS_12[mi], opacity:0.88},
-    name:MON_NAMES_3D[mi], showlegend:true
+    marker:{size:5, color:b.ci, opacity:0.88, showscale:false},
+    showlegend:false
   }));
-  const layout3dMod = {
-    paper_bgcolor:'#0a0a0e',
-    scene:{
-      bgcolor:'#0a0a0e',
-      xaxis:{color:'#888899', gridcolor:'#2a2a40', title:'X'},
-      yaxis:{color:'#888899', gridcolor:'#2a2a40', title:'dX/dt'},
-      zaxis:{color:'#888899', gridcolor:'#2a2a40', title:'t (months)'},
-      camera:{eye:{x:1.5,y:1.5,z:0.8}}
-    },
-    font:{color:'#e8e8f0'},
-    title:{text:'Poincaré Spiral — Duffing Equation · monthly sampling (12 points/year)',
-           font:{color:'#e8e8f0',size:13}},
-    margin:{l:0,r:0,t:44,b:0},
-    showlegend:true,
-    legend:{font:{color:'#888899',size:10}, bgcolor:'rgba(10,10,14,0.8)',
-            orientation:'v', x:1.02, y:1}
-  };
-  Plotly.newPlot('plot-3d-mod', modTraces, layout3dMod, {responsive:true, displaylogo:false});
+  Plotly.newPlot('plot-3d-mod', modTraces,
+    makeLayout('Duffing Equation — Phase Space × Month of Year',
+               'X', 'dX/dt'),
+    {responsive:true, displaylogo:false});
+
+  // ── Pre-compute year loops for animation (irest===0 monthly samples) ──
+  const calMinY = Math.min(...callaoData.year);
+  const calMaxY = Math.max(...callaoData.year);
+  const obsYearMap = {}, calYearMap = {};
+
+  for (let i=0; i<OBS_N; i++) {
+    if (observedData.irest[i]!==0) continue;
+    const yr = observedData.year[i];
+    if (!obsYearMap[yr]) obsYearMap[yr] = {xi:[],yi:[],zi:[]};
+    obsYearMap[yr].xi.push(observedData.x[i]);
+    obsYearMap[yr].yi.push(observedData.y[i]);
+    obsYearMap[yr].zi.push(observedData.month[i]);
+  }
+  for (let i=0; i<CAL_N; i++) {
+    if (callaoData.irest[i]!==0) continue;
+    const yr = callaoData.year[i];
+    if (!calYearMap[yr]) calYearMap[yr] = {xi:[],yi:[],zi:[]};
+    calYearMap[yr].xi.push(callaoData.x[i] - callaoMean);
+    calYearMap[yr].yi.push(callaoData.y[i]);
+    calYearMap[yr].zi.push(callaoData.month[i]);
+  }
+
+  const obsYears = Object.keys(obsYearMap).map(Number).sort((a,b)=>a-b);
+  const calYears = Object.keys(calYearMap).map(Number).sort((a,b)=>a-b);
+
+  FA3D.obsYearLoops = obsYears.map(yr => ({
+    type:'scatter3d', mode:'markers',
+    x:obsYearMap[yr].xi, y:obsYearMap[yr].yi, z:obsYearMap[yr].zi,
+    marker:{size:5, color:yearColor(yr,obsMinY,obsMaxY), opacity:0.88, showscale:false},
+    name:String(yr), showlegend:false
+  }));
+  FA3D.calYearLoops = calYears.map(yr => ({
+    type:'scatter3d', mode:'markers',
+    x:calYearMap[yr].xi, y:calYearMap[yr].yi, z:calYearMap[yr].zi,
+    marker:{size:5, color:yearColor(yr,calMinY,calMaxY), opacity:0.88, showscale:false},
+    name:String(yr), showlegend:false
+  }));
+
+  // ── Animated plot layouts ─────────────────────────────────────────────
+  FA3D.obsAnimLayout = makeLayout(
+    'SST NINO1+2 — animated by year', 'T (°C)', 'dT/dt (°C/mo)');
+  FA3D.calAnimLayout = makeLayout(
+    'Callao SSH — animated by year', 'SSH anomaly (mm)', 'dSSH/dt (mm/mo)');
+
+  Plotly.newPlot('plot-3d-obs-anim', [], FA3D.obsAnimLayout,
+    {responsive:true, displaylogo:false});
+  Plotly.newPlot('plot-3d-cal-anim', [], FA3D.calAnimLayout,
+    {responsive:true, displaylogo:false});
+
+  // ── Animation: one year per frame ────────────────────────────────────
+  function fa3dFrame() {
+    if (!FA3D.running || FA3D.paused) return;
+    const i = FA3D.yearIdx;
+    if (i >= FA3D.obsYearLoops.length) {
+      FA3D.running = false;
+      document.getElementById('fa3d-run').disabled = false;
+      document.getElementById('fa3d-pause').disabled = true;
+      return;
+    }
+    Plotly.addTraces('plot-3d-obs-anim', FA3D.obsYearLoops[i]);
+    const ci = Math.min(i, FA3D.calYearLoops.length - 1);
+    Plotly.addTraces('plot-3d-cal-anim', FA3D.calYearLoops[ci]);
+    const lbl = document.getElementById('fa3d-year-label');
+    if (lbl) lbl.textContent = 'Year: ' + FA3D.obsYearLoops[i].name;
+    FA3D.yearIdx++;
+    FA3D.rafId = setTimeout(fa3dFrame, FA3D.delay);
+  }
+
+  function fa3dRun() {
+    if (FA3D.running && !FA3D.paused) return;
+    if (FA3D.paused) {
+      FA3D.paused = false;
+    } else {
+      FA3D.yearIdx = 0;
+      FA3D.running = true;
+      Plotly.react('plot-3d-obs-anim', [], FA3D.obsAnimLayout);
+      Plotly.react('plot-3d-cal-anim', [], FA3D.calAnimLayout);
+    }
+    document.getElementById('fa3d-run').disabled = true;
+    document.getElementById('fa3d-pause').disabled = false;
+    fa3dFrame();
+  }
+
+  function fa3dPause() {
+    FA3D.paused = true;
+    if (FA3D.rafId) { clearTimeout(FA3D.rafId); FA3D.rafId = null; }
+    document.getElementById('fa3d-run').disabled = false;
+    document.getElementById('fa3d-pause').disabled = true;
+  }
+
+  function fa3dReset() {
+    FA3D.running = false; FA3D.paused = false; FA3D.yearIdx = 0;
+    if (FA3D.rafId) { clearTimeout(FA3D.rafId); FA3D.rafId = null; }
+    Plotly.react('plot-3d-obs-anim', [], FA3D.obsAnimLayout);
+    Plotly.react('plot-3d-cal-anim', [], FA3D.calAnimLayout);
+    const lbl = document.getElementById('fa3d-year-label');
+    if (lbl) lbl.textContent = 'Year: —';
+    document.getElementById('fa3d-run').disabled = false;
+    document.getElementById('fa3d-pause').disabled = true;
+  }
+
+  // ── Wire controls ─────────────────────────────────────────────────────
+  document.getElementById('fa3d-run').addEventListener('click', fa3dRun);
+  document.getElementById('fa3d-pause').addEventListener('click', fa3dPause);
+  document.getElementById('fa3d-reset').addEventListener('click', fa3dReset);
+  const delaySl  = document.getElementById('fa3d-delay');
+  const delayLbl = document.getElementById('fa3d-delay-lbl');
+  delaySl.addEventListener('input', () => {
+    FA3D.delay = +delaySl.value;
+    delayLbl.textContent = delaySl.value + ' ms';
+  });
 }
 
 window.addEventListener('load', () => {

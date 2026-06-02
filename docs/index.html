@@ -450,6 +450,34 @@ function obs1DrawBgs() {
   drawBg(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1_LABELS_CAL, CAL_SSH_TICKS);
 }
 
+function _cmpCommonStart() {
+  // Find the later of the two dataset start dates (1975/01 for SST,
+  // 1970/01 for Callao) so both canvases animate in sync.
+  const obsY0 = observedData.year[0], obsM0 = observedData.month[0];
+  const calY0 = callaoData.year[0],   calM0 = callaoData.month[0];
+  let startYear, startMonth;
+  if (obsY0 > calY0 || (obsY0===calY0 && obsM0>calM0)) {
+    startYear=obsY0; startMonth=obsM0;
+  } else {
+    startYear=calY0; startMonth=calM0;
+  }
+  let obsStartIdx=0;
+  for (let i=0;i<OBS_N;i++){
+    if(observedData.year[i]>startYear ||
+       (observedData.year[i]===startYear && observedData.month[i]>=startMonth)){
+      obsStartIdx=i; break;
+    }
+  }
+  let calStartIdx=0;
+  for (let i=0;i<CAL_N;i++){
+    if(callaoData.year[i]>startYear ||
+       (callaoData.year[i]===startYear && callaoData.month[i]>=startMonth)){
+      calStartIdx=i; break;
+    }
+  }
+  return {startYear, startMonth, obsStartIdx, calStartIdx};
+}
+
 function obs1Init() {
   OBS1.sstCanvas = document.getElementById('obs1-sst-canvas');
   OBS1.sstCtx    = OBS1.sstCanvas.getContext('2d');
