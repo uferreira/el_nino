@@ -959,6 +959,7 @@ function addToOffWhite(offCtx, x1, y1, x2, y2, PLT, DOM) {
 function compositeFrameWhite(ctx, CW, CH, PLT, DOM, offCanvas, tail, timeStr) {
   const mx = x => PLT.l + (x-DOM.xmin)/(DOM.xmax-DOM.xmin)*(PLT.r-PLT.l);
   const my = y => PLT.b - (y-DOM.ymin)/(DOM.ymax-DOM.ymin)*(PLT.b-PLT.t);
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,CW,CH);
   ctx.drawImage(offCanvas,0,0);
   const n=tail.length;
   for(let i=1;i<n;i++){
@@ -993,8 +994,8 @@ function compositeFrameWhite(ctx, CW, CH, PLT, DOM, offCanvas, tail, timeStr) {
 }
 
 function clsDrawBgs(){
-  drawBgWhite(CLS.sstCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_SST,CLS_LABELS_SST,SST_ABS_TICKS);
-  drawBgWhite(CLS.calCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS_LABELS_CAL,CAL_SSH_TICKS);
+  drawBgWhite(CLS.sstOffCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_SST,CLS_LABELS_SST,SST_ABS_TICKS);
+  drawBgWhite(CLS.calOffCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS_LABELS_CAL,CAL_SSH_TICKS);
 }
 
 function clsStatus(){
@@ -1020,6 +1021,8 @@ function clsInit(){
   CLS.obsIdx=cs.obsStartIdx; CLS.calIdx=cs.calStartIdx;
   CLS.totalFrames=Math.min(OBS_N-cs.obsStartIdx,CAL_N-cs.calStartIdx);
   clsDrawBgs();
+  CLS.sstCtx.drawImage(CLS.sstOff,0,0);
+  CLS.calCtx.drawImage(CLS.calOff,0,0);
   const slSpf=document.getElementById('cls-sl-spf');
   const slDelay=document.getElementById('cls-sl-delay');
   if(slSpf) slSpf.addEventListener('input',()=>{CLS.spf=parseInt(slSpf.value)||1; document.getElementById('cls-lbl-spf').textContent=slSpf.value;});
@@ -1075,7 +1078,6 @@ function clsLoop(){
   }
   const tIdx=Math.min(CLS.obsIdx,OBS_N-1);
   const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
-  clsDrawBgs();
   compositeFrameWhite(CLS.sstCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_SST,CLS.sstOff,CLS.obsTail,dispStr);
   compositeFrameWhite(CLS.calCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS.calOff,CLS.calTail,null);
   document.getElementById('cls-time-display').textContent=observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
@@ -1131,6 +1133,8 @@ function clsReset(){
   CLS.sstOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
   CLS.calOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
   clsDrawBgs();
+  CLS.sstCtx.drawImage(CLS.sstOff,0,0);
+  CLS.calCtx.drawImage(CLS.calOff,0,0);
   const scrub=document.getElementById('cls-scrubber');
   if(scrub) scrub.value=0;
   document.getElementById('cls-time-display').textContent='Jan 1975';
@@ -1143,6 +1147,7 @@ function clsRedrawToFrame(targetFrame){
   const obsStart=CLS.obsStartIdx, calStart=CLS.calStartIdx;
   CLS.sstOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
   CLS.calOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
+  clsDrawBgs();
   let obsTail=[], calTail=[];
   for(let f=0;f<frame;f++){
     const oi=obsStart+f, ci=calStart+f;
@@ -1169,7 +1174,6 @@ function clsRedrawToFrame(targetFrame){
   CLS.obsTail=obsTail; CLS.calTail=calTail;
   const tIdx=Math.min(CLS.obsIdx,OBS_N-1);
   const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
-  clsDrawBgs();
   compositeFrameWhite(CLS.sstCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_SST,CLS.sstOff,CLS.obsTail,dispStr);
   compositeFrameWhite(CLS.calCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS.calOff,CLS.calTail,null);
   document.getElementById('cls-time-display').textContent=observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
