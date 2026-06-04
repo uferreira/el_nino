@@ -122,7 +122,16 @@ input:checked + .toggle-slider:before { transform:translateX(16px); background:#
 <!-- Dataset selector -->
 <div class="controls">
   <div class="ctrl-head">Select datasets</div>
-  <div class="ds-grid" id="cmp-ds-grid"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:.8rem;">
+    <div>
+      <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-bottom:.4rem;">SST Indices</div>
+      <div class="ds-grid" id="cmp-ds-sst"></div>
+    </div>
+    <div>
+      <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-bottom:.4rem;">Sea Level Stations</div>
+      <div class="ds-grid" id="cmp-ds-ssh"></div>
+    </div>
+  </div>
   <div style="display:flex;align-items:center;gap:1.5rem;margin-top:.8rem;flex-wrap:wrap;">
     <div class="toggle-wrap">
       <label class="toggle-switch">
@@ -289,7 +298,8 @@ const CMP_PALETTE = [
 // Canvas setup
 // ─────────────────────────────────────────────────────────────
 const CMP_CW = 1100, CMP_CH = 520;
-const CMP_PLT = { l:64, r:CMP_CW-20, t:30, b:CMP_CH-50 };
+const PLT_SST = {l:64,  r:520,  t:30, b:470};
+const PLT_SSH = {l:580, r:1080, t:30, b:470};
 
 let cmpCanvas, cmpCtx, cmpOffCanvas, cmpOffCtx;
 
@@ -330,86 +340,94 @@ function cmpNormY(v, prep, norm) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Domain computation
+// Panel assignment helpers
 // ─────────────────────────────────────────────────────────────
-function cmpComputeDomain(activePreps, norm) {
-  if (norm) return { xmin:-4, xmax:4, ymin:-2, ymax:2 };
-  let xlo=Infinity, xhi=-Infinity, ylo=Infinity, yhi=-Infinity;
-  for (const p of activePreps) {
-    for (const v of p.data.x) { const a=v-p.mean_x; xlo=Math.min(xlo,a); xhi=Math.max(xhi,a); }
-    for (const v of p.data.y) { ylo=Math.min(ylo,v); yhi=Math.max(yhi,v); }
+function getPltForPrep(p) { return p.group === 'sst' ? PLT_SST : PLT_SSH; }
+function getDomForPrep(p) { return p.group === 'sst' ? CMP.domSST : CMP.domSSH; }
+
+// ─────────────────────────────────────────────────────────────
+// Domain computation — two panels
+// ─────────────────────────────────────────────────────────────
+function cmpComputeDomains(norm) {
+  if (norm) {
+    const nd = {xmin:-4, xmax:4, ymin:-2, ymax:2};
+    return {sst:nd, ssh:nd};
   }
-  if (!isFinite(xlo)) return { xmin:-3, xmax:3, ymin:-1.5, ymax:1.5 };
-  const xp=(xhi-xlo)*0.05, yp=(yhi-ylo)*0.05;
-  return { xmin:xlo-xp, xmax:xhi+xp, ymin:ylo-yp, ymax:yhi+yp };
+  return {
+    sst:{xmin:-7.5, xmax:7.5, ymin:-2.5, ymax:2.5},
+    ssh:{xmin:-300,  xmax:300, ymin:-60,  ymax:60 }
+  };
 }
 
 // ─────────────────────────────────────────────────────────────
 // Canvas drawing helpers
 // ─────────────────────────────────────────────────────────────
-function cmpDataX(v, dom) {
-  return CMP_PLT.l + (v - dom.xmin)/(dom.xmax - dom.xmin)*(CMP_PLT.r - CMP_PLT.l);
+function mapX(v, dom, plt) {
+  return plt.l + (v - dom.xmin)/(dom.xmax - dom.xmin)*(plt.r - plt.l);
 }
-function cmpDataY(v, dom) {
-  return CMP_PLT.b - (v - dom.ymin)/(dom.ymax - dom.ymin)*(CMP_PLT.b - CMP_PLT.t);
+function mapY(v, dom, plt) {
+  return plt.b - (v - dom.ymin)/(dom.ymax - dom.ymin)*(plt.b - plt.t);
 }
 
-function cmpDrawBackground(ctx, dom, norm) {
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, CMP_CW, CMP_CH);
+function drawPanel(ctx, plt, dom, norm, xlabel, ylabel, title) {
+  ctx.strokeStyle = '#cccccc'; ctx.lineWidth = 1;
+  ctx.strokeRect(plt.l, plt.t, plt.r-plt.l, plt.b-plt.t);
 
-  // Plot area border
-  ctx.strokeStyle = '#cccccc';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(CMP_PLT.l, CMP_PLT.t, CMP_PLT.r-CMP_PLT.l, CMP_PLT.b-CMP_PLT.t);
-
-  // Grid lines
-  ctx.strokeStyle = '#eeeeee';
-  ctx.lineWidth = 0.8;
-
-  const nticksX = 8, nticksY = 6;
+  ctx.strokeStyle = '#eeeeee'; ctx.lineWidth = 0.8;
+  const xdec = norm ? 1 : (Math.abs(dom.xmax) > 10 ? 0 : 1);
+  const ydec = 1;
+  const nticksX = 6, nticksY = 5;
   for (let i=0; i<=nticksX; i++) {
     const xv = dom.xmin + i*(dom.xmax-dom.xmin)/nticksX;
-    const px = cmpDataX(xv, dom);
-    ctx.beginPath(); ctx.moveTo(px, CMP_PLT.t); ctx.lineTo(px, CMP_PLT.b); ctx.stroke();
-    ctx.fillStyle = '#666666';
-    ctx.font = '10px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(xv.toFixed(norm?1:0), px, CMP_PLT.b+14);
+    const px = mapX(xv, dom, plt);
+    ctx.beginPath(); ctx.moveTo(px, plt.t); ctx.lineTo(px, plt.b); ctx.stroke();
+    ctx.fillStyle='#666666'; ctx.font='10px monospace'; ctx.textAlign='center';
+    ctx.fillText(xv.toFixed(xdec), px, plt.b+14);
   }
   for (let i=0; i<=nticksY; i++) {
     const yv = dom.ymin + i*(dom.ymax-dom.ymin)/nticksY;
-    const py = cmpDataY(yv, dom);
-    ctx.beginPath(); ctx.moveTo(CMP_PLT.l, py); ctx.lineTo(CMP_PLT.r, py); ctx.stroke();
-    ctx.fillStyle = '#666666';
-    ctx.font = '10px monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText(yv.toFixed(norm?1:0), CMP_PLT.l-4, py+3);
+    const py = mapY(yv, dom, plt);
+    ctx.beginPath(); ctx.moveTo(plt.l, py); ctx.lineTo(plt.r, py); ctx.stroke();
+    ctx.fillStyle='#666666'; ctx.font='10px monospace'; ctx.textAlign='right';
+    ctx.fillText(yv.toFixed(ydec), plt.l-4, py+3);
   }
 
-  // Zero lines
   if (dom.xmin <= 0 && dom.xmax >= 0) {
-    const px0 = cmpDataX(0, dom);
+    const px0 = mapX(0, dom, plt);
     ctx.strokeStyle='#bbbbbb'; ctx.lineWidth=1.2;
-    ctx.beginPath(); ctx.moveTo(px0,CMP_PLT.t); ctx.lineTo(px0,CMP_PLT.b); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px0, plt.t); ctx.lineTo(px0, plt.b); ctx.stroke();
   }
   if (dom.ymin <= 0 && dom.ymax >= 0) {
-    const py0 = cmpDataY(0, dom);
+    const py0 = mapY(0, dom, plt);
     ctx.strokeStyle='#bbbbbb'; ctx.lineWidth=1.2;
-    ctx.beginPath(); ctx.moveTo(CMP_PLT.l,py0); ctx.lineTo(CMP_PLT.r,py0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(plt.l, py0); ctx.lineTo(plt.r, py0); ctx.stroke();
   }
 
-  // Axis labels
-  ctx.fillStyle = '#333333';
-  ctx.font = '11px sans-serif';
-  ctx.textAlign = 'center';
-  const xlabel = norm ? 'Normalized anomaly (σ)' : 'Anomaly';
-  ctx.fillText(xlabel, (CMP_PLT.l+CMP_PLT.r)/2, CMP_CH-8);
+  ctx.fillStyle='#333333'; ctx.font='11px sans-serif'; ctx.textAlign='center';
+  ctx.fillText(xlabel, (plt.l+plt.r)/2, plt.b+28);
   ctx.save();
-  ctx.translate(14, (CMP_PLT.t+CMP_PLT.b)/2);
+  ctx.translate(plt.l-38, (plt.t+plt.b)/2);
   ctx.rotate(-Math.PI/2);
-  ctx.fillText(norm ? 'd/dt (σ/month)' : 'dT/dt', 0, 0);
+  ctx.fillText(ylabel, 0, 0);
   ctx.restore();
+
+  ctx.fillStyle='#222222'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
+  ctx.fillText(title, (plt.l+plt.r)/2, plt.t-10);
+}
+
+function cmpDrawBackground(ctx, domSST, domSSH, norm) {
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, CMP_CW, CMP_CH);
+
+  const sstXL = norm ? 'Anomaly (σ)'      : 'SST anomaly (°C)';
+  const sstYL = norm ? 'dT/dt (σ/mo)'    : 'dT/dt (°C/mo)';
+  const sshXL = norm ? 'Anomaly (σ)'      : 'SSH anomaly (mm)';
+  const sshYL = norm ? 'dSL/dt (σ/mo)'   : 'dSL/dt (mm/mo)';
+  drawPanel(ctx, PLT_SST, domSST, norm, sstXL, sstYL, 'SST Indices');
+  drawPanel(ctx, PLT_SSH, domSSH, norm, sshXL, sshYL, 'Sea Level');
+
+  ctx.strokeStyle='#cccccc'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(550, 20); ctx.lineTo(550, 490); ctx.stroke();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -420,10 +438,11 @@ let CMP = {
   timer: null,
   frame: 0,
   totalFrames: 0,
-  activePreps: [],   // prepared dataset objects
-  startIndices: [],  // per-dataset aligned start index
-  tails: [],         // per-dataset tail arrays [{x,y}]
-  domain: null,
+  activePreps: [],
+  startIndices: [],
+  tails: [],
+  domSST: null,
+  domSSH: null,
 };
 
 function cmpGetParams() {
@@ -497,7 +516,6 @@ function cmpPushTail(tail, px, py, color, tailLen) {
 
 function cmpRenderFrame(params) {
   const { norm, tail: TAIL } = params;
-  const dom = CMP.domain;
 
   // Clear display and stamp offscreen (background+gray history)
   cmpCtx.fillStyle = '#ffffff';
@@ -540,17 +558,18 @@ function cmpRenderFrame(params) {
 
 function cmpAdvanceFrame(params) {
   const { spf, tail: TAIL, norm } = params;
-  const dom = CMP.domain;
   for (let s=0; s<spf && CMP.frame < CMP.totalFrames-1; s++) {
     CMP.frame++;
     for (let k=0; k<CMP.activePreps.length; k++) {
       const p   = CMP.activePreps[k];
       const idx = CMP.startIndices[k] + CMP.frame;
       if (idx >= p.data.x.length) continue;
-      const xv = cmpNormX(p.data.x[idx], p, norm);
-      const yv = cmpNormY(p.data.y[idx], p, norm);
-      const px = cmpDataX(xv, dom);
-      const py = cmpDataY(yv, dom);
+      const xv  = cmpNormX(p.data.x[idx], p, norm);
+      const yv  = cmpNormY(p.data.y[idx], p, norm);
+      const plt = getPltForPrep(p);
+      const dom = getDomForPrep(p);
+      const px  = mapX(xv, dom, plt);
+      const py  = mapY(yv, dom, plt);
       const color = CMP_PALETTE[k % CMP_PALETTE.length];
       cmpPushTail(CMP.tails[k], px, py, color, TAIL);
     }
@@ -600,9 +619,11 @@ function cmpPrepareState() {
   CMP.activePreps  = preps;
   CMP.startIndices = starts;
   CMP.totalFrames  = total;
-  CMP.tails        = preps.map(() => []);
-  CMP.domain       = cmpComputeDomain(preps, params.norm);
-  CMP.frame        = 0;
+  CMP.tails  = preps.map(() => []);
+  const doms = cmpComputeDomains(params.norm);
+  CMP.domSST = doms.sst;
+  CMP.domSSH = doms.ssh;
+  CMP.frame  = 0;
   return true;
 }
 
@@ -612,7 +633,7 @@ function cmpStart() {
     if (!cmpPrepareState()) return;
     // Draw fresh background on offscreen
     cmpOffCtx.clearRect(0, 0, CMP_CW, CMP_CH);
-    cmpDrawBackground(cmpOffCtx, CMP.domain, cmpGetParams().norm);
+    cmpDrawBackground(cmpOffCtx, CMP.domSST, CMP.domSSH, cmpGetParams().norm);
     // Stamp to display
     cmpCtx.drawImage(cmpOffCanvas, 0, 0);
     // Initialise scrubber
@@ -638,17 +659,22 @@ function cmpPause() {
 function cmpReset() {
   CMP.running = false;
   clearTimeout(CMP.timer);
-  CMP.frame        = 0;
-  CMP.activePreps  = [];
-  CMP.tails        = [];
+  CMP.frame       = 0;
+  CMP.activePreps = [];
+  CMP.tails       = [];
   document.getElementById('cmp-run').disabled   = false;
   document.getElementById('cmp-pause').disabled = true;
   document.getElementById('cmp-status').innerHTML = '<span class="st-ready">Ready</span>';
   document.getElementById('cmp-time-display').textContent = '—';
   document.getElementById('cmp-scrubber').value = 0;
+  const norm = document.getElementById('cmp-norm-toggle').checked;
+  const doms = cmpComputeDomains(norm);
+  CMP.domSST = doms.sst; CMP.domSSH = doms.ssh;
   cmpOffCtx.clearRect(0, 0, CMP_CW, CMP_CH);
+  cmpDrawBackground(cmpOffCtx, CMP.domSST, CMP.domSSH, norm);
   cmpCtx.fillStyle = '#ffffff';
   cmpCtx.fillRect(0, 0, CMP_CW, CMP_CH);
+  cmpCtx.drawImage(cmpOffCanvas, 0, 0);
 }
 
 function cmpScrub(val) {
@@ -656,7 +682,7 @@ function cmpScrub(val) {
   if (CMP.activePreps.length === 0) {
     if (!cmpPrepareState()) return;
     cmpOffCtx.clearRect(0, 0, CMP_CW, CMP_CH);
-    cmpDrawBackground(cmpOffCtx, CMP.domain, cmpGetParams().norm);
+    cmpDrawBackground(cmpOffCtx, CMP.domSST, CMP.domSSH, cmpGetParams().norm);
     document.getElementById('cmp-scrubber').max = CMP.totalFrames - 1;
   }
   const targetFrame = parseInt(val);
@@ -664,7 +690,7 @@ function cmpScrub(val) {
 
   // Replay from scratch to target frame
   cmpOffCtx.clearRect(0, 0, CMP_CW, CMP_CH);
-  cmpDrawBackground(cmpOffCtx, CMP.domain, params.norm);
+  cmpDrawBackground(cmpOffCtx, CMP.domSST, CMP.domSSH, params.norm);
   CMP.tails = CMP.activePreps.map(() => []);
   CMP.frame = 0;
   const TAIL = params.tail;
@@ -675,10 +701,12 @@ function cmpScrub(val) {
       const p   = CMP.activePreps[k];
       const idx = CMP.startIndices[k] + f;
       if (idx >= p.data.x.length) continue;
-      const xv = cmpNormX(p.data.x[idx], p, params.norm);
-      const yv = cmpNormY(p.data.y[idx], p, params.norm);
-      const px = cmpDataX(xv, CMP.domain);
-      const py = cmpDataY(yv, CMP.domain);
+      const xv  = cmpNormX(p.data.x[idx], p, params.norm);
+      const yv  = cmpNormY(p.data.y[idx], p, params.norm);
+      const plt = getPltForPrep(p);
+      const dom = getDomForPrep(p);
+      const px  = mapX(xv, dom, plt);
+      const py  = mapY(yv, dom, plt);
       const color = CMP_PALETTE[k % CMP_PALETTE.length];
       cmpPushTail(CMP.tails[k], px, py, color, TAIL);
     }
@@ -706,18 +734,22 @@ function cmpWireSliders() {
 // Dataset selector UI
 // ─────────────────────────────────────────────────────────────
 function cmpBuildSelector() {
-  const grid   = document.getElementById('cmp-ds-grid');
-  const legend = document.getElementById('cmp-legend');
-  grid.innerHTML = '';
-  legend.innerHTML = '';
+  const sstGrid = document.getElementById('cmp-ds-sst');
+  const sshGrid = document.getElementById('cmp-ds-ssh');
+  const legend  = document.getElementById('cmp-legend');
+  sstGrid.innerHTML = '';
+  sshGrid.innerHTML = '';
+  legend.innerHTML  = '';
   CMP_REGISTRY.forEach((entry, i) => {
-    const color    = CMP_PALETTE[i % CMP_PALETTE.length];
-    const hasData  = entry.data.x.length > 0;
-    const chip     = document.createElement('label');
+    const color   = CMP_PALETTE[i % CMP_PALETTE.length];
+    const hasData = entry.data.x.length > 0;
+    const grid    = entry.group === 'sst' ? sstGrid : sshGrid;
+    const chip    = document.createElement('label');
     chip.className = 'ds-chip' + (hasData ? '' : ' disabled-ds');
     chip.title     = hasData ? '' : 'No data — run the pipeline first';
+    const defaultOn = (entry.id === 'nino12' || entry.id === 'callao') && hasData;
     chip.innerHTML = `
-      <input type="checkbox" id="cmp-cb-${entry.id}" ${i < 2 && hasData ? 'checked' : ''}>
+      <input type="checkbox" id="cmp-cb-${entry.id}" ${defaultOn ? 'checked' : ''}>
       <span class="ds-swatch" style="background:${color}"></span>
       <span>${entry.label}</span>`;
     grid.appendChild(chip);
@@ -747,9 +779,14 @@ let G_DOT = 3.0;
       document.getElementById('g-dot-lbl').textContent = G_DOT;
     });
   }
-  // Draw empty white canvas
+  // Draw panel backgrounds on load
+  const _initNorm = document.getElementById('cmp-norm-toggle').checked;
+  const _initDoms = cmpComputeDomains(_initNorm);
+  CMP.domSST = _initDoms.sst; CMP.domSSH = _initDoms.ssh;
+  cmpDrawBackground(cmpOffCtx, CMP.domSST, CMP.domSSH, _initNorm);
   cmpCtx.fillStyle = '#ffffff';
   cmpCtx.fillRect(0, 0, CMP_CW, CMP_CH);
+  cmpCtx.drawImage(cmpOffCanvas, 0, 0);
 })();
 </script>
 </body>
