@@ -644,11 +644,11 @@ function drawBg(ctx, CW, CH, PLT, DOM, labels, ticks) {
     }
   }
 
-  // Zero axes (dashed)
-  ctx.strokeStyle='#363650'; ctx.lineWidth=1.2;
-  ctx.setLineDash([5,4]);
-  ctx.beginPath(); ctx.moveTo(mx(0),PLT.t); ctx.lineTo(mx(0),PLT.b); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(PLT.l,my(0)); ctx.lineTo(PLT.r,my(0)); ctx.stroke();
+  // Zero axes (dashed, visible)
+  ctx.strokeStyle='rgba(180,180,180,0.6)'; ctx.lineWidth=1;
+  ctx.setLineDash([4,4]);
+  const x0z=mx(0); if(x0z>=PLT.l&&x0z<=PLT.r){ctx.beginPath();ctx.moveTo(x0z,PLT.t);ctx.lineTo(x0z,PLT.b);ctx.stroke();}
+  const y0z=my(0); if(y0z>=PLT.t&&y0z<=PLT.b){ctx.beginPath();ctx.moveTo(PLT.l,y0z);ctx.lineTo(PLT.r,y0z);ctx.stroke();}
   ctx.setLineDash([]);
 
   // Border
@@ -1368,11 +1368,11 @@ function _poiBg(ctx, CW, CH, PLT, DOM, xtitle, ytitle) {
   for (let y=Math.ceil(DOM.ymin); y<=Math.floor(DOM.ymax); y++) {
     ctx.beginPath(); ctx.moveTo(PLT.l,my(y)); ctx.lineTo(PLT.r,my(y)); ctx.stroke();
   }
-  // Zero axes
-  ctx.strokeStyle='#333348'; ctx.lineWidth=1.1;
+  // Zero axes (dashed, visible)
+  ctx.strokeStyle='rgba(180,180,180,0.6)'; ctx.lineWidth=1;
   ctx.setLineDash([4,4]);
-  ctx.beginPath(); ctx.moveTo(mx(0),PLT.t); ctx.lineTo(mx(0),PLT.b); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(PLT.l,my(0)); ctx.lineTo(PLT.r,my(0)); ctx.stroke();
+  const _x0z=mx(0); if(_x0z>=PLT.l&&_x0z<=PLT.r){ctx.beginPath();ctx.moveTo(_x0z,PLT.t);ctx.lineTo(_x0z,PLT.b);ctx.stroke();}
+  const _y0z=my(0); if(_y0z>=PLT.t&&_y0z<=PLT.b){ctx.beginPath();ctx.moveTo(PLT.l,_y0z);ctx.lineTo(PLT.r,_y0z);ctx.stroke();}
   ctx.setLineDash([]);
   // Border
   ctx.strokeStyle='#333348'; ctx.lineWidth=1;

@@ -84,6 +84,7 @@ footer a:hover { text-decoration:underline; }
       <button id="ens-play-btn" onclick="ensPlay()">&#9654; Play</button>
       <button id="ens-pause-btn" class="secondary" onclick="ensPause()" disabled>&#9646;&#9646; Pause</button>
       <button id="ens-reset-btn" class="danger" onclick="ensReset()">&#8635; Reset</button>
+      <button id="ens-loop-btn" class="secondary" onclick="ensToggleLoop()">Loop &#8635;</button>
       <span style="margin-left:.8rem;font-size:.82rem;color:var(--muted);">Speed&nbsp;(ms/frame):</span>
       <input type="range" id="ens-speed-sl" min="50" max="500" step="25" value="150"
              style="width:130px;accent-color:var(--accent);"
@@ -98,6 +99,15 @@ footer a:hover { text-decoration:underline; }
   <div class="two-col">
     <div class="plot-box"><div id="ens-plot-sst" style="height:420px;"></div></div>
     <div class="plot-box"><div id="ens-plot-cal" style="height:420px;"></div></div>
+  </div>
+  <div style="display:flex;justify-content:center;align-items:center;gap:1.5rem;
+              margin:.6rem 0 0;font-size:.85rem;color:var(--muted);">
+    <span>Year color:</span>
+    <span style="color:hsl(240,80%,55%)">&#9632; 1975</span>
+    <span style="color:hsl(169,80%,55%)">&#9632; 1990</span>
+    <span style="color:hsl(122,80%,55%)">&#9632; 2000</span>
+    <span style="color:hsl(75,80%,55%)">&#9632; 2010</span>
+    <span style="color:hsl(0,80%,55%)">&#9632; 2026</span>
   </div>
 </div>
 </section>
@@ -197,41 +207,79 @@ const ensLayoutSST = Object.assign({}, _darkBase, {
   title:{text:'SST NINO1+2 — all years at same instant', font:{color:'#e8e8f0',size:13}},
   xaxis:{title:{text:'SST anomaly (°C)'}, range:[-7.5,7.5],
          color:'#888899', gridcolor:'#2a2a40',
-         zerolinecolor:'#4488ff', zerolinewidth:1.5},
+         zeroline:true, zerolinecolor:'#666', zerolinewidth:1.5},
   yaxis:{title:{text:'dT/dt (°C/month)'}, range:[-2.5,2.5],
          color:'#888899', gridcolor:'#2a2a40',
-         zerolinecolor:'#555577', zerolinewidth:1},
+         zeroline:true, zerolinecolor:'#666', zerolinewidth:1.5},
 });
 const ensLayoutCal = Object.assign({}, _darkBase, {
   title:{text:'Callao SSH — all years at same instant', font:{color:'#e8e8f0',size:13}},
   xaxis:{title:{text:'SSH anomaly (mm)'}, range:[-300,300],
          color:'#888899', gridcolor:'#2a2a40',
-         zerolinecolor:'#4488ff', zerolinewidth:1.5},
+         zeroline:true, zerolinecolor:'#666', zerolinewidth:1.5},
   yaxis:{title:{text:'dSL/dt (mm/month)'}, range:[-60,60],
          color:'#888899', gridcolor:'#2a2a40',
-         zerolinecolor:'#555577', zerolinewidth:1},
+         zeroline:true, zerolinecolor:'#666', zerolinewidth:1.5},
 });
 
 // ═══════════════════════════════════════════════════════
-// 4. ANIMATION
+// 4. YEAR TRACKS (background ovals — one full loop per year)
+// ═══════════════════════════════════════════════════════
+
+const obsYearTracks = {};
+const calYearTracks = {};
+for (let k=0; k<ENS_FRAMES; k++) {
+  for (let j=0; j<obsEns[k].years.length; j++) {
+    const yr = obsEns[k].years[j];
+    if (!obsYearTracks[yr]) obsYearTracks[yr] = {x:[], y:[]};
+    obsYearTracks[yr].x.push(obsEns[k].x[j]);
+    obsYearTracks[yr].y.push(obsEns[k].y[j]);
+  }
+  for (let j=0; j<calEns[k].years.length; j++) {
+    const yr = calEns[k].years[j];
+    if (!calYearTracks[yr]) calYearTracks[yr] = {x:[], y:[]};
+    calYearTracks[yr].x.push(calEns[k].x[j]);
+    calYearTracks[yr].y.push(calEns[k].y[j]);
+  }
+}
+
+function mkBgTraces(yearTracks, minY, maxY) {
+  return Object.entries(yearTracks).map(([yr, d]) => ({
+    type:'scatter', mode:'lines',
+    x:d.x, y:d.y,
+    line:{
+      color: yearColor(+yr, minY, maxY)
+               .replace('hsl(', 'hsla(').replace(')', ',0.18)'),
+      width:1,
+    },
+    showlegend:false, hoverinfo:'skip', name:String(yr),
+  }));
+}
+
+// ═══════════════════════════════════════════════════════
+// 5. ANIMATION
 // ═══════════════════════════════════════════════════════
 
 let ensFrame = 0, ensRunning = false, ensDelay = 150, ensTimerId = null;
+let ensLoopMode = true;
 
-function _ensTrace(ensArr, minY, maxY) {
-  const d = ensArr[ensFrame];
-  return [{
-    type:'scatter', mode:'markers',
-    x:d.x, y:d.y,
-    marker:{size:7, color:ensColors(d.years, minY, maxY), opacity:0.85},
-    text:d.years,
-    hovertemplate:'%{text}: (%{x:.2f}, %{y:.2f})<extra></extra>',
-  }];
-}
+// These are set in init after bg traces are built
+let _obsBgLen = 0, _calBgLen = 0;
 
 function ensRenderFrame() {
-  Plotly.react('ens-plot-sst', _ensTrace(obsEns, obsMinY, obsMaxY), ensLayoutSST);
-  Plotly.react('ens-plot-cal', _ensTrace(calEns, calMinY, calMaxY), ensLayoutCal);
+  const od = obsEns[ensFrame], cd = calEns[ensFrame];
+  Plotly.restyle('ens-plot-sst', {
+    x: [od.x],
+    y: [od.y],
+    'marker.color': [ensColors(od.years, obsMinY, obsMaxY)],
+    text: [od.years.map(String)],
+  }, [_obsBgLen]);
+  Plotly.restyle('ens-plot-cal', {
+    x: [cd.x],
+    y: [cd.y],
+    'marker.color': [ensColors(cd.years, calMinY, calMaxY)],
+    text: [cd.years.map(String)],
+  }, [_calBgLen]);
   document.getElementById('ens-time-label').textContent = frameLabel(ensFrame);
 }
 
@@ -239,6 +287,10 @@ function ensLoop() {
   if (!ensRunning) return;
   ensFrame = (ensFrame + 1) % ENS_FRAMES;
   ensRenderFrame();
+  if (!ensLoopMode && ensFrame === 0) {
+    ensPause();
+    return;
+  }
   ensTimerId = setTimeout(ensLoop, ensDelay);
 }
 
@@ -268,19 +320,38 @@ function ensSetDelay(val) {
   document.getElementById('ens-speed-lbl').textContent = val + 'ms';
 }
 
+function ensToggleLoop() {
+  ensLoopMode = !ensLoopMode;
+  document.getElementById('ens-loop-btn').textContent =
+    ensLoopMode ? 'Loop ↻' : 'One cycle →';
+}
+
 // ═══════════════════════════════════════════════════════
-// 5. INIT
+// 6. INIT
 // ═══════════════════════════════════════════════════════
 
 window.addEventListener('load', () => {
   document.getElementById('ens-legend-text').innerHTML =
     'Blue&nbsp;=&nbsp;' + obsMinY + ' &nbsp;&middot;&nbsp; Red&nbsp;=&nbsp;' + obsMaxY;
 
-  // Initial plot — frame 0
-  Plotly.newPlot('ens-plot-sst', _ensTrace(obsEns, obsMinY, obsMaxY),
+  const obsBgTraces = mkBgTraces(obsYearTracks, obsMinY, obsMaxY);
+  const calBgTraces = mkBgTraces(calYearTracks, calMinY, calMaxY);
+  _obsBgLen = obsBgTraces.length;
+  _calBgLen = calBgTraces.length;
+
+  const emptyDots = {
+    type:'scatter', mode:'markers',
+    x:[], y:[],
+    marker:{size:7, color:[], opacity:0.9},
+    text:[],
+    hovertemplate:'%{text}: (%{x:.2f}, %{y:.2f})<extra></extra>',
+  };
+
+  Plotly.newPlot('ens-plot-sst', [...obsBgTraces, Object.assign({}, emptyDots)],
     ensLayoutSST, {responsive:true, displayModeBar:false});
-  Plotly.newPlot('ens-plot-cal', _ensTrace(calEns, calMinY, calMaxY),
+  Plotly.newPlot('ens-plot-cal', [...calBgTraces, Object.assign({}, emptyDots)],
     ensLayoutCal, {responsive:true, displayModeBar:false});
+
   document.getElementById('ens-time-label').textContent = frameLabel(0);
 });
 </script>
