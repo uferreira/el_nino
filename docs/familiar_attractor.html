@@ -714,20 +714,21 @@ function init3D() {
   const honPhaseZ    = Array.from({length:HON_N},    (_, i) => TWO_PI * ((honoluluData.month[i]-1) + honoluluData.irest[i]/5) / 12);
   const palPhaseZ    = Array.from({length:PAL_N},    (_, i) => TWO_PI * ((palauData.month[i]-1)    + palauData.irest[i]/5)    / 12);
 
+  const _safeN = (data, N) => (N > 0 && data.year[0] <= 2010) ? N : 0;
   FA3D.psExtras = [
-    { id:'nino3',  xanom:nino3Xanom,  yArr:nino3Data.y,    accel:nino3Accel,  phaseZ:nino3PhaseZ,  N:NINO3_N,
+    { id:'nino3',  xanom:nino3Xanom,  yArr:nino3Data.y,    accel:nino3Accel,  phaseZ:nino3PhaseZ,  N:_safeN(nino3Data,NINO3_N),
       xLabel:'NINO3 anomaly (°C)', yLabel:'dT/dt (°C/mo)', accelLayout:null, phaseLayout:null, idx:0 },
-    { id:'nino34', xanom:nino34Xanom, yArr:nino34Data.y,   accel:nino34Accel, phaseZ:nino34PhaseZ, N:NINO34_N,
+    { id:'nino34', xanom:nino34Xanom, yArr:nino34Data.y,   accel:nino34Accel, phaseZ:nino34PhaseZ, N:_safeN(nino34Data,NINO34_N),
       xLabel:'NINO3.4 anomaly (°C)', yLabel:'dT/dt (°C/mo)', accelLayout:null, phaseLayout:null, idx:0 },
-    { id:'nino4',  xanom:nino4Xanom,  yArr:nino4Data.y,    accel:nino4Accel,  phaseZ:nino4PhaseZ,  N:NINO4_N,
+    { id:'nino4',  xanom:nino4Xanom,  yArr:nino4Data.y,    accel:nino4Accel,  phaseZ:nino4PhaseZ,  N:_safeN(nino4Data,NINO4_N),
       xLabel:'NINO4 anomaly (°C)', yLabel:'dT/dt (°C/mo)', accelLayout:null, phaseLayout:null, idx:0 },
-    { id:'tal',    xanom:talXanom,    yArr:talaraData.y,   accel:talAccel,    phaseZ:talPhaseZ,    N:TAL_N,
+    { id:'tal',    xanom:talXanom,    yArr:talaraData.y,   accel:talAccel,    phaseZ:talPhaseZ,    N:_safeN(talaraData,TAL_N),
       xLabel:'SSH anomaly (mm)', yLabel:'dSL/dt (mm/mo)', accelLayout:null, phaseLayout:null, idx:0 },
-    { id:'lalib',  xanom:llXanom,     yArr:laLibData.y,    accel:llAccel,     phaseZ:llPhaseZ,     N:LALIB_N,
+    { id:'lalib',  xanom:llXanom,     yArr:laLibData.y,    accel:llAccel,     phaseZ:llPhaseZ,     N:_safeN(laLibData,LALIB_N),
       xLabel:'SSH anomaly (mm)', yLabel:'dSL/dt (mm/mo)', accelLayout:null, phaseLayout:null, idx:0 },
-    { id:'hon',    xanom:honXanom,    yArr:honoluluData.y, accel:honAccel,    phaseZ:honPhaseZ,    N:HON_N,
+    { id:'hon',    xanom:honXanom,    yArr:honoluluData.y, accel:honAccel,    phaseZ:honPhaseZ,    N:_safeN(honoluluData,HON_N),
       xLabel:'SSH anomaly (mm)', yLabel:'dSL/dt (mm/mo)', accelLayout:null, phaseLayout:null, idx:0 },
-    { id:'pal',    xanom:palXanom,    yArr:palauData.y,    accel:palAccel,    phaseZ:palPhaseZ,    N:PAL_N,
+    { id:'pal',    xanom:palXanom,    yArr:palauData.y,    accel:palAccel,    phaseZ:palPhaseZ,    N:_safeN(palauData,PAL_N),
       xLabel:'SSH anomaly (mm)', yLabel:'dSL/dt (mm/mo)', accelLayout:null, phaseLayout:null, idx:0 },
   ];
 

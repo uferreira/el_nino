@@ -656,25 +656,38 @@ const OBS1_EXTRA_CFGS = [
 ];
 let OBS1_EXTRAS = [];
 
+function safeStartIdx(data, N) {
+  if (!data || N === 0) return -1;
+  if (data.year[0] > 2010) return -1;
+  return 0;
+}
 function _obs1ExtraStarts(cs) {
-  return [cs.nino3StartIdx, cs.nino34StartIdx, cs.nino4StartIdx, cs.talStartIdx, cs.llStartIdx, cs.honStartIdx, cs.palStartIdx];
+  return [
+    safeStartIdx(nino3Data,    NINO3_N),
+    safeStartIdx(nino34Data,   NINO34_N),
+    safeStartIdx(nino4Data,    NINO4_N),
+    safeStartIdx(talaraData,   TAL_N),
+    safeStartIdx(laLibData,    LALIB_N),
+    safeStartIdx(honoluluData, HON_N),
+    safeStartIdx(palauData,    PAL_N),
+  ];
 }
 function _obs1TotalFrames(cs) {
   const fc = [OBS_N-cs.obsStartIdx, CAL_N-cs.calStartIdx];
-  if (NINO3_N>0)  fc.push(NINO3_N -cs.nino3StartIdx);
-  if (NINO34_N>0) fc.push(NINO34_N-cs.nino34StartIdx);
-  if (NINO4_N>0)  fc.push(NINO4_N -cs.nino4StartIdx);
-  if (TAL_N>0)    fc.push(TAL_N   -cs.talStartIdx);
-  if (LALIB_N>0)  fc.push(LALIB_N -cs.llStartIdx);
-  if (HON_N>0)    fc.push(HON_N   -cs.honStartIdx);
-  if (PAL_N>0)    fc.push(PAL_N   -cs.palStartIdx);
+  if (NINO3_N>0  && safeStartIdx(nino3Data,   NINO3_N)  !== -1) fc.push(NINO3_N);
+  if (NINO34_N>0 && safeStartIdx(nino34Data,  NINO34_N) !== -1) fc.push(NINO34_N);
+  if (NINO4_N>0  && safeStartIdx(nino4Data,   NINO4_N)  !== -1) fc.push(NINO4_N);
+  if (TAL_N>0    && safeStartIdx(talaraData,  TAL_N)    !== -1) fc.push(TAL_N);
+  if (LALIB_N>0  && safeStartIdx(laLibData,   LALIB_N)  !== -1) fc.push(LALIB_N);
+  if (HON_N>0    && safeStartIdx(honoluluData,HON_N)    !== -1) fc.push(HON_N);
+  if (PAL_N>0    && safeStartIdx(palauData,   PAL_N)    !== -1) fc.push(PAL_N);
   return Math.min(...fc);
 }
 
 function obs1InitExtras(startIndices) {
   OBS1_EXTRAS = OBS1_EXTRA_CFGS.map((cfg, i) => {
     const canvas = document.getElementById(cfg.id);
-    if (cfg.N === 0) {
+    if (cfg.N === 0 || startIndices[i] === -1) {
       if (canvas) {
         const ctx = canvas.getContext('2d');
         ctx.fillStyle='#1a1a2a'; ctx.fillRect(0,0,OBS1_CW,OBS1_CH);
@@ -744,33 +757,29 @@ function obs1DrawBgs() {
 }
 
 function _cmpCommonStart() {
-  const ALL_DS = [
-    { data:observedData, N:OBS_N,   key:'obs'   },
-    { data:callaoData,   N:CAL_N,   key:'cal'   },
-    { data:nino3Data,    N:NINO3_N, key:'nino3' },
-    { data:nino34Data,   N:NINO34_N,key:'nino34'},
-    { data:nino4Data,    N:NINO4_N, key:'nino4' },
-    { data:talaraData,   N:TAL_N,   key:'tal'   },
-    { data:laLibData,    N:LALIB_N, key:'ll'    },
-    { data:honoluluData, N:HON_N,   key:'hon'   },
-    { data:palauData,    N:PAL_N,   key:'pal'   },
-  ];
-  const active = ALL_DS.filter(d => d.N > 0);
-  let startYear=0, startMonth=0;
-  for (const d of active) {
-    const y0=d.data.year[0], m0=d.data.month[0];
-    if (y0>startYear || (y0===startYear && m0>startMonth)) { startYear=y0; startMonth=m0; }
+  const obsY0 = observedData.year[0], obsM0 = observedData.month[0];
+  const calY0 = callaoData.year[0],   calM0 = callaoData.month[0];
+  let startYear, startMonth;
+  if (obsY0 > calY0 || (obsY0 === calY0 && obsM0 > calM0)) {
+    startYear = obsY0; startMonth = obsM0;
+  } else {
+    startYear = calY0; startMonth = calM0;
   }
-  function findIdx(data, N) {
-    if (N===0) return 0;
-    for (let i=0;i<N;i++) {
-      if (data.year[i]>startYear || (data.year[i]===startYear && data.month[i]>=startMonth)) return i;
+  let obsStartIdx = 0;
+  for (let i = 0; i < OBS_N; i++) {
+    if (observedData.year[i] > startYear ||
+        (observedData.year[i] === startYear && observedData.month[i] >= startMonth)) {
+      obsStartIdx = i; break;
     }
-    return N;
   }
-  const result = { startYear, startMonth };
-  for (const d of ALL_DS) result[d.key+'StartIdx'] = findIdx(d.data, d.N);
-  return result;
+  let calStartIdx = 0;
+  for (let i = 0; i < CAL_N; i++) {
+    if (callaoData.year[i] > startYear ||
+        (callaoData.year[i] === startYear && callaoData.month[i] >= startMonth)) {
+      calStartIdx = i; break;
+    }
+  }
+  return { startYear, startMonth, obsStartIdx, calStartIdx };
 }
 
 function obs1Init() {
@@ -1170,7 +1179,7 @@ let CLS_EXTRAS = [];
 function clsInitExtras(startIndices) {
   CLS_EXTRAS = CLS_EXTRA_CFGS.map((cfg, i) => {
     const canvas = document.getElementById(cfg.id);
-    if (cfg.N === 0) {
+    if (cfg.N === 0 || startIndices[i] === -1) {
       if (canvas) {
         const ctx = canvas.getContext('2d');
         ctx.fillStyle='#f8f8f8'; ctx.fillRect(0,0,CLS_CW,CLS_CH);
