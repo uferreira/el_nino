@@ -233,7 +233,7 @@ def _run_sst_pipeline(cfg: dict, hn1: float, hn2: float, ndots: int,
     m0  = int(result["MES"][0])
     m1  = int(result["MES"][-1])
     final = out_dir / f"sva.2_filter_{int(hn1)}_{int(hn2)}_{yr0}.{m0}_{yr1}.{m1}_SAIDApy.dat"
-    tmp_path.rename(final)
+    tmp_path.replace(final)
     result["output_file"] = str(final)
     return final, result
 

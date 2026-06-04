@@ -9,8 +9,11 @@ dependency on pandas beyond this module boundary.
 
 from __future__ import annotations
 
+import shutil
+import warnings
 from datetime import datetime, timezone
 from io import StringIO
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -125,6 +128,16 @@ def _find_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
         if cand in df.columns:
             return cand
     return None
+
+
+def _save_raw(path: str, content: str) -> None:
+    """Write ``content`` to ``path``; silently warns on failure."""
+    try:
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+    except Exception as exc:
+        warnings.warn(f"Could not save {path}: {exc}")
 
 
 def _parse_rapid_csv(text: str) -> pd.DataFrame | None:
@@ -248,6 +261,7 @@ def _load_rapid(station_id: str) -> pd.DataFrame:
             if df.empty:
                 continue
 
+            _save_raw(f"data/input/rapid_{station_id}_raw.csv", resp.text)
             print(
                 f"  RAPID: {len(df):,} records  "
                 f"({df['time_utc'].iloc[0]} → {df['time_utc'].iloc[-1]})"
@@ -416,6 +430,8 @@ def load_sst(
     # we reuse _parse_sst_lines for both.
     with open(local_file, "r") as fh:
         local_lines = fh.readlines()
+    # File 2: preserve the historical source file as-is.
+    _save_raw("data/input/sst_historical_pre1982.txt", "".join(local_lines))
     df_local = _parse_sst_lines(local_lines, ano_inicio=ano_inicio)
     # Guard: keep only the pre-1982 record from the local file to avoid
     # double-counting the overlap if the local file extends beyond 1981.
@@ -424,6 +440,8 @@ def load_sst(
     # Download the live NOAA record (1982–present).
     print(f"  Downloading SST from NOAA: {NOAA_SST_URL}")
     resp = _fetch(NOAA_SST_URL, "NOAA SST indices (sstoi.indices)")
+    # File 1: save the exact NOAA response text.
+    _save_raw("data/input/noaa_sstoi_raw.txt", resp.text)
     df_noaa = _parse_sst_lines(resp.text.splitlines(), ano_inicio=1982)
 
     # Merge, sort, and enforce correct dtypes.
@@ -440,6 +458,16 @@ def load_sst(
         f"({df['YR'].iloc[0]}/{df['MON'].iloc[0]:02d} → "
         f"{df['YR'].iloc[-1]}/{df['MON'].iloc[-1]:02d})"
     )
+
+    # File 3: combined SST series fed to the filter.
+    _ym = datetime.now(timezone.utc).strftime("%Y-%m")
+    _sst_lines = [
+        f"# SST combined series (NINO1+2) generated {_ym}\n",
+        "year  month  sst_degC\n",
+    ]
+    for _r in df.itertuples(index=False):
+        _sst_lines.append(f"{_r.YR:4d}  {_r.MON:5d}  {_r.NINO12:.4f}\n")
+    _save_raw(f"data/input/sst_combined_{_ym}.txt", "".join(_sst_lines))
 
     return {
         "IYR":  df["YR"].to_numpy(dtype=np.int32),
@@ -514,6 +542,8 @@ def load_sea_level(
     )
     print(f"  Downloading {station_name} (UHSLC {station_id}) …")
     resp = _fetch(url, f"UHSLC ERDDAP station {station_id} ({station_name})")
+    # File 4: raw ERDDAP CSV before any parsing.
+    _save_raw(f"data/input/uhslc_fd_{station_id}_raw.csv", resp.text)
 
     # ERDDAP prepends two header rows: column names then a units row.
     # skiprows=[1] drops the units row while keeping the column-name row.
@@ -585,6 +615,19 @@ def load_sea_level(
         f"  {station_name}: {len(monthly)} monthly means  "
         f"({monthly['YR'].iloc[0]}/{monthly['MON'].iloc[0]:02d} → "
         f"{monthly['YR'].iloc[-1]}/{monthly['MON'].iloc[-1]:02d})"
+    )
+
+    # File 6: combined monthly sea level series.
+    _ym = datetime.now(timezone.utc).strftime("%Y-%m")
+    _sl_lines = [
+        f"# SSH combined monthly means station {station_id} generated {_ym}\n",
+        "year  month  sea_level_mm\n",
+    ]
+    for _r in monthly.itertuples(index=False):
+        _sl_lines.append(f"{_r.YR:4d}  {_r.MON:5d}  {_r.sl_mm:.2f}\n")
+    _save_raw(
+        f"data/input/ssh_combined_{station_id}_{_ym}.txt",
+        "".join(_sl_lines),
     )
 
     return {
