@@ -275,6 +275,76 @@ def run_sst(
     }
 
 
+def run_sst_index(
+    index_key: str,
+    local_file: str,
+    ano_inicio: int,
+    HN1: float,
+    HN2: float,
+    NDOTS: int,
+    output_file: str,
+) -> dict:
+    """
+    Pipeline for a single SST anomaly index (NINO12, NINO3, NINO4, NINO34).
+
+    Unlike run_sst, this function operates on the pre-computed anomaly column
+    (already deseasonalized by NOAA), so it skips the climatology subtraction
+    step and feeds the anomaly directly to passa_baixa.
+
+    Parameters
+    ----------
+    index_key   : str  — one of "nino12", "nino3", "nino4", "nino34"
+    local_file  : str  — path to local historical SST file
+    ano_inicio  : int  — first year to use
+    HN1, HN2    : float — filter band edges (months)
+    NDOTS       : int  — interpolation sub-points per monthly interval
+    output_file : str  — path for the output .dat file
+
+    Returns
+    -------
+    dict with keys: IYR, MES, ANOM, filtered, interp, vel, sigma30, sigma04,
+    output_file
+    """
+    _anom_key_map = {
+        "nino12": "ANOM12",
+        "nino3":  "ANOM3",
+        "nino4":  "ANOM4",
+        "nino34": "ANOM34",
+    }
+    anom_key = _anom_key_map.get(index_key)
+    if anom_key is None:
+        raise ValueError(f"Unknown SST index key: {index_key!r}")
+
+    raw_data = download.load_sst(local_file=local_file, ano_inicio=ano_inicio)
+    IYR  = raw_data["IYR"]
+    MES  = raw_data["MES"]
+    anom = raw_data[anom_key]
+    NT   = len(anom)
+    print(f"  NT = {NT}")
+
+    filtered_anom = passa_baixa(HN1, HN2, anom)
+    interp, vel, accel = deri_fourier(NDOTS, filtered_anom)
+    sigma30, sigma04 = compute_sigma(anom, filtered_anom, interp, NDOTS)
+    print(f"  SIGMA30 = {sigma30:.4f}")
+    print(f"  SIGMA04 = {sigma04:.4f}")
+
+    _write_dat(output_file, interp, vel, IYR, MES, NDOTS)
+    NTD = (NT - 1) * NDOTS + 1
+    print(f"  Written: {output_file}  ({NTD} interpolated points)")
+
+    return {
+        "IYR":         IYR,
+        "MES":         MES,
+        "ANOM":        anom,
+        "filtered":    filtered_anom,
+        "interp":      interp,
+        "vel":         vel,
+        "sigma30":     sigma30,
+        "sigma04":     sigma04,
+        "output_file": output_file,
+    }
+
+
 def run_sea_level(
     station_id: str,
     station_name: str,
@@ -283,6 +353,7 @@ def run_sea_level(
     HN2: float,
     NDOTS: int,
     output_file: str,
+    rqd_url: str | None = None,
 ) -> dict:
     """
     Full sea level pipeline: raw data → Fourier filter → output .dat file.
@@ -325,6 +396,7 @@ def run_sea_level(
         station_id=station_id,
         station_name=station_name,
         start_date=start_date,
+        rqd_url=rqd_url,
     )
     IYR = raw_data["IYR"]
     MES = raw_data["MES"]
@@ -384,10 +456,11 @@ def run_all(config_path: str = "config.yaml") -> dict:
     Returns
     -------
     dict with keys:
-        "sst"      : dict from run_sst
-        "callao"   : dict from run_sea_level
-        "honolulu" : dict from run_sea_level
-        "palau"    : dict from run_sea_level
+        "sst_nino12"  : dict from run_sst (NINO1+2 absolute SST)
+        "sst_nino3"   : dict from run_sst_index (NINO3 anomaly)
+        "sst_nino4"   : dict from run_sst_index (NINO4 anomaly)
+        "sst_nino34"  : dict from run_sst_index (NINO3.4 anomaly)
+        "<station_key>": dict from run_sea_level for each station in config
 
     Raises
     ------
@@ -406,45 +479,40 @@ def run_all(config_path: str = "config.yaml") -> dict:
     HN2     = float(flt["HN2"])
     NDOTS   = int(flt["NDOTS"])
     out_dir = Path("data/output")
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- SST ---
     sst_cfg = cfg["sst"]
-    print("\n=== SST pipeline ===")
+    result  = {}
 
-    # Load once to read start/end dates for the filename, then run.
-    # We load inside run_sst; build the filename from config so we don't
-    # need a separate pre-load just for dates — use ano_inicio instead.
-    yr0 = sst_cfg["ano_inicio"]
-
-    # Temporary placeholder filename — updated after knowing the end date.
-    # We construct the final filename inside run_sst's returned dict.
-    # To avoid a double download, pass a temporary name and rename later.
-    _tmp_sst_name = (
-        out_dir / f"sva.2_filter_{int(HN1)}_{int(HN2)}_SAIDApy_tmp.dat"
-    )
-    sst_result = run_sst(
+    # --- NINO1+2 absolute SST (Classic phase diagram) ---
+    print("\n=== SST NINO1+2 pipeline (absolute) ===")
+    nino12_path = out_dir / "sva.2_filter_NINO12_SAIDApy.dat"
+    result["sst_nino12"] = run_sst(
         local_file=sst_cfg["local_file"],
-        ano_inicio=yr0,
+        ano_inicio=sst_cfg["ano_inicio"],
         HN1=HN1,
         HN2=HN2,
         NDOTS=NDOTS,
-        output_file=str(_tmp_sst_name),
+        output_file=str(nino12_path),
     )
+    result["sst_nino12"]["output_file"] = str(nino12_path)
 
-    # Rename to the proper convention once we know the actual data range.
-    yr1 = int(sst_result["IYR"][-1])
-    m0  = int(sst_result["MES"][0])
-    m1  = int(sst_result["MES"][-1])
-    final_sst_name = (
-        out_dir
-        / f"sva.2_filter_{int(HN1)}_{int(HN2)}"
-        f"_{yr0}.{m0}_{yr1}.{m1}_SAIDApy.dat"
-    )
-    _tmp_sst_name.rename(final_sst_name)
-    sst_result["output_file"] = str(final_sst_name)
-    print(f"  Renamed → {final_sst_name.name}")
-
-    result = {"sst": sst_result}
+    # --- Remaining SST indices (anomaly-based) ---
+    for idx_cfg in cfg.get("sst_indices", []):
+        key = idx_cfg["key"]
+        if key == "nino12":
+            continue  # handled above
+        print(f"\n=== SST {idx_cfg['label']} pipeline (anomaly) ===")
+        out_path = out_dir / f"sva.2_filter_{key.upper()}_SAIDApy.dat"
+        result[f"sst_{key}"] = run_sst_index(
+            index_key=key,
+            local_file=sst_cfg["local_file"],
+            ano_inicio=sst_cfg["ano_inicio"],
+            HN1=HN1,
+            HN2=HN2,
+            NDOTS=NDOTS,
+            output_file=str(out_path),
+        )
 
     # --- Sea level stations ---
     for key, st in cfg["stations"].items():
@@ -458,6 +526,7 @@ def run_all(config_path: str = "config.yaml") -> dict:
             HN2=HN2,
             NDOTS=NDOTS,
             output_file=str(out_path),
+            rqd_url=st.get("rqd_url"),
         )
 
     return result

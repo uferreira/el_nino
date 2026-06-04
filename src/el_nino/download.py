@@ -459,7 +459,7 @@ def load_sst(
         f"{df['YR'].iloc[-1]}/{df['MON'].iloc[-1]:02d})"
     )
 
-    # File 3: combined SST series fed to the filter.
+    # File 3: combined SST series (NINO1+2 only, legacy format).
     _ym = datetime.now(timezone.utc).strftime("%Y-%m")
     _sst_lines = [
         f"# SST combined series (NINO1+2) generated {_ym}\n",
@@ -469,10 +469,210 @@ def load_sst(
         _sst_lines.append(f"{_r.YR:4d}  {_r.MON:5d}  {_r.NINO12:.4f}\n")
     _save_raw(f"data/input/sst_combined_{_ym}.txt", "".join(_sst_lines))
 
+    # File 3b: all four index columns for downstream use.
+    _idx_lines = [
+        f"# SST combined all indices generated {_ym}\n",
+        "year month nino12 anom12 nino3 anom3 nino4 anom4 nino34 anom34\n",
+    ]
+    for _r in df.itertuples(index=False):
+        _idx_lines.append(
+            f"{_r.YR:4d} {_r.MON:3d}"
+            f"  {_r.NINO12:.4f}  {_r.ANOM12:.4f}"
+            f"  {_r.NINO3:.4f}  {_r.ANOM3:.4f}"
+            f"  {_r.NINO4:.4f}  {_r.ANOM4:.4f}"
+            f"  {_r.NINO34:.4f}  {_r.ANOM34:.4f}\n"
+        )
+    _save_raw(f"data/input/sst_combined_indices_{_ym}.txt", "".join(_idx_lines))
+
     return {
-        "IYR":  df["YR"].to_numpy(dtype=np.int32),
-        "MES":  df["MON"].to_numpy(dtype=np.int32),
-        "SST0": df["NINO12"].to_numpy(dtype=np.float64),
+        "IYR":   df["YR"].to_numpy(dtype=np.int32),
+        "MES":   df["MON"].to_numpy(dtype=np.int32),
+        "SST0":  df["NINO12"].to_numpy(dtype=np.float64),
+        "ANOM12": df["ANOM12"].to_numpy(dtype=np.float64),
+        "SST3":  df["NINO3"].to_numpy(dtype=np.float64),
+        "ANOM3": df["ANOM3"].to_numpy(dtype=np.float64),
+        "SST4":  df["NINO4"].to_numpy(dtype=np.float64),
+        "ANOM4": df["ANOM4"].to_numpy(dtype=np.float64),
+        "SST34": df["NINO34"].to_numpy(dtype=np.float64),
+        "ANOM34": df["ANOM34"].to_numpy(dtype=np.float64),
+    }
+
+
+def _load_sea_level_erddap(
+    station_id: str,
+    station_name: str,
+    start_date: str,
+) -> dict:
+    """Download + aggregate via UHSLC ERDDAP FD + RAPID. Raises RuntimeError on failure."""
+    end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    url = (
+        f"{ERDDAP_BASE}"
+        f"?sea_level,time"
+        f"&time>={start_date}T00:00:00Z"
+        f"&time<={end_date}T23:59:59Z"
+        f"&uhslc_id={station_id}"
+    )
+    print(f"  Downloading {station_name} (UHSLC {station_id}) …")
+    resp = _fetch(url, f"UHSLC ERDDAP station {station_id} ({station_name})")
+    _save_raw(f"data/input/uhslc_fd_{station_id}_raw.csv", resp.text)
+
+    df = pd.read_csv(StringIO(resp.text), skiprows=[1])
+    df.columns = [c.split("(")[0].strip().lower() for c in df.columns]
+
+    if "time" not in df.columns or "sea_level" not in df.columns:
+        raise RuntimeError(
+            f"Unexpected ERDDAP columns for station {station_id}: "
+            f"{list(df.columns)}"
+        )
+
+    df["time_utc"] = pd.to_datetime(df["time"], utc=True)
+    df["sl_mm"]    = _clean_obs(df["sea_level"])
+    df["time_utc"] = _snap_to_hour(df["time_utc"])
+    df = (
+        df[["time_utc", "sl_mm"]]
+          .dropna(subset=["sl_mm"])
+          .sort_values("time_utc")
+          .drop_duplicates(subset=["time_utc"], keep="last")
+          .reset_index(drop=True)
+    )
+
+    if df.empty:
+        raise RuntimeError(
+            f"No valid observations for station {station_id} ({station_name}). "
+            f"Check the station ID and date range."
+        )
+
+    print(
+        f"  {station_name}: {len(df):,} hourly obs  "
+        f"({df['time_utc'].iloc[0]} → {df['time_utc'].iloc[-1]})"
+    )
+
+    df_rapid = _load_rapid(station_id)
+    if not df_rapid.empty:
+        fd_last    = df["time_utc"].max()
+        rapid_tail = df_rapid[df_rapid["time_utc"] > fd_last].copy()
+        if not rapid_tail.empty:
+            n_ext = len(rapid_tail)
+            df = _merge_fd_rapid(df, rapid_tail)
+            print(f"  Extended record with RAPID: {n_ext:,} additional hours")
+
+    df = df.set_index("time_utc")
+    monthly = (
+        df["sl_mm"]
+          .resample("MS")
+          .mean()
+          .dropna()
+          .reset_index()
+    )
+    monthly["YR"]  = monthly["time_utc"].dt.year.astype(np.int32)
+    monthly["MON"] = monthly["time_utc"].dt.month.astype(np.int32)
+
+    print(
+        f"  {station_name}: {len(monthly)} monthly means  "
+        f"({monthly['YR'].iloc[0]}/{monthly['MON'].iloc[0]:02d} → "
+        f"{monthly['YR'].iloc[-1]}/{monthly['MON'].iloc[-1]:02d})"
+    )
+
+    _ym = datetime.now(timezone.utc).strftime("%Y-%m")
+    _sl_lines = [
+        f"# SSH combined monthly means station {station_id} generated {_ym}\n",
+        "year  month  sea_level_mm\n",
+    ]
+    for _r in monthly.itertuples(index=False):
+        _sl_lines.append(f"{_r.YR:4d}  {_r.MON:5d}  {_r.sl_mm:.2f}\n")
+    _save_raw(
+        f"data/input/ssh_combined_{station_id}_{_ym}.txt",
+        "".join(_sl_lines),
+    )
+
+    return {
+        "IYR": monthly["YR"].to_numpy(dtype=np.int32),
+        "MES": monthly["MON"].to_numpy(dtype=np.int32),
+        "SL0": monthly["sl_mm"].to_numpy(dtype=np.float64),
+    }
+
+
+def load_sea_level_rqd(url: str, station_name: str) -> dict:
+    """
+    Download UHSLC Research Quality Data (RQD) hourly CSV and aggregate to monthly means.
+
+    The RQD CSV format is whitespace-separated with five columns:
+        year  month  day  hour  sea_level_mm
+    Missing values are encoded as -32767 or -32768.
+
+    Parameters
+    ----------
+    url          : str — direct URL to the RQD hourly CSV file
+    station_name : str — human-readable station name (for progress messages)
+
+    Returns
+    -------
+    dict with keys IYR (int32), MES (int32), SL0 (float64)
+
+    Raises
+    ------
+    RuntimeError
+        If the download fails or produces no usable data.
+    """
+    print(f"  [{station_name}] Trying RQD fallback: {url}")
+    resp = _fetch(url, f"UHSLC RQD {station_name}")
+
+    # Derive station id from URL for saving raw file.
+    _sid = url.rstrip("/").split("/")[-1].split(".")[0].lstrip("h")
+    _save_raw(f"data/input/rqd_{_sid}_raw.csv", resp.text)
+
+    # Parse: whitespace-separated, 5 columns, no header.
+    rows = []
+    for line in resp.text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) < 5:
+            continue
+        try:
+            yr, mo, dy, hr = int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])
+            sl = float(parts[4])
+        except ValueError:
+            continue
+        if sl in (-32767, -32768) or np.isnan(sl):
+            continue
+        rows.append((yr, mo, dy, hr, sl))
+
+    if not rows:
+        raise RuntimeError(f"RQD file for {station_name} contains no valid data.")
+
+    import pandas as pd
+    df = pd.DataFrame(rows, columns=["year", "month", "day", "hour", "sl_mm"])
+    df["time_utc"] = pd.to_datetime(
+        {"year": df["year"], "month": df["month"], "day": df["day"], "hour": df["hour"]},
+        utc=True, errors="coerce",
+    )
+    df = df.dropna(subset=["time_utc"]).set_index("time_utc")
+
+    # 50 % valid-hour threshold per month.
+    monthly_count = df["sl_mm"].resample("MS").count()
+    monthly_mean  = df["sl_mm"].resample("MS").mean()
+    days_in_month = monthly_mean.index.days_in_month
+    monthly_mean  = monthly_mean[monthly_count >= days_in_month * 24 * 0.5]
+    monthly_mean  = monthly_mean.dropna().reset_index()
+
+    if monthly_mean.empty:
+        raise RuntimeError(f"RQD data for {station_name}: no months passed 50% valid threshold.")
+
+    monthly_mean["YR"]  = monthly_mean["time_utc"].dt.year.astype(np.int32)
+    monthly_mean["MON"] = monthly_mean["time_utc"].dt.month.astype(np.int32)
+
+    print(
+        f"  {station_name} (RQD): {len(monthly_mean)} monthly means  "
+        f"({monthly_mean['YR'].iloc[0]}/{monthly_mean['MON'].iloc[0]:02d} → "
+        f"{monthly_mean['YR'].iloc[-1]}/{monthly_mean['MON'].iloc[-1]:02d})"
+    )
+    return {
+        "IYR": monthly_mean["YR"].to_numpy(dtype=np.int32),
+        "MES": monthly_mean["MON"].to_numpy(dtype=np.int32),
+        "SL0": monthly_mean["sl_mm"].to_numpy(dtype=np.float64),
     }
 
 
@@ -480,6 +680,7 @@ def load_sea_level(
     station_id: str,
     station_name: str,
     start_date: str,
+    rqd_url: str | None = None,
 ) -> dict:
     """
     Download hourly sea level from UHSLC ERDDAP, extend with RAPID
@@ -531,110 +732,24 @@ def load_sea_level(
     RuntimeError
         If the ERDDAP download fails or returns no usable data.
     """
-    end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-    url = (
-        f"{ERDDAP_BASE}"
-        f"?sea_level,time"
-        f"&time>={start_date}T00:00:00Z"
-        f"&time<={end_date}T23:59:59Z"
-        f"&uhslc_id={station_id}"
-    )
-    print(f"  Downloading {station_name} (UHSLC {station_id}) …")
-    resp = _fetch(url, f"UHSLC ERDDAP station {station_id} ({station_name})")
-    # File 4: raw ERDDAP CSV before any parsing.
-    _save_raw(f"data/input/uhslc_fd_{station_id}_raw.csv", resp.text)
-
-    # ERDDAP prepends two header rows: column names then a units row.
-    # skiprows=[1] drops the units row while keeping the column-name row.
-    df = pd.read_csv(StringIO(resp.text), skiprows=[1])
-    # Strip units suffixes like "sea_level (m)" → "sea_level".
-    df.columns = [c.split("(")[0].strip().lower() for c in df.columns]
-
-    if "time" not in df.columns or "sea_level" not in df.columns:
-        raise RuntimeError(
-            f"Unexpected ERDDAP columns for station {station_id}: "
-            f"{list(df.columns)}"
+    try:
+        return _load_sea_level_erddap(station_id, station_name, start_date)
+    except RuntimeError as erddap_exc:
+        if rqd_url is None:
+            raise
+        warnings.warn(
+            f"ERDDAP failed for {station_name} ({erddap_exc}); "
+            f"falling back to RQD.",
+            stacklevel=2,
         )
-
-    # Parse timestamps as UTC-aware; clean sea level values.
-    df["time_utc"] = pd.to_datetime(df["time"], utc=True)
-    df["sl_mm"]    = _clean_obs(df["sea_level"])
-
-    # Correct near-hour timestamps before deduplication so that two
-    # readings at e.g. 04:59:59 and 05:00:01 collapse to one at 05:00:00.
-    df["time_utc"] = _snap_to_hour(df["time_utc"])
-
-    # Drop missing values, deduplicate, and sort.
-    df = (
-        df[["time_utc", "sl_mm"]]
-          .dropna(subset=["sl_mm"])
-          .sort_values("time_utc")
-          .drop_duplicates(subset=["time_utc"], keep="last")
-          .reset_index(drop=True)
-    )
-
-    if df.empty:
-        raise RuntimeError(
-            f"No valid observations for station {station_id} ({station_name}). "
-            f"Check the station ID and date range."
-        )
-
-    print(
-        f"  {station_name}: {len(df):,} hourly obs  "
-        f"({df['time_utc'].iloc[0]} → {df['time_utc'].iloc[-1]})"
-    )
-
-    # ── RAPID extension ───────────────────────────────────────────────────────
-    # Append only observations strictly after the last FD timestamp so that
-    # raw RAPID data never overwrites the quality-controlled FD archive.
-    df_rapid = _load_rapid(station_id)
-    if not df_rapid.empty:
-        fd_last    = df["time_utc"].max()
-        rapid_tail = df_rapid[df_rapid["time_utc"] > fd_last].copy()
-        if not rapid_tail.empty:
-            n_ext = len(rapid_tail)
-            df = _merge_fd_rapid(df, rapid_tail)
-            print(f"  Extended record with RAPID: {n_ext:,} additional hours")
-
-    # ── Aggregate hourly → monthly mean ───────────────────────────────────────
-    # resample("MS") = month-start frequency; .mean() automatically skips NaN.
-    # dropna() removes months with zero valid observations (e.g. instrument gaps).
-    df = df.set_index("time_utc")
-    monthly = (
-        df["sl_mm"]
-          .resample("MS")
-          .mean()
-          .dropna()
-          .reset_index()
-    )
-    monthly["YR"]  = monthly["time_utc"].dt.year.astype(np.int32)
-    monthly["MON"] = monthly["time_utc"].dt.month.astype(np.int32)
-
-    print(
-        f"  {station_name}: {len(monthly)} monthly means  "
-        f"({monthly['YR'].iloc[0]}/{monthly['MON'].iloc[0]:02d} → "
-        f"{monthly['YR'].iloc[-1]}/{monthly['MON'].iloc[-1]:02d})"
-    )
-
-    # File 6: combined monthly sea level series.
-    _ym = datetime.now(timezone.utc).strftime("%Y-%m")
-    _sl_lines = [
-        f"# SSH combined monthly means station {station_id} generated {_ym}\n",
-        "year  month  sea_level_mm\n",
-    ]
-    for _r in monthly.itertuples(index=False):
-        _sl_lines.append(f"{_r.YR:4d}  {_r.MON:5d}  {_r.sl_mm:.2f}\n")
-    _save_raw(
-        f"data/input/ssh_combined_{station_id}_{_ym}.txt",
-        "".join(_sl_lines),
-    )
-
-    return {
-        "IYR": monthly["YR"].to_numpy(dtype=np.int32),
-        "MES": monthly["MON"].to_numpy(dtype=np.int32),
-        "SL0": monthly["sl_mm"].to_numpy(dtype=np.float64),
-    }
+        try:
+            return load_sea_level_rqd(rqd_url, station_name)
+        except RuntimeError as rqd_exc:
+            raise RuntimeError(
+                f"Both ERDDAP and RQD failed for {station_name}.\n"
+                f"  ERDDAP: {erddap_exc}\n"
+                f"  RQD:    {rqd_exc}"
+            ) from rqd_exc
 
 
 def load_from_config(config_path: str = "config.yaml") -> dict:
@@ -675,10 +790,9 @@ def load_from_config(config_path: str = "config.yaml") -> dict:
     Returns
     -------
     dict with keys:
-        "sst"      : dict from load_sst (IYR, MES, SST0)
-        "callao"   : dict from load_sea_level (IYR, MES, SL0)
-        "honolulu" : dict from load_sea_level (IYR, MES, SL0)
-        "palau"    : dict from load_sea_level (IYR, MES, SL0)
+        "sst"         : dict from load_sst (IYR, MES, SST0, ANOM12, …)
+        "<station_key>": dict from load_sea_level (IYR, MES, SL0) for each
+                         station defined in config.yaml
 
     Raises
     ------
@@ -701,15 +815,13 @@ def load_from_config(config_path: str = "config.yaml") -> dict:
         )
     }
 
-    # Iterate over stations in config order (callao, honolulu, palau).
-    # The config key becomes the output dict key so callers can do
-    # data["callao"] instead of data[0].
     for key, st in cfg["stations"].items():
         print(f"\n=== Loading {st['name']} ===")
         result[key] = load_sea_level(
             station_id=st["id"],
             station_name=st["name"],
             start_date=st["start_date"],
+            rqd_url=st.get("rqd_url"),
         )
 
     return result

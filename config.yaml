@@ -4,12 +4,30 @@ filter:
   HN2: 9.0    # high cutoff period (months)
   NDOTS: 5    # interpolation points per month
 
-
 # SST data source
 sst:
   local_file: "assets/data/sst1950_1981.txt"
   ano_inicio: 1975
   noaa_url: "https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices"
+
+# SST index definitions
+sst_indices:
+  - key: "nino12"
+    col: 2
+    anom_col: 3
+    label: "NINO1+2"
+  - key: "nino3"
+    col: 4
+    anom_col: 5
+    label: "NINO3"
+  - key: "nino4"
+    col: 6
+    anom_col: 7
+    label: "NINO4"
+  - key: "nino34"
+    col: 8
+    anom_col: 9
+    label: "NINO3.4"
 
 # Sea level stations (UHSLC)
 stations:
@@ -17,17 +35,34 @@ stations:
     id: "093"
     name: "Callao"
     start_date: "1905-01-01"
+    rqd_url: "https://uhslc.soest.hawaii.edu/data/csv/rqds/pacific/hourly/h093a.csv"
+    xlim: [-300, 300]
+    ylim: [-60, 60]
+  talara:
+    id: "092"
+    name: "Talara"
+    start_date: "1942-01-01"
+    rqd_url: "https://uhslc.soest.hawaii.edu/data/csv/rqds/pacific/hourly/h092a.csv"
+    xlim: [-300, 300]
+    ylim: [-60, 60]
+  la_libertad:
+    id: "091"
+    name: "La Libertad"
+    start_date: "1949-01-01"
+    rqd_url: "https://uhslc.soest.hawaii.edu/data/csv/rqds/pacific/hourly/h091a.csv"
     xlim: [-300, 300]
     ylim: [-60, 60]
   honolulu:
     id: "057"
     name: "Honolulu"
     start_date: "1905-01-01"
+    rqd_url: "https://uhslc.soest.hawaii.edu/data/csv/rqds/pacific/hourly/h057a.csv"
     xlim: [-300, 300]
     ylim: [-60, 60]
   palau:
     id: "007"
     name: "Palau"
     start_date: "1905-01-01"
+    rqd_url: "https://uhslc.soest.hawaii.edu/data/csv/rqds/pacific/hourly/h007a.csv"
     xlim: [-380, 380]
     ylim: [-100, 100]

@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El Niño Familiar Attractor — Compare Datasets</title>
+<style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+:root {
+  --bg:#0a0a0e; --surface:#12121a; --card:#1a1a28; --border:#2a2a40;
+  --text:#e8e8f0; --muted:#888899; --accent:#4488ff; --hot:#ff5533; --cold:#3388ff;
+  --fg:#e8e8f0;
+}
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+header { text-align:center; padding:3rem 1rem 2rem; background:linear-gradient(180deg,#0d0d18 0%,var(--bg) 100%); border-bottom:1px solid var(--border); }
+header h1 { font-size:clamp(1.8rem,5vw,3rem); font-weight:700; background:linear-gradient(135deg,var(--cold),var(--hot)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:.5rem; }
+header p.subtitle { color:var(--muted); font-size:1.05rem; }
+.container { max-width:1280px; margin:0 auto; padding:0 1.2rem; }
+section { padding:2.5rem 0; border-bottom:1px solid var(--border); }
+section:last-of-type { border-bottom:none; }
+h2 { font-size:1.4rem; font-weight:600; color:var(--accent); margin-bottom:.5rem; }
+p.section-desc { color:var(--muted); margin-bottom:1.5rem; max-width:780px; }
+.plot-box { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:.5rem; }
+.controls { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:1.2rem 1.4rem; margin-bottom:1rem; }
+.ctrl-head { font-size:.82rem; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:1rem; }
+.param-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.9rem 1.4rem; }
+.param-row { display:flex; flex-direction:column; gap:.3rem; }
+.param-row label { font-size:.78rem; font-weight:600; color:var(--muted); display:flex; justify-content:space-between; }
+.param-row label span { color:var(--accent); font-family:monospace; font-size:.82rem; }
+.param-row input[type=range] { -webkit-appearance:none; width:100%; height:4px; background:var(--border); border-radius:2px; outline:none; }
+.param-row input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; }
+.param-inline { display:flex; align-items:center; gap:.5rem; }
+.btn-row { margin-top:1rem; display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; }
+button { background:var(--accent); color:#fff; border:none; border-radius:5px; padding:.45rem 1.1rem; font-size:.85rem; font-weight:600; cursor:pointer; transition:opacity .15s; }
+button:hover:not(:disabled) { opacity:.85; }
+button:disabled { opacity:.4; cursor:not-allowed; }
+button.secondary { background:var(--surface); border:1px solid var(--border); color:var(--text); }
+.status-bar { font-family:monospace; font-size:.82rem; color:var(--muted); background:var(--surface); border:1px solid var(--border); border-radius:5px; padding:.4rem .8rem; margin-bottom:1rem; min-height:1.8rem; }
+.st-running { color:#44cc88; } .st-paused { color:#ffcc44; } .st-done { color:var(--accent); } .st-ready { color:var(--muted); }
+canvas.phasecanvas { display:block; width:100%; height:auto; border-radius:6px; border:1px solid var(--border); background:white; }
+.science-box { background:var(--surface); border-left:3px solid var(--accent); border-radius:0 6px 6px 0; padding:1rem 1.3rem; margin-bottom:1.5rem; color:var(--muted); font-size:.9rem; max-width:820px; }
+.science-box strong { color:var(--text); }
+footer { text-align:center; padding:2rem 1rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); }
+footer a { color:var(--accent); text-decoration:none; }
+footer a:hover { text-decoration:underline; }
+
+/* ── Site navigation ─────────────────────── */
+.site-nav{display:flex;gap:1.2rem;justify-content:center;padding:.5rem 0 .2rem;}
+.site-nav .nav-link{color:var(--fg);text-decoration:none;font-size:.92rem;
+  padding:.28rem .85rem;border-radius:5px;transition:background .15s;}
+.site-nav .nav-link:hover{background:rgba(255,255,255,.1);}
+.site-nav .nav-link.active{background:var(--accent);color:#fff;}
+
+/* ── Dataset selector grid ── */
+.ds-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:.5rem; margin-bottom:1rem; }
+.ds-chip { display:flex; align-items:center; gap:.5rem; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:.4rem .7rem; cursor:pointer; font-size:.82rem; transition:border-color .15s; }
+.ds-chip:hover { border-color:var(--accent); }
+.ds-chip input[type=checkbox] { cursor:pointer; accent-color:var(--accent); width:14px; height:14px; }
+.ds-chip .ds-swatch { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.ds-chip.disabled-ds { opacity:.4; pointer-events:none; }
+
+/* ── Legend row under canvas ── */
+.legend-row { display:flex; flex-wrap:wrap; gap:.6rem 1.2rem; margin-top:.6rem; font-size:.8rem; color:var(--muted); }
+.legend-item { display:flex; align-items:center; gap:.4rem; }
+.legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+/* ── Toggle switch ── */
+.toggle-wrap { display:flex; align-items:center; gap:.6rem; font-size:.82rem; color:var(--muted); }
+.toggle-switch { position:relative; display:inline-block; width:36px; height:20px; }
+.toggle-switch input { opacity:0; width:0; height:0; }
+.toggle-slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:var(--border); border-radius:20px; transition:.2s; }
+.toggle-slider:before { position:absolute; content:""; height:14px; width:14px; left:3px; bottom:3px; background:var(--muted); border-radius:50%; transition:.2s; }
+input:checked + .toggle-slider { background:var(--accent); }
+input:checked + .toggle-slider:before { transform:translateX(16px); background:#fff; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <h1>El Niño Familiar Attractor</h1>
+    <p class="subtitle">Compare ENSO Phase Diagrams — Overlay Multiple Datasets</p>
+    <nav class="site-nav">
+  <a href="index.html" class="nav-link">Phase Diagrams</a>
+  <a href="animations.html" class="nav-link">Animations</a>
+  <a href="familiar_attractor.html" class="nav-link">Familiar Attractor</a>
+  <a href="ensemble.html" class="nav-link">Year Ensemble</a>
+  <a href="compare.html" class="nav-link active">Compare</a>
+</nav>
+  </div>
+</header>
+
+<div class="container">
+
+<!-- ══════════════════════════════════════════════════════════════════
+     COMPARE — multi-dataset overlay
+════════════════════════════════════════════════════════════════════ -->
+<section>
+<h2>Dataset Comparison</h2>
+<p class="section-desc">
+  Overlay up to 9 ENSO phase-diagram datasets on the same canvas. Each dataset
+  shows <em>T</em> (sea temperature or sea level anomaly) on the horizontal axis
+  versus <em>dT/dt</em> on the vertical axis. Enable <strong>normalisation</strong>
+  to project all datasets onto the same dimensionless axes for direct shape
+  comparison.
+</p>
+
+<div class="science-box">
+  <strong>Normalization:</strong>
+  x<sub>norm</sub> = (x − mean) / σ<sub>x</sub>,
+  y<sub>norm</sub> = y / σ<sub>x</sub>
+  (same divisor preserves the geometry of the phase portrait).
+  Raw mode shows physical units: °C for SST, mm for sea level.
+</div>
+
+<!-- Dataset selector -->
+<div class="controls">
+  <div class="ctrl-head">Select datasets</div>
+  <div class="ds-grid" id="cmp-ds-grid"></div>
+  <div style="display:flex;align-items:center;gap:1.5rem;margin-top:.8rem;flex-wrap:wrap;">
+    <div class="toggle-wrap">
+      <label class="toggle-switch">
+        <input type="checkbox" id="cmp-norm-toggle">
+        <span class="toggle-slider"></span>
+      </label>
+      <span>Normalise axes</span>
+    </div>
+    <div class="toggle-wrap">
+      <label class="toggle-switch">
+        <input type="checkbox" id="cmp-align-toggle" checked>
+        <span class="toggle-slider"></span>
+      </label>
+      <span>Align start date</span>
+    </div>
+  </div>
+</div>
+
+<!-- Animation controls -->
+<div class="controls">
+  <div class="ctrl-head">Playback</div>
+  <div class="param-grid">
+    <div class="param-row">
+      <label>Speed (steps/frame) <span id="cmp-lbl-spf">3</span></label>
+      <input type="range" id="cmp-sl-spf" min="1" max="20" value="3">
+    </div>
+    <div class="param-row">
+      <label>Tail length <span id="cmp-lbl-tail">60</span></label>
+      <input type="range" id="cmp-sl-tail" min="10" max="200" value="60">
+    </div>
+    <div class="param-row">
+      <label>Frame delay ms <span id="cmp-lbl-delay">30</span></label>
+      <input type="range" id="cmp-sl-delay" min="0" max="200" value="30">
+    </div>
+  </div>
+  <div class="btn-row">
+    <button id="cmp-run"   onclick="cmpStart()">&#9654; Run</button>
+    <button id="cmp-pause" onclick="cmpPause()" disabled>&#9208; Pause</button>
+    <button id="cmp-reset" onclick="cmpReset()">&#8635; Reset</button>
+  </div>
+</div>
+
+<!-- Scrubber -->
+<input type="range" id="cmp-scrubber" min="0" value="0"
+       style="width:100%;margin-bottom:.5rem;accent-color:var(--accent);"
+       oninput="cmpScrub(this.value)">
+<div id="cmp-time-display" style="text-align:center;font-family:monospace;font-size:1rem;color:#88ccff;font-weight:700;margin-bottom:.5rem;">—</div>
+
+<!-- Status -->
+<div class="status-bar" id="cmp-status"><span class="st-ready">Ready — select datasets and press Run</span></div>
+
+<!-- Canvas -->
+<div class="plot-box">
+  <canvas id="cmp-canvas" class="phasecanvas" width="1100" height="520" style="background:white;"></canvas>
+</div>
+<div class="legend-row" id="cmp-legend"></div>
+
+</section>
+</div><!-- /container -->
+
+<footer>
+  <p>Data: <a href="https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices" target="_blank">NOAA CPC SST Indices</a> &amp; <a href="https://uhslc.soest.hawaii.edu/" target="_blank">UHSLC Sea Level</a></p>
+</footer>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// Embedded datasets (injected by update_website.py)
+// ─────────────────────────────────────────────────────────────
+const observedData = { x:[], y:[], year:[], month:[], irest:[] };
+const OBS_N = observedData.x.length;  // 0
+const nino3Data = { x:[], y:[], year:[], month:[], irest:[] };
+const NINO3_N = nino3Data.x.length;  // 0
+const nino4Data = { x:[], y:[], year:[], month:[], irest:[] };
+const NINO4_N = nino4Data.x.length;  // 0
+const nino34Data = { x:[], y:[], year:[], month:[], irest:[] };
+const NINO34_N = nino34Data.x.length;  // 0
+const callaoData = { x:[], y:[], year:[], month:[], irest:[] };
+const CAL_N = callaoData.x.length;  // 0
+const talaraData = { x:[], y:[], year:[], month:[], irest:[] };
+const TAL_N = talaraData.x.length;  // 0
+const laLibData = { x:[], y:[], year:[], month:[], irest:[] };
+const LALIB_N = laLibData.x.length;  // 0
+const honoluluData = { x:[], y:[], year:[], month:[], irest:[] };
+const HON_N = honoluluData.x.length;  // 0
+const palauData = { x:[], y:[], year:[], month:[], irest:[] };
+const PAL_N = palauData.x.length;  // 0
+
+// ─────────────────────────────────────────────────────────────
+// Dataset registry
+// ─────────────────────────────────────────────────────────────
+const CMP_REGISTRY = [
+  { id:'nino12',   label:'NINO1+2 SST',    data:observedData, unit:'°C',  group:'sst' },
+  { id:'nino3',    label:'NINO3 Anom',     data:nino3Data,    unit:'°C',  group:'sst' },
+  { id:'nino4',    label:'NINO4 Anom',     data:nino4Data,    unit:'°C',  group:'sst' },
+  { id:'nino34',   label:'NINO3.4 Anom',   data:nino34Data,   unit:'°C',  group:'sst' },
+  { id:'callao',   label:'Callao SL',      data:callaoData,   unit:'mm',  group:'sl' },
+  { id:'talara',   label:'Talara SL',      data:talaraData,   unit:'mm',  group:'sl' },
+  { id:'lalib',    label:'La Libertad SL', data:laLibData,    unit:'mm',  group:'sl' },
+  { id:'honolulu', label:'Honolulu SL',    data:honoluluData, unit:'mm',  group:'sl' },
+  { id:'palau',    label:'Palau SL',       data:palauData,    unit:'mm',  group:'sl' },
+];
+
+// Color palette — one per dataset slot
+const CMP_PALETTE = [
+  '#ff5533','#4488ff','#44cc88','#ffcc44',
+  '#cc66ff','#44ccff','#ff8844','#88dd44','#ff4499'
+];
+
+// ─────────────────────────────────────────────────────────────
+// Canvas setup
+// ─────────────────────────────────────────────────────────────
+const CMP_CW = 1100, CMP_CH = 520;
+const CMP_PLT = { l:64, r:CMP_CW-20, t:30, b:CMP_CH-50 };
+
+let cmpCanvas, cmpCtx, cmpOffCanvas, cmpOffCtx;
+
+function cmpInitCanvas() {
+  cmpCanvas    = document.getElementById('cmp-canvas');
+  cmpCtx       = cmpCanvas.getContext('2d');
+  cmpOffCanvas = document.createElement('canvas');
+  cmpOffCanvas.width  = CMP_CW;
+  cmpOffCanvas.height = CMP_CH;
+  cmpOffCtx    = cmpOffCanvas.getContext('2d');
+}
+
+// ─────────────────────────────────────────────────────────────
+// Math helpers
+// ─────────────────────────────────────────────────────────────
+function cmpMean(arr) {
+  return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+}
+function cmpStd(arr, mean) {
+  if (arr.length < 2) return 1;
+  const v = arr.reduce((a,b)=>a+(b-mean)*(b-mean),0)/(arr.length-1);
+  return Math.sqrt(v) || 1;
+}
+
+function cmpPrepareDataset(entry) {
+  const d = entry.data;
+  if (!d || d.x.length === 0) return null;
+  const mx = cmpMean(d.x);
+  const sx = cmpStd(d.x, mx);
+  return { ...entry, mean_x: mx, std_x: sx };
+}
+
+function cmpNormX(v, prep, norm) {
+  return norm ? (v - prep.mean_x) / prep.std_x : v;
+}
+function cmpNormY(v, prep, norm) {
+  return norm ? v / prep.std_x : v;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Domain computation
+// ─────────────────────────────────────────────────────────────
+function cmpComputeDomain(activePreps, norm) {
+  if (norm) return { xmin:-4, xmax:4, ymin:-3, ymax:3 };
+  let xlo=Infinity, xhi=-Infinity, ylo=Infinity, yhi=-Infinity;
+  for (const p of activePreps) {
+    for (const v of p.data.x) { xlo=Math.min(xlo,v); xhi=Math.max(xhi,v); }
+    for (const v of p.data.y) { ylo=Math.min(ylo,v); yhi=Math.max(yhi,v); }
+  }
+  if (!isFinite(xlo)) return { xmin:-3, xmax:3, ymin:-3, ymax:3 };
+  const xp=(xhi-xlo)*0.05, yp=(yhi-ylo)*0.05;
+  return { xmin:xlo-xp, xmax:xhi+xp, ymin:ylo-yp, ymax:yhi+yp };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Canvas drawing helpers
+// ─────────────────────────────────────────────────────────────
+function cmpDataX(v, dom) {
+  return CMP_PLT.l + (v - dom.xmin)/(dom.xmax - dom.xmin)*(CMP_PLT.r - CMP_PLT.l);
+}
+function cmpDataY(v, dom) {
+  return CMP_PLT.b - (v - dom.ymin)/(dom.ymax - dom.ymin)*(CMP_PLT.b - CMP_PLT.t);
+}
+
+function cmpDrawBackground(ctx, dom, norm) {
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, CMP_CW, CMP_CH);
+
+  // Plot area border
+  ctx.strokeStyle = '#cccccc';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(CMP_PLT.l, CMP_PLT.t, CMP_PLT.r-CMP_PLT.l, CMP_PLT.b-CMP_PLT.t);
+
+  // Grid lines
+  ctx.strokeStyle = '#eeeeee';
+  ctx.lineWidth = 0.8;
+
+  const nticksX = 8, nticksY = 6;
+  for (let i=0; i<=nticksX; i++) {
+    const xv = dom.xmin + i*(dom.xmax-dom.xmin)/nticksX;
+    const px = cmpDataX(xv, dom);
+    ctx.beginPath(); ctx.moveTo(px, CMP_PLT.t); ctx.lineTo(px, CMP_PLT.b); ctx.stroke();
+    ctx.fillStyle = '#666666';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(xv.toFixed(norm?1:0), px, CMP_PLT.b+14);
+  }
+  for (let i=0; i<=nticksY; i++) {
+    const yv = dom.ymin + i*(dom.ymax-dom.ymin)/nticksY;
+    const py = cmpDataY(yv, dom);
+    ctx.beginPath(); ctx.moveTo(CMP_PLT.l, py); ctx.lineTo(CMP_PLT.r, py); ctx.stroke();
+    ctx.fillStyle = '#666666';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(yv.toFixed(norm?1:0), CMP_PLT.l-4, py+3);
+  }
+
+  // Zero lines
+  if (dom.xmin <= 0 && dom.xmax >= 0) {
+    const px0 = cmpDataX(0, dom);
+    ctx.strokeStyle='#bbbbbb'; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(px0,CMP_PLT.t); ctx.lineTo(px0,CMP_PLT.b); ctx.stroke();
+  }
+  if (dom.ymin <= 0 && dom.ymax >= 0) {
+    const py0 = cmpDataY(0, dom);
+    ctx.strokeStyle='#bbbbbb'; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(CMP_PLT.l,py0); ctx.lineTo(CMP_PLT.r,py0); ctx.stroke();
+  }
+
+  // Axis labels
+  ctx.fillStyle = '#333333';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  const xlabel = norm ? 'T  (normalised)' : 'T';
+  ctx.fillText(xlabel, (CMP_PLT.l+CMP_PLT.r)/2, CMP_CH-8);
+  ctx.save();
+  ctx.translate(14, (CMP_PLT.t+CMP_PLT.b)/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillText(norm ? 'dT/dt  (normalised)' : 'dT/dt', 0, 0);
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Animation state
+// ─────────────────────────────────────────────────────────────
+let CMP = {
+  running: false,
+  timer: null,
+  frame: 0,
+  totalFrames: 0,
+  activePreps: [],   // prepared dataset objects
+  startIndices: [],  // per-dataset aligned start index
+  tails: [],         // per-dataset tail arrays [{x,y}]
+  domain: null,
+};
+
+function cmpGetParams() {
+  return {
+    spf:   parseInt(document.getElementById('cmp-sl-spf').value),
+    tail:  parseInt(document.getElementById('cmp-sl-tail').value),
+    delay: parseInt(document.getElementById('cmp-sl-delay').value),
+    norm:  document.getElementById('cmp-norm-toggle').checked,
+    align: document.getElementById('cmp-align-toggle').checked,
+  };
+}
+
+function cmpGetSelected() {
+  return CMP_REGISTRY.map((entry, i) => {
+    const cb = document.getElementById('cmp-cb-' + entry.id);
+    return cb && cb.checked && entry.data.x.length > 0 ? i : -1;
+  }).filter(i => i >= 0);
+}
+
+function cmpGetTimeLabel(preps, startIndices, frame) {
+  if (!preps.length) return '—';
+  const idx = startIndices[0] + frame;
+  const d = preps[0].data;
+  if (idx >= d.year.length) return '—';
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return mo[d.month[idx]-1] + ' ' + d.year[idx];
+}
+
+function cmpAlignedStartIndices(preps, align) {
+  if (!align || preps.length === 0) return preps.map(() => 0);
+  // Find the latest start date across all selected datasets
+  let latestYM = 0;
+  for (const p of preps) {
+    const ym = p.data.year[0]*12 + p.data.month[0];
+    if (ym > latestYM) latestYM = ym;
+  }
+  return preps.map(p => {
+    let i = 0;
+    while (i < p.data.year.length && p.data.year[i]*12 + p.data.month[i] < latestYM) i++;
+    return i;
+  });
+}
+
+function cmpTotalFrames(preps, startIndices) {
+  if (!preps.length) return 0;
+  let min = Infinity;
+  for (let k=0; k<preps.length; k++) {
+    const avail = preps[k].data.x.length - startIndices[k];
+    if (avail < min) min = avail;
+  }
+  return Math.max(0, min);
+}
+
+// Add point to tail, evict oldest to offscreen
+function cmpPushTail(tail, px, py, color, tailLen) {
+  tail.push({px, py});
+  if (tail.length > tailLen) {
+    const oldest = tail.shift();
+    if (tail.length > 0) {
+      cmpOffCtx.globalAlpha = 0.25;
+      cmpOffCtx.strokeStyle = color;
+      cmpOffCtx.lineWidth = 1.5;
+      cmpOffCtx.beginPath();
+      cmpOffCtx.moveTo(oldest.px, oldest.py);
+      cmpOffCtx.lineTo(tail[0].px, tail[0].py);
+      cmpOffCtx.stroke();
+      cmpOffCtx.globalAlpha = 1.0;
+    }
+  }
+}
+
+function cmpRenderFrame(params) {
+  const { norm, tail: TAIL } = params;
+  const dom = CMP.domain;
+
+  // Clear display and stamp offscreen (background+gray history)
+  cmpCtx.fillStyle = '#ffffff';
+  cmpCtx.fillRect(0, 0, CMP_CW, CMP_CH);
+  cmpCtx.drawImage(cmpOffCanvas, 0, 0);
+
+  // Draw active tails and dots
+  for (let k=0; k<CMP.activePreps.length; k++) {
+    const color = CMP_PALETTE[k % CMP_PALETTE.length];
+    const tail  = CMP.tails[k];
+    if (tail.length < 2) continue;
+
+    // Red tail segments
+    cmpCtx.save();
+    for (let s=1; s<tail.length; s++) {
+      const alpha = 0.4 + 0.6*(s/tail.length);
+      cmpCtx.globalAlpha = alpha;
+      cmpCtx.strokeStyle = color;
+      cmpCtx.lineWidth   = 1.5;
+      cmpCtx.beginPath();
+      cmpCtx.moveTo(tail[s-1].px, tail[s-1].py);
+      cmpCtx.lineTo(tail[s].px,   tail[s].py);
+      cmpCtx.stroke();
+    }
+    cmpCtx.restore();
+
+    // Current dot
+    const tip = tail[tail.length-1];
+    cmpCtx.beginPath();
+    cmpCtx.arc(tip.px, tip.py, 4, 0, 2*Math.PI);
+    cmpCtx.fillStyle = color;
+    cmpCtx.fill();
+  }
+
+  // Time label
+  const tlabel = cmpGetTimeLabel(CMP.activePreps, CMP.startIndices, CMP.frame);
+  document.getElementById('cmp-time-display').textContent = tlabel;
+  document.getElementById('cmp-scrubber').value = CMP.frame;
+}
+
+function cmpAdvanceFrame(params) {
+  const { spf, tail: TAIL, norm } = params;
+  const dom = CMP.domain;
+  for (let s=0; s<spf && CMP.frame < CMP.totalFrames-1; s++) {
+    CMP.frame++;
+    for (let k=0; k<CMP.activePreps.length; k++) {
+      const p   = CMP.activePreps[k];
+      const idx = CMP.startIndices[k] + CMP.frame;
+      if (idx >= p.data.x.length) continue;
+      const xv = cmpNormX(p.data.x[idx], p, norm);
+      const yv = cmpNormY(p.data.y[idx], p, norm);
+      const px = cmpDataX(xv, dom);
+      const py = cmpDataY(yv, dom);
+      const color = CMP_PALETTE[k % CMP_PALETTE.length];
+      cmpPushTail(CMP.tails[k], px, py, color, TAIL);
+    }
+  }
+}
+
+function cmpLoop() {
+  if (!CMP.running) return;
+  const params = cmpGetParams();
+  cmpAdvanceFrame(params);
+  cmpRenderFrame(params);
+  if (CMP.frame >= CMP.totalFrames - 1) {
+    CMP.running = false;
+    document.getElementById('cmp-run').disabled   = false;
+    document.getElementById('cmp-pause').disabled = true;
+    document.getElementById('cmp-status').innerHTML = '<span class="st-done">Done</span>';
+    return;
+  }
+  CMP.timer = setTimeout(cmpLoop, params.delay);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Public controls
+// ─────────────────────────────────────────────────────────────
+function cmpPrepareState() {
+  const selIdx = cmpGetSelected();
+  if (selIdx.length === 0) {
+    document.getElementById('cmp-status').innerHTML =
+      '<span class="st-ready">Select at least one dataset</span>';
+    return false;
+  }
+  const params = cmpGetParams();
+  const preps  = selIdx.map(i => cmpPrepareDataset(CMP_REGISTRY[i])).filter(Boolean);
+  if (preps.length === 0) {
+    document.getElementById('cmp-status').innerHTML =
+      '<span class="st-ready">No data loaded — run the pipeline first</span>';
+    return false;
+  }
+  const starts = cmpAlignedStartIndices(preps, params.align);
+  const total  = cmpTotalFrames(preps, starts);
+  if (total === 0) {
+    document.getElementById('cmp-status').innerHTML =
+      '<span class="st-ready">No overlapping data range</span>';
+    return false;
+  }
+
+  CMP.activePreps  = preps;
+  CMP.startIndices = starts;
+  CMP.totalFrames  = total;
+  CMP.tails        = preps.map(() => []);
+  CMP.domain       = cmpComputeDomain(preps, params.norm);
+  CMP.frame        = 0;
+  return true;
+}
+
+function cmpStart() {
+  if (CMP.running) return;
+  if (CMP.frame === 0 || CMP.activePreps.length === 0) {
+    if (!cmpPrepareState()) return;
+    // Draw fresh background on offscreen
+    cmpOffCtx.clearRect(0, 0, CMP_CW, CMP_CH);
+    cmpDrawBackground(cmpOffCtx, CMP.domain, cmpGetParams().norm);
+    // Stamp to display
+    cmpCtx.drawImage(cmpOffCanvas, 0, 0);
+    // Initialise scrubber
+    document.getElementById('cmp-scrubber').max = CMP.totalFrames - 1;
+    document.getElementById('cmp-scrubber').value = 0;
+  }
+  CMP.running = true;
+  document.getElementById('cmp-run').disabled   = true;
+  document.getElementById('cmp-pause').disabled = false;
+  document.getElementById('cmp-status').innerHTML = '<span class="st-running">Running…</span>';
+  cmpLoop();
+}
+
+function cmpPause() {
+  if (!CMP.running) return;
+  CMP.running = false;
+  clearTimeout(CMP.timer);
+  document.getElementById('cmp-run').disabled   = false;
+  document.getElementById('cmp-pause').disabled = true;
+  document.getElementById('cmp-status').innerHTML = '<span class="st-paused">Paused</span>';
+}
+
+function cmpReset() {
+  CMP.running = false;
+  clearTimeout(CMP.timer);
+  CMP.frame        = 0;
+  CMP.activePreps  = [];
+  CMP.tails        = [];
+  document.getElementById('cmp-run').disabled   = false;
+  document.getElementById('cmp-pause').disabled = true;
+  document.getElementById('cmp-status').innerHTML = '<span class="st-ready">Ready</span>';
+  document.getElementById('cmp-time-display').textContent = '—';
+  document.getElementById('cmp-scrubber').value = 0;
+  cmpOffCtx.clearRect(0, 0, CMP_CW, CMP_CH);
+  cmpCtx.fillStyle = '#ffffff';
+  cmpCtx.fillRect(0, 0, CMP_CW, CMP_CH);
+}
+
+function cmpScrub(val) {
+  if (CMP.running) cmpPause();
+  if (CMP.activePreps.length === 0) {
+    if (!cmpPrepareState()) return;
+    cmpOffCtx.clearRect(0, 0, CMP_CW, CMP_CH);
+    cmpDrawBackground(cmpOffCtx, CMP.domain, cmpGetParams().norm);
+    document.getElementById('cmp-scrubber').max = CMP.totalFrames - 1;
+  }
+  const targetFrame = parseInt(val);
+  const params = cmpGetParams();
+
+  // Replay from scratch to target frame
+  cmpOffCtx.clearRect(0, 0, CMP_CW, CMP_CH);
+  cmpDrawBackground(cmpOffCtx, CMP.domain, params.norm);
+  CMP.tails = CMP.activePreps.map(() => []);
+  CMP.frame = 0;
+  const TAIL = params.tail;
+
+  for (let f=0; f<targetFrame; f++) {
+    CMP.frame = f;
+    for (let k=0; k<CMP.activePreps.length; k++) {
+      const p   = CMP.activePreps[k];
+      const idx = CMP.startIndices[k] + f;
+      if (idx >= p.data.x.length) continue;
+      const xv = cmpNormX(p.data.x[idx], p, params.norm);
+      const yv = cmpNormY(p.data.y[idx], p, params.norm);
+      const px = cmpDataX(xv, CMP.domain);
+      const py = cmpDataY(yv, CMP.domain);
+      const color = CMP_PALETTE[k % CMP_PALETTE.length];
+      cmpPushTail(CMP.tails[k], px, py, color, TAIL);
+    }
+  }
+  CMP.frame = targetFrame;
+  cmpRenderFrame(params);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Slider live labels
+// ─────────────────────────────────────────────────────────────
+function cmpWireSliders() {
+  document.getElementById('cmp-sl-spf').addEventListener('input', function() {
+    document.getElementById('cmp-lbl-spf').textContent = this.value;
+  });
+  document.getElementById('cmp-sl-tail').addEventListener('input', function() {
+    document.getElementById('cmp-lbl-tail').textContent = this.value;
+  });
+  document.getElementById('cmp-sl-delay').addEventListener('input', function() {
+    document.getElementById('cmp-lbl-delay').textContent = this.value;
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Dataset selector UI
+// ─────────────────────────────────────────────────────────────
+function cmpBuildSelector() {
+  const grid   = document.getElementById('cmp-ds-grid');
+  const legend = document.getElementById('cmp-legend');
+  grid.innerHTML = '';
+  legend.innerHTML = '';
+  CMP_REGISTRY.forEach((entry, i) => {
+    const color    = CMP_PALETTE[i % CMP_PALETTE.length];
+    const hasData  = entry.data.x.length > 0;
+    const chip     = document.createElement('label');
+    chip.className = 'ds-chip' + (hasData ? '' : ' disabled-ds');
+    chip.title     = hasData ? '' : 'No data — run the pipeline first';
+    chip.innerHTML = `
+      <input type="checkbox" id="cmp-cb-${entry.id}" ${i < 2 && hasData ? 'checked' : ''}>
+      <span class="ds-swatch" style="background:${color}"></span>
+      <span>${entry.label}</span>`;
+    grid.appendChild(chip);
+
+    const li = document.createElement('div');
+    li.className = 'legend-item';
+    li.innerHTML = `<span class="legend-dot" style="background:${color}"></span><span>${entry.label}</span>`;
+    if (!hasData) li.style.opacity = '.4';
+    legend.appendChild(li);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────────────────────
+(function init() {
+  cmpInitCanvas();
+  cmpBuildSelector();
+  cmpWireSliders();
+  // Draw empty white canvas
+  cmpCtx.fillStyle = '#ffffff';
+  cmpCtx.fillRect(0, 0, CMP_CW, CMP_CH);
+})();
+</script>
+</body>
+</html>
