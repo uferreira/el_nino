@@ -187,8 +187,40 @@ footer a:hover { text-decoration:underline; }
     <div class="plot-box"><div id="plot-static-cal-accel-anim" style="height:480px;"></div></div>
   </div>
   <div class="two-col" style="margin-top:1.2rem;">
+    <div class="plot-box"><div id="plot-static-nino3-accel-anim" style="height:380px;"></div></div>
+    <div class="plot-box"><div id="plot-static-nino34-accel-anim" style="height:380px;"></div></div>
+  </div>
+  <div class="two-col" style="margin-top:1.2rem;">
+    <div class="plot-box"><div id="plot-static-nino4-accel-anim" style="height:380px;"></div></div>
+    <div class="plot-box"><div id="plot-static-tal-accel-anim" style="height:380px;"></div></div>
+  </div>
+  <div class="two-col" style="margin-top:1.2rem;">
+    <div class="plot-box"><div id="plot-static-lalib-accel-anim" style="height:380px;"></div></div>
+    <div class="plot-box"><div id="plot-static-hon-accel-anim" style="height:380px;"></div></div>
+  </div>
+  <div class="two-col" style="margin-top:1.2rem;">
+    <div class="plot-box"><div id="plot-static-pal-accel-anim" style="height:380px;"></div></div>
+    <div></div>
+  </div>
+  <div class="two-col" style="margin-top:1.2rem;">
     <div class="plot-box"><div id="plot-static-sst-phase-anim" style="height:480px;"></div></div>
     <div class="plot-box"><div id="plot-static-cal-phase-anim" style="height:480px;"></div></div>
+  </div>
+  <div class="two-col" style="margin-top:1.2rem;">
+    <div class="plot-box"><div id="plot-static-nino3-phase-anim" style="height:380px;"></div></div>
+    <div class="plot-box"><div id="plot-static-nino34-phase-anim" style="height:380px;"></div></div>
+  </div>
+  <div class="two-col" style="margin-top:1.2rem;">
+    <div class="plot-box"><div id="plot-static-nino4-phase-anim" style="height:380px;"></div></div>
+    <div class="plot-box"><div id="plot-static-tal-phase-anim" style="height:380px;"></div></div>
+  </div>
+  <div class="two-col" style="margin-top:1.2rem;">
+    <div class="plot-box"><div id="plot-static-lalib-phase-anim" style="height:380px;"></div></div>
+    <div class="plot-box"><div id="plot-static-hon-phase-anim" style="height:380px;"></div></div>
+  </div>
+  <div class="two-col" style="margin-top:1.2rem;">
+    <div class="plot-box"><div id="plot-static-pal-phase-anim" style="height:380px;"></div></div>
+    <div></div>
   </div>
 </div>
 </section>
@@ -549,8 +581,19 @@ function gradientAccel(yArr) {
   return a;
 }
 const obsMean  = observedData.x.reduce((a,b) => a+b, 0) / OBS_N;
-const obsAccel = gradientAccel(observedData.y);
-const calAccel = gradientAccel(callaoData.y);
+const obsAccel    = gradientAccel(observedData.y);
+const calAccel    = gradientAccel(callaoData.y);
+const nino3Accel  = NINO3_N  > 0 ? gradientAccel(nino3Data.y)    : [];
+const nino34Accel = NINO34_N > 0 ? gradientAccel(nino34Data.y)   : [];
+const nino4Accel  = NINO4_N  > 0 ? gradientAccel(nino4Data.y)    : [];
+const talAccel    = TAL_N    > 0 ? gradientAccel(talaraData.y)   : [];
+const llAccel     = LALIB_N  > 0 ? gradientAccel(laLibData.y)    : [];
+const honAccel    = HON_N    > 0 ? gradientAccel(honoluluData.y) : [];
+const palAccel    = PAL_N    > 0 ? gradientAccel(palauData.y)    : [];
+const talMean  = TAL_N   > 0 ? talaraData.x.reduce((a,b)=>a+b,0)/TAL_N   : 0;
+const llMean   = LALIB_N > 0 ? laLibData.x.reduce((a,b)=>a+b,0)/LALIB_N  : 0;
+const honMean  = HON_N   > 0 ? honoluluData.x.reduce((a,b)=>a+b,0)/HON_N  : 0;
+const palMean  = PAL_N   > 0 ? palauData.x.reduce((a,b)=>a+b,0)/PAL_N    : 0;
 
 const FA3D = {
   running:false, paused:false, yearIdx:0, rafId:null,
@@ -562,6 +605,7 @@ const FA3D = {
   obsPhaseLayout:null,  calPhaseLayout:null,
   psRunning:false, psPaused:false, psRafId:null,
   obsIdx:0, calIdx:0, spf:5,
+  psExtras:[],
 };
 
 function init3D() {
@@ -649,6 +693,38 @@ function init3D() {
   const calPhaseZ = Array.from({length:CAL_N}, (_, i) =>
     TWO_PI * ((callaoData.month[i]-1) + callaoData.irest[i]/5) / 12);
 
+  const nino3Xanom  = nino3Data.x.slice();
+  const nino34Xanom = nino34Data.x.slice();
+  const nino4Xanom  = nino4Data.x.slice();
+  const talXanom    = talaraData.x.map(v => v - talMean);
+  const llXanom     = laLibData.x.map(v => v - llMean);
+  const honXanom    = honoluluData.x.map(v => v - honMean);
+  const palXanom    = palauData.x.map(v => v - palMean);
+  const nino3PhaseZ  = Array.from({length:NINO3_N},  (_, i) => TWO_PI * ((nino3Data.month[i]-1)    + nino3Data.irest[i]/5)    / 12);
+  const nino34PhaseZ = Array.from({length:NINO34_N}, (_, i) => TWO_PI * ((nino34Data.month[i]-1)   + nino34Data.irest[i]/5)   / 12);
+  const nino4PhaseZ  = Array.from({length:NINO4_N},  (_, i) => TWO_PI * ((nino4Data.month[i]-1)    + nino4Data.irest[i]/5)    / 12);
+  const talPhaseZ    = Array.from({length:TAL_N},    (_, i) => TWO_PI * ((talaraData.month[i]-1)   + talaraData.irest[i]/5)   / 12);
+  const llPhaseZ     = Array.from({length:LALIB_N},  (_, i) => TWO_PI * ((laLibData.month[i]-1)    + laLibData.irest[i]/5)    / 12);
+  const honPhaseZ    = Array.from({length:HON_N},    (_, i) => TWO_PI * ((honoluluData.month[i]-1) + honoluluData.irest[i]/5) / 12);
+  const palPhaseZ    = Array.from({length:PAL_N},    (_, i) => TWO_PI * ((palauData.month[i]-1)    + palauData.irest[i]/5)    / 12);
+
+  FA3D.psExtras = [
+    { id:'nino3',  xanom:nino3Xanom,  yArr:nino3Data.y,    accel:nino3Accel,  phaseZ:nino3PhaseZ,  N:NINO3_N,
+      xLabel:'NINO3 anomaly (°C)', yLabel:'dT/dt (°C/mo)', accelLayout:null, phaseLayout:null, idx:0 },
+    { id:'nino34', xanom:nino34Xanom, yArr:nino34Data.y,   accel:nino34Accel, phaseZ:nino34PhaseZ, N:NINO34_N,
+      xLabel:'NINO3.4 anomaly (°C)', yLabel:'dT/dt (°C/mo)', accelLayout:null, phaseLayout:null, idx:0 },
+    { id:'nino4',  xanom:nino4Xanom,  yArr:nino4Data.y,    accel:nino4Accel,  phaseZ:nino4PhaseZ,  N:NINO4_N,
+      xLabel:'NINO4 anomaly (°C)', yLabel:'dT/dt (°C/mo)', accelLayout:null, phaseLayout:null, idx:0 },
+    { id:'tal',    xanom:talXanom,    yArr:talaraData.y,   accel:talAccel,    phaseZ:talPhaseZ,    N:TAL_N,
+      xLabel:'SSH anomaly (mm)', yLabel:'dSL/dt (mm/mo)', accelLayout:null, phaseLayout:null, idx:0 },
+    { id:'lalib',  xanom:llXanom,     yArr:laLibData.y,    accel:llAccel,     phaseZ:llPhaseZ,     N:LALIB_N,
+      xLabel:'SSH anomaly (mm)', yLabel:'dSL/dt (mm/mo)', accelLayout:null, phaseLayout:null, idx:0 },
+    { id:'hon',    xanom:honXanom,    yArr:honoluluData.y, accel:honAccel,    phaseZ:honPhaseZ,    N:HON_N,
+      xLabel:'SSH anomaly (mm)', yLabel:'dSL/dt (mm/mo)', accelLayout:null, phaseLayout:null, idx:0 },
+    { id:'pal',    xanom:palXanom,    yArr:palauData.y,    accel:palAccel,    phaseZ:palPhaseZ,    N:PAL_N,
+      xLabel:'SSH anomaly (mm)', yLabel:'dSL/dt (mm/mo)', accelLayout:null, phaseLayout:null, idx:0 },
+  ];
+
   FA3D.obsAccelLayout = makeLayoutZ('SST NINO1+2 — animated · d²T/dt²',
     'SST anomaly (°C)', 'dT/dt (°C/mo)', zCfgAccelSST);
   FA3D.calAccelLayout = makeLayoutZ('Callao SSH — animated · d²SL/dt²',
@@ -657,6 +733,21 @@ function init3D() {
     'SST anomaly (°C)', 'dT/dt (°C/mo)', zCfgPhase);
   FA3D.calPhaseLayout = makeLayoutZ('Callao SSH — animated · annual phase',
     'SSH anomaly (mm)', 'dSL/dt (mm/mo)', zCfgPhase);
+
+  const _EXTRA_LABELS = {
+    nino3:  ['NINO3 — animated · d²T/dt²',              'NINO3 — animated · annual phase',              'NINO3 anomaly (°C)',   'dT/dt (°C/mo)',  zCfgAccelSST],
+    nino34: ['NINO3.4 — animated · d²T/dt²',            'NINO3.4 — animated · annual phase',            'NINO3.4 anomaly (°C)', 'dT/dt (°C/mo)',  zCfgAccelSST],
+    nino4:  ['NINO4 — animated · d²T/dt²',              'NINO4 — animated · annual phase',              'NINO4 anomaly (°C)',   'dT/dt (°C/mo)',  zCfgAccelSST],
+    tal:    ['Talara SSH — animated · d²SL/dt²',        'Talara SSH — animated · annual phase',        'SSH anomaly (mm)',     'dSL/dt (mm/mo)', zCfgAccelCal],
+    lalib:  ['La Libertad SSH — animated · d²SL/dt²',  'La Libertad SSH — animated · annual phase',  'SSH anomaly (mm)',     'dSL/dt (mm/mo)', zCfgAccelCal],
+    hon:    ['Honolulu SSH — animated · d²SL/dt²',      'Honolulu SSH — animated · annual phase',      'SSH anomaly (mm)',     'dSL/dt (mm/mo)', zCfgAccelCal],
+    pal:    ['Palau SSH — animated · d²SL/dt²',         'Palau SSH — animated · annual phase',         'SSH anomaly (mm)',     'dSL/dt (mm/mo)', zCfgAccelCal],
+  };
+  for (const e of FA3D.psExtras) {
+    const [at, pt, xl, yl, zca] = _EXTRA_LABELS[e.id];
+    e.accelLayout = makeLayoutZ(at, xl, yl, zca);
+    e.phaseLayout = makeLayoutZ(pt, xl, yl, zCfgPhase);
+  }
 
   // 3-trace init: history (gray line), tail (red), dot (blue)
   const TAIL_N = 60;
@@ -682,6 +773,12 @@ function init3D() {
     {responsive:true, displaylogo:false});
   Plotly.newPlot('plot-static-cal-phase-anim', mkInitTraces(), FA3D.calPhaseLayout,
     {responsive:true, displaylogo:false});
+  for (const e of FA3D.psExtras) {
+    if (e.N > 0) {
+      Plotly.newPlot('plot-static-' + e.id + '-accel-anim', mkInitTraces(), e.accelLayout, {responsive:true, displaylogo:false});
+      Plotly.newPlot('plot-static-' + e.id + '-phase-anim', mkInitTraces(), e.phaseLayout, {responsive:true, displaylogo:false});
+    }
+  }
 
   // ── Point-by-point smooth animation for phase3d-static ────────────────
   function psClear() {
@@ -690,6 +787,12 @@ function init3D() {
     Plotly.react('plot-static-cal-accel-anim', mkInitTraces(), FA3D.calAccelLayout);
     Plotly.react('plot-static-sst-phase-anim', mkInitTraces(), FA3D.obsPhaseLayout);
     Plotly.react('plot-static-cal-phase-anim', mkInitTraces(), FA3D.calPhaseLayout);
+    for (const e of FA3D.psExtras) {
+      if (e.N > 0) {
+        Plotly.react('plot-static-' + e.id + '-accel-anim', mkInitTraces(), e.accelLayout);
+        Plotly.react('plot-static-' + e.id + '-phase-anim', mkInitTraces(), e.phaseLayout);
+      }
+    }
   }
   function psFrame() {
     if (!FA3D.psRunning || FA3D.psPaused) return;
@@ -758,6 +861,37 @@ function init3D() {
         {x:[[cx[cx.length-1]]], y:[[cy[cy.length-1]]], z:[[cph[cph.length-1]]]}, [2]);
     }
 
+    // ── Extra datasets ──
+    for (const e of FA3D.psExtras) {
+      if (e.N === 0) continue;
+      const eExt = {x:[[]], y:[[]], z_a:[[]], z_p:[[]]};
+      for (let s = 0; s < spf && e.idx < e.N; s++, e.idx++) {
+        const i = e.idx;
+        eExt.x[0].push(e.xanom[i]);
+        eExt.y[0].push(e.yArr[i]);
+        eExt.z_a[0].push(e.accel[i]);
+        eExt.z_p[0].push(e.phaseZ[i]);
+      }
+      if (eExt.x[0].length) {
+        Plotly.extendTraces('plot-static-' + e.id + '-accel-anim', {x:eExt.x, y:eExt.y, z:eExt.z_a}, [0]);
+        Plotly.extendTraces('plot-static-' + e.id + '-phase-anim', {x:eExt.x, y:eExt.y, z:eExt.z_p}, [0]);
+      }
+      const ei = e.idx - 1;
+      if (ei >= 0 && ei < e.N) {
+        const ts = Math.max(0, ei - TAIL_N + 1);
+        const ex  = sl(e.xanom,  ts, ei+1);
+        const ey  = sl(e.yArr,   ts, ei+1);
+        const eac = sl(e.accel,  ts, ei+1);
+        const eph = sl(e.phaseZ, ts, ei+1);
+        const aid = 'plot-static-' + e.id + '-accel-anim';
+        const pid = 'plot-static-' + e.id + '-phase-anim';
+        Plotly.restyle(aid, {x:[ex], y:[ey], z:[eac]}, [1]);
+        Plotly.restyle(aid, {x:[[ex[ex.length-1]]], y:[[ey[ey.length-1]]], z:[[eac[eac.length-1]]]}, [2]);
+        Plotly.restyle(pid, {x:[ex], y:[ey], z:[eph]}, [1]);
+        Plotly.restyle(pid, {x:[[ex[ex.length-1]]], y:[[ey[ey.length-1]]], z:[[eph[eph.length-1]]]}, [2]);
+      }
+    }
+
     // ── Label ──
     if (oi >= 0 && oi < OBS_N) {
       const lbl = document.getElementById('ps-year-label');
@@ -766,7 +900,9 @@ function init3D() {
     }
 
     // ── Continue or stop ──
-    if (FA3D.obsIdx >= OBS_N && FA3D.calIdx >= CAL_N) {
+    const _allDone = FA3D.obsIdx >= OBS_N && FA3D.calIdx >= CAL_N &&
+      FA3D.psExtras.every(e => e.N === 0 || e.idx >= e.N);
+    if (_allDone) {
       FA3D.psRunning = false;
       document.getElementById('ps-run').disabled  = false;
       document.getElementById('ps-pause').disabled = true;
@@ -780,6 +916,7 @@ function init3D() {
       FA3D.psPaused = false;
     } else {
       FA3D.obsIdx = 0; FA3D.calIdx = 0; FA3D.psRunning = true;
+      for (const e of FA3D.psExtras) { e.idx = 0; }
       psClear();
     }
     document.getElementById('ps-run').disabled  = true;
@@ -795,6 +932,7 @@ function init3D() {
   function psReset() {
     FA3D.psRunning = false; FA3D.psPaused = false;
     FA3D.obsIdx = 0; FA3D.calIdx = 0;
+    for (const e of FA3D.psExtras) { e.idx = 0; }
     if (FA3D.psRafId) { clearTimeout(FA3D.psRafId); FA3D.psRafId = null; }
     psClear();
     const lbl = document.getElementById('ps-year-label');

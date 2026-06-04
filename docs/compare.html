@@ -317,7 +317,7 @@ function cmpPrepareDataset(entry) {
 }
 
 function cmpNormX(v, prep, norm) {
-  return norm ? (v - prep.mean_x) / prep.std_x : v;
+  return norm ? (v - prep.mean_x) / prep.std_x : v - prep.mean_x;
 }
 function cmpNormY(v, prep, norm) {
   return norm ? v / prep.std_x : v;
@@ -327,13 +327,13 @@ function cmpNormY(v, prep, norm) {
 // Domain computation
 // ─────────────────────────────────────────────────────────────
 function cmpComputeDomain(activePreps, norm) {
-  if (norm) return { xmin:-4, xmax:4, ymin:-3, ymax:3 };
+  if (norm) return { xmin:-4, xmax:4, ymin:-2, ymax:2 };
   let xlo=Infinity, xhi=-Infinity, ylo=Infinity, yhi=-Infinity;
   for (const p of activePreps) {
-    for (const v of p.data.x) { xlo=Math.min(xlo,v); xhi=Math.max(xhi,v); }
+    for (const v of p.data.x) { const a=v-p.mean_x; xlo=Math.min(xlo,a); xhi=Math.max(xhi,a); }
     for (const v of p.data.y) { ylo=Math.min(ylo,v); yhi=Math.max(yhi,v); }
   }
-  if (!isFinite(xlo)) return { xmin:-3, xmax:3, ymin:-3, ymax:3 };
+  if (!isFinite(xlo)) return { xmin:-3, xmax:3, ymin:-1.5, ymax:1.5 };
   const xp=(xhi-xlo)*0.05, yp=(yhi-ylo)*0.05;
   return { xmin:xlo-xp, xmax:xhi+xp, ymin:ylo-yp, ymax:yhi+yp };
 }
@@ -397,12 +397,12 @@ function cmpDrawBackground(ctx, dom, norm) {
   ctx.fillStyle = '#333333';
   ctx.font = '11px sans-serif';
   ctx.textAlign = 'center';
-  const xlabel = norm ? 'T  (normalised)' : 'T';
+  const xlabel = norm ? 'Normalized anomaly (σ)' : 'Anomaly';
   ctx.fillText(xlabel, (CMP_PLT.l+CMP_PLT.r)/2, CMP_CH-8);
   ctx.save();
   ctx.translate(14, (CMP_PLT.t+CMP_PLT.b)/2);
   ctx.rotate(-Math.PI/2);
-  ctx.fillText(norm ? 'dT/dt  (normalised)' : 'dT/dt', 0, 0);
+  ctx.fillText(norm ? 'd/dt (σ/month)' : 'dT/dt', 0, 0);
   ctx.restore();
 }
 
@@ -731,6 +731,8 @@ function cmpBuildSelector() {
   cmpInitCanvas();
   cmpBuildSelector();
   cmpWireSliders();
+  document.getElementById('cmp-norm-toggle').addEventListener('change', cmpReset);
+  document.getElementById('cmp-align-toggle').addEventListener('change', cmpReset);
   // Draw empty white canvas
   cmpCtx.fillStyle = '#ffffff';
   cmpCtx.fillRect(0, 0, CMP_CW, CMP_CH);

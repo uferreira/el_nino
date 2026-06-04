@@ -200,6 +200,47 @@ footer a:hover { text-decoration:underline; }
     </div>
   </div>
 
+  <div class="two-col" style="margin-bottom:.6rem;">
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">NINO3 anomaly (°C)</div>
+      <canvas id="obs1-nino3-canvas" class="phasecanvas" width="700" height="480"></canvas>
+    </div>
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">NINO3.4 anomaly (°C)</div>
+      <canvas id="obs1-nino34-canvas" class="phasecanvas" width="700" height="480"></canvas>
+    </div>
+  </div>
+
+  <div class="two-col" style="margin-bottom:.6rem;">
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">NINO4 anomaly (°C)</div>
+      <canvas id="obs1-nino4-canvas" class="phasecanvas" width="700" height="480"></canvas>
+    </div>
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">Talara SSH anomaly (mm)</div>
+      <canvas id="obs1-tal-canvas" class="phasecanvas" width="700" height="480"></canvas>
+    </div>
+  </div>
+
+  <div class="two-col" style="margin-bottom:.6rem;">
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">La Libertad SSH anomaly (mm)</div>
+      <canvas id="obs1-lalib-canvas" class="phasecanvas" width="700" height="480"></canvas>
+    </div>
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">Honolulu SSH anomaly (mm)</div>
+      <canvas id="obs1-hon-canvas" class="phasecanvas" width="700" height="480"></canvas>
+    </div>
+  </div>
+
+  <div class="two-col" style="margin-bottom:.6rem;">
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">Palau SSH anomaly (mm)</div>
+      <canvas id="obs1-pal-canvas" class="phasecanvas" width="700" height="480"></canvas>
+    </div>
+    <div></div>
+  </div>
+
   <div style="margin:.5rem 0 1rem;">
     <input type="range" id="obs1-scrubber" min="0" max="100" value="0"
            style="width:100%;cursor:pointer;accent-color:var(--accent);"
@@ -259,6 +300,48 @@ footer a:hover { text-decoration:underline; }
       <canvas id="cls-cal-canvas" class="phasecanvas" width="700" height="480" style="background:white;"></canvas>
     </div>
   </div>
+
+  <div class="two-col" style="margin-bottom:.6rem;">
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">NINO3 anomaly (°C)</div>
+      <canvas id="cls-nino3-canvas" class="phasecanvas" width="700" height="480" style="background:white;"></canvas>
+    </div>
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">NINO3.4 anomaly (°C)</div>
+      <canvas id="cls-nino34-canvas" class="phasecanvas" width="700" height="480" style="background:white;"></canvas>
+    </div>
+  </div>
+
+  <div class="two-col" style="margin-bottom:.6rem;">
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">NINO4 anomaly (°C)</div>
+      <canvas id="cls-nino4-canvas" class="phasecanvas" width="700" height="480" style="background:white;"></canvas>
+    </div>
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">Talara SSH anomaly (mm)</div>
+      <canvas id="cls-tal-canvas" class="phasecanvas" width="700" height="480" style="background:white;"></canvas>
+    </div>
+  </div>
+
+  <div class="two-col" style="margin-bottom:.6rem;">
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">La Libertad SSH anomaly (mm)</div>
+      <canvas id="cls-lalib-canvas" class="phasecanvas" width="700" height="480" style="background:white;"></canvas>
+    </div>
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">Honolulu SSH anomaly (mm)</div>
+      <canvas id="cls-hon-canvas" class="phasecanvas" width="700" height="480" style="background:white;"></canvas>
+    </div>
+  </div>
+
+  <div class="two-col" style="margin-bottom:.6rem;">
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">Palau SSH anomaly (mm)</div>
+      <canvas id="cls-pal-canvas" class="phasecanvas" width="700" height="480" style="background:white;"></canvas>
+    </div>
+    <div></div>
+  </div>
+
   <div style="margin:.5rem 0 1rem;">
     <input type="range" id="cls-scrubber" min="0" max="100" value="0"
            style="width:100%;cursor:pointer;accent-color:var(--accent);"
@@ -520,6 +603,13 @@ const palauData = {
 };
 const PAL_N = palauData.x.length;  // 3396
 const callaoMean = 1093.16;  // mean sea level mm — subtract for anomaly
+const talMean  = TAL_N   > 0 ? talaraData.x.reduce((a,b)=>a+b,0)/TAL_N   : 0;
+const llMean   = LALIB_N > 0 ? laLibData.x.reduce((a,b)=>a+b,0)/LALIB_N  : 0;
+const honMean  = HON_N   > 0 ? honoluluData.x.reduce((a,b)=>a+b,0)/HON_N  : 0;
+const palMean  = PAL_N   > 0 ? palauData.x.reduce((a,b)=>a+b,0)/PAL_N    : 0;
+
+const ANOM_TICKS    = {x:[-4,-2,0,2,4], y:[-1.5,-1,-0.5,0,0.5,1,1.5]};
+const PAL_SSH_TICKS = {x:[-300,-200,-100,0,100,200,300], y:[-80,-40,0,40,80]};
 
 // irest = i % 5  (NDOTS=5, verified from data file)
 // month is the original monthly point when i % 5 === 0
@@ -549,6 +639,81 @@ const CAL_SSH_TICKS={x:[-300,-200,-100,0,100,200,300],y:[-60,-40,-20,0,20,40,60]
 const SST_ANOM_TICKS={x:[-6,-4,-2,0,2,4,6],y:[-2,-1,0,1,2]};
 const OBS1_TAIL=60;
 
+const OBS1_EXTRA_CFGS = [
+  { id:'obs1-nino3-canvas',  data:nino3Data,    N:NINO3_N,  mean:0,       dom:{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5}, labels:{x:'NINO3 anom (°C)',   y:'dT/dt'},  ticks:ANOM_TICKS    },
+  { id:'obs1-nino34-canvas', data:nino34Data,   N:NINO34_N, mean:0,       dom:{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5}, labels:{x:'NINO3.4 anom (°C)', y:'dT/dt'},  ticks:ANOM_TICKS    },
+  { id:'obs1-nino4-canvas',  data:nino4Data,    N:NINO4_N,  mean:0,       dom:{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5}, labels:{x:'NINO4 anom (°C)',   y:'dT/dt'},  ticks:ANOM_TICKS    },
+  { id:'obs1-tal-canvas',    data:talaraData,   N:TAL_N,    mean:talMean, dom:{xmin:-300,xmax:300,ymin:-60,ymax:60}, labels:{x:'Talara SSH (mm)',       y:'dSL/dt'}, ticks:CAL_SSH_TICKS },
+  { id:'obs1-lalib-canvas',  data:laLibData,    N:LALIB_N,  mean:llMean,  dom:{xmin:-300,xmax:300,ymin:-60,ymax:60}, labels:{x:'La Libertad SSH (mm)',  y:'dSL/dt'}, ticks:CAL_SSH_TICKS },
+  { id:'obs1-hon-canvas',    data:honoluluData, N:HON_N,    mean:honMean, dom:{xmin:-300,xmax:300,ymin:-60,ymax:60}, labels:{x:'Honolulu SSH (mm)',     y:'dSL/dt'}, ticks:CAL_SSH_TICKS },
+  { id:'obs1-pal-canvas',    data:palauData,    N:PAL_N,    mean:palMean, dom:{xmin:-380,xmax:380,ymin:-100,ymax:100}, labels:{x:'Palau SSH (mm)',     y:'dSL/dt'}, ticks:PAL_SSH_TICKS },
+];
+let OBS1_EXTRAS = [];
+
+function _obs1ExtraStarts(cs) {
+  return [cs.nino3StartIdx, cs.nino34StartIdx, cs.nino4StartIdx, cs.talStartIdx, cs.llStartIdx, cs.honStartIdx, cs.palStartIdx];
+}
+function _obs1TotalFrames(cs) {
+  const fc = [OBS_N-cs.obsStartIdx, CAL_N-cs.calStartIdx];
+  if (NINO3_N>0)  fc.push(NINO3_N -cs.nino3StartIdx);
+  if (NINO34_N>0) fc.push(NINO34_N-cs.nino34StartIdx);
+  if (NINO4_N>0)  fc.push(NINO4_N -cs.nino4StartIdx);
+  if (TAL_N>0)    fc.push(TAL_N   -cs.talStartIdx);
+  if (LALIB_N>0)  fc.push(LALIB_N -cs.llStartIdx);
+  if (HON_N>0)    fc.push(HON_N   -cs.honStartIdx);
+  if (PAL_N>0)    fc.push(PAL_N   -cs.palStartIdx);
+  return Math.min(...fc);
+}
+
+function obs1InitExtras(startIndices) {
+  OBS1_EXTRAS = OBS1_EXTRA_CFGS.map((cfg, i) => {
+    const canvas = document.getElementById(cfg.id);
+    if (cfg.N === 0) {
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle='#1a1a2a'; ctx.fillRect(0,0,OBS1_CW,OBS1_CH);
+        ctx.fillStyle='#555568'; ctx.font='16px sans-serif'; ctx.textAlign='center';
+        ctx.fillText('No data — run update_website.py', OBS1_CW/2, OBS1_CH/2);
+      }
+      return null;
+    }
+    const ctx = canvas ? canvas.getContext('2d') : null;
+    const off = makeOff(OBS1_CW, OBS1_CH);
+    const offCtx = off.getContext('2d');
+    if (ctx) drawBg(ctx, OBS1_CW, OBS1_CH, OBS1_PLT, cfg.dom, cfg.labels, cfg.ticks);
+    return { cfg, ctx, off, offCtx, tail:[], startIdx:startIndices[i], idx:startIndices[i] };
+  });
+}
+
+function obs1AdvanceExtraStep() {
+  for (const ex of OBS1_EXTRAS) {
+    if (!ex) continue;
+    if (ex.idx < ex.cfg.N) {
+      pushTail(ex.tail, ex.cfg.data.x[ex.idx]-ex.cfg.mean, ex.cfg.data.y[ex.idx],
+               ex.cfg.data.month[ex.idx], OBS1_TAIL, ex.offCtx, OBS1_PLT, ex.cfg.dom);
+      ex.idx++;
+    }
+  }
+}
+
+function obs1DrawExtras() {
+  for (const ex of OBS1_EXTRAS) {
+    if (!ex || !ex.ctx) continue;
+    drawBg(ex.ctx, OBS1_CW, OBS1_CH, OBS1_PLT, ex.cfg.dom, ex.cfg.labels, ex.cfg.ticks);
+    compositeFrame(ex.ctx, OBS1_CW, OBS1_CH, OBS1_PLT, ex.cfg.dom, ex.off, ex.tail, null);
+  }
+}
+
+function obs1ResetExtras(startIndices) {
+  for (let i=0; i<OBS1_EXTRAS.length; i++) {
+    const ex = OBS1_EXTRAS[i];
+    if (!ex) continue;
+    ex.tail=[]; ex.idx=startIndices[i];
+    ex.offCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
+    if (ex.ctx) drawBg(ex.ctx, OBS1_CW, OBS1_CH, OBS1_PLT, ex.cfg.dom, ex.cfg.labels, ex.cfg.ticks);
+  }
+}
+
 const OBS1 = {
   running:false, paused:false,
   obsIdx:0, calIdx:0,
@@ -573,31 +738,33 @@ function obs1DrawBgs() {
 }
 
 function _cmpCommonStart() {
-  // Find the later of the two dataset start dates (1975/01 for SST,
-  // 1970/01 for Callao) so both canvases animate in sync.
-  const obsY0 = observedData.year[0], obsM0 = observedData.month[0];
-  const calY0 = callaoData.year[0],   calM0 = callaoData.month[0];
-  let startYear, startMonth;
-  if (obsY0 > calY0 || (obsY0===calY0 && obsM0>calM0)) {
-    startYear=obsY0; startMonth=obsM0;
-  } else {
-    startYear=calY0; startMonth=calM0;
+  const ALL_DS = [
+    { data:observedData, N:OBS_N,   key:'obs'   },
+    { data:callaoData,   N:CAL_N,   key:'cal'   },
+    { data:nino3Data,    N:NINO3_N, key:'nino3' },
+    { data:nino34Data,   N:NINO34_N,key:'nino34'},
+    { data:nino4Data,    N:NINO4_N, key:'nino4' },
+    { data:talaraData,   N:TAL_N,   key:'tal'   },
+    { data:laLibData,    N:LALIB_N, key:'ll'    },
+    { data:honoluluData, N:HON_N,   key:'hon'   },
+    { data:palauData,    N:PAL_N,   key:'pal'   },
+  ];
+  const active = ALL_DS.filter(d => d.N > 0);
+  let startYear=0, startMonth=0;
+  for (const d of active) {
+    const y0=d.data.year[0], m0=d.data.month[0];
+    if (y0>startYear || (y0===startYear && m0>startMonth)) { startYear=y0; startMonth=m0; }
   }
-  let obsStartIdx=0;
-  for (let i=0;i<OBS_N;i++){
-    if(observedData.year[i]>startYear ||
-       (observedData.year[i]===startYear && observedData.month[i]>=startMonth)){
-      obsStartIdx=i; break;
+  function findIdx(data, N) {
+    if (N===0) return 0;
+    for (let i=0;i<N;i++) {
+      if (data.year[i]>startYear || (data.year[i]===startYear && data.month[i]>=startMonth)) return i;
     }
+    return N;
   }
-  let calStartIdx=0;
-  for (let i=0;i<CAL_N;i++){
-    if(callaoData.year[i]>startYear ||
-       (callaoData.year[i]===startYear && callaoData.month[i]>=startMonth)){
-      calStartIdx=i; break;
-    }
-  }
-  return {startYear, startMonth, obsStartIdx, calStartIdx};
+  const result = { startYear, startMonth };
+  for (const d of ALL_DS) result[d.key+'StartIdx'] = findIdx(d.data, d.N);
+  return result;
 }
 
 function obs1Init() {
@@ -614,9 +781,10 @@ function obs1Init() {
   const cs = _cmpCommonStart();
   OBS1.obsStartIdx = cs.obsStartIdx;
   OBS1.calStartIdx = cs.calStartIdx;
-  OBS1.totalFrames = Math.min(OBS_N-cs.obsStartIdx, CAL_N-cs.calStartIdx);
+  OBS1.totalFrames = _obs1TotalFrames(cs);
   OBS1.obsIdx = cs.obsStartIdx;
   OBS1.calIdx = cs.calStartIdx;
+  obs1InitExtras(_obs1ExtraStarts(cs));
 
   obs1DrawBgs();
 
@@ -679,12 +847,14 @@ function obs1Loop() {
       pushTail(OBS1.calTail, cx, cy, callaoData.month[OBS1.calIdx], OBS1_TAIL, OBS1.calOffCtx, OBS1_PLT, OBS1_DOM_CAL);
       OBS1.calIdx++;
     }
+    obs1AdvanceExtraStep();
   }
   const tIdx = Math.min(OBS1.obsIdx, OBS_N-1);
   const dispStr = MO_NAMES[observedData.month[tIdx]-1] + ' ' + observedData.year[tIdx];
   obs1DrawBgs();
   compositeFrame(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1.sstOff, OBS1.obsTail, dispStr);
   compositeFrame(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1.calOff, OBS1.calTail, null);
+  obs1DrawExtras();
   document.getElementById('obs1-time-display').textContent =
     observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
   const scrub = document.getElementById('obs1-scrubber');
@@ -710,11 +880,12 @@ function obs1Start() {
   const cs = _cmpCommonStart();
   OBS1.obsStartIdx = cs.obsStartIdx; OBS1.calStartIdx = cs.calStartIdx;
   OBS1.obsIdx = cs.obsStartIdx;      OBS1.calIdx = cs.calStartIdx;
-  OBS1.totalFrames = Math.min(OBS_N-cs.obsStartIdx, CAL_N-cs.calStartIdx);
+  OBS1.totalFrames = _obs1TotalFrames(cs);
   OBS1.obsTail=[]; OBS1.calTail=[];
   OBS1.running=true; OBS1.paused=false;
   OBS1.sstOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
   OBS1.calOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
+  obs1ResetExtras(_obs1ExtraStarts(cs));
   obs1DrawBgs();
   const scrub = document.getElementById('obs1-scrubber');
   if (scrub) { scrub.max=OBS1.totalFrames-1; scrub.value=0; }
@@ -753,6 +924,7 @@ function obs1Reset() {
   OBS1.obsTail=[]; OBS1.calTail=[];
   OBS1.sstOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
   OBS1.calOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
+  obs1ResetExtras(_obs1ExtraStarts(cs));
   obs1DrawBgs();
   const scrub = document.getElementById('obs1-scrubber');
   if (scrub) scrub.value=0;
@@ -766,6 +938,11 @@ function obs1RedrawToFrame(targetFrame) {
   const obsStart = OBS1.obsStartIdx, calStart = OBS1.calStartIdx;
   OBS1.sstOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
   OBS1.calOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
+  for (const ex of OBS1_EXTRAS) {
+    if (!ex) continue;
+    ex.tail=[]; ex.idx=ex.startIdx;
+    ex.offCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
+  }
   let obsTail=[], calTail=[];
   for (let f=0; f<frame; f++) {
     const oi=obsStart+f, ci=calStart+f;
@@ -777,6 +954,15 @@ function obs1RedrawToFrame(targetFrame) {
       const cx=callaoData.x[ci]-callaoMean, cy=callaoData.y[ci];
       pushTail(calTail, cx, cy, callaoData.month[ci], OBS1_TAIL, OBS1.calOffCtx, OBS1_PLT, OBS1_DOM_CAL);
     }
+    for (const ex of OBS1_EXTRAS) {
+      if (!ex) continue;
+      const idx=ex.startIdx+f;
+      if (idx<ex.cfg.N) {
+        pushTail(ex.tail, ex.cfg.data.x[idx]-ex.cfg.mean, ex.cfg.data.y[idx],
+                 ex.cfg.data.month[idx], OBS1_TAIL, ex.offCtx, OBS1_PLT, ex.cfg.dom);
+        ex.idx=idx+1;
+      }
+    }
   }
   OBS1.obsIdx=obsStart+frame; OBS1.calIdx=calStart+frame;
   OBS1.obsTail=obsTail; OBS1.calTail=calTail;
@@ -785,6 +971,7 @@ function obs1RedrawToFrame(targetFrame) {
   obs1DrawBgs();
   compositeFrame(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1.sstOff, OBS1.obsTail, dispStr);
   compositeFrame(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1.calOff, OBS1.calTail, null);
+  obs1DrawExtras();
   document.getElementById('obs1-time-display').textContent =
     observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
   const scrub = document.getElementById('obs1-scrubber');
@@ -955,6 +1142,72 @@ const CLS_LABELS_CAL={x:'SSH anomaly (mm)',  y:'dSL/dt'};
 const SST_ABS_TICKS={x:[18,20,22,24,26,28,30,32],y:[-2,-1,0,1,2]};
 const CLS_TAIL=60;
 
+const CLS_EXTRA_CFGS = [
+  { id:'cls-nino3-canvas',  data:nino3Data,    N:NINO3_N,  mean:0,       dom:{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5}, labels:{x:'NINO3 anom (°C)',   y:'dT/dt'},  ticks:ANOM_TICKS    },
+  { id:'cls-nino34-canvas', data:nino34Data,   N:NINO34_N, mean:0,       dom:{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5}, labels:{x:'NINO3.4 anom (°C)', y:'dT/dt'},  ticks:ANOM_TICKS    },
+  { id:'cls-nino4-canvas',  data:nino4Data,    N:NINO4_N,  mean:0,       dom:{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5}, labels:{x:'NINO4 anom (°C)',   y:'dT/dt'},  ticks:ANOM_TICKS    },
+  { id:'cls-tal-canvas',    data:talaraData,   N:TAL_N,    mean:talMean, dom:{xmin:-300,xmax:300,ymin:-60,ymax:60}, labels:{x:'Talara SSH (mm)',       y:'dSL/dt'}, ticks:CAL_SSH_TICKS },
+  { id:'cls-lalib-canvas',  data:laLibData,    N:LALIB_N,  mean:llMean,  dom:{xmin:-300,xmax:300,ymin:-60,ymax:60}, labels:{x:'La Libertad SSH (mm)',  y:'dSL/dt'}, ticks:CAL_SSH_TICKS },
+  { id:'cls-hon-canvas',    data:honoluluData, N:HON_N,    mean:honMean, dom:{xmin:-300,xmax:300,ymin:-60,ymax:60}, labels:{x:'Honolulu SSH (mm)',     y:'dSL/dt'}, ticks:CAL_SSH_TICKS },
+  { id:'cls-pal-canvas',    data:palauData,    N:PAL_N,    mean:palMean, dom:{xmin:-380,xmax:380,ymin:-100,ymax:100}, labels:{x:'Palau SSH (mm)',     y:'dSL/dt'}, ticks:PAL_SSH_TICKS },
+];
+let CLS_EXTRAS = [];
+
+function clsInitExtras(startIndices) {
+  CLS_EXTRAS = CLS_EXTRA_CFGS.map((cfg, i) => {
+    const canvas = document.getElementById(cfg.id);
+    if (cfg.N === 0) {
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle='#f8f8f8'; ctx.fillRect(0,0,CLS_CW,CLS_CH);
+        ctx.fillStyle='#888'; ctx.font='16px sans-serif'; ctx.textAlign='center';
+        ctx.fillText('No data — run update_website.py', CLS_CW/2, CLS_CH/2);
+      }
+      return null;
+    }
+    const ctx = canvas ? canvas.getContext('2d') : null;
+    const off = makeOff(CLS_CW, CLS_CH);
+    const offCtx = off.getContext('2d');
+    drawBgWhite(offCtx, CLS_CW, CLS_CH, CLS_PLT, cfg.dom, cfg.labels, cfg.ticks);
+    if (ctx) ctx.drawImage(off, 0, 0);
+    return { cfg, ctx, off, offCtx, tail:[], startIdx:startIndices[i], idx:startIndices[i] };
+  });
+}
+
+function clsAdvanceExtraStep() {
+  for (const ex of CLS_EXTRAS) {
+    if (!ex) continue;
+    if (ex.idx < ex.cfg.N) {
+      const xv = ex.cfg.data.x[ex.idx] - ex.cfg.mean;
+      const yv = ex.cfg.data.y[ex.idx];
+      ex.tail.push({x:xv, y:yv});
+      if (ex.tail.length > CLS_TAIL) {
+        addToOffWhite(ex.offCtx, ex.tail[0].x, ex.tail[0].y, ex.tail[1].x, ex.tail[1].y, CLS_PLT, ex.cfg.dom);
+        ex.tail.shift();
+      }
+      ex.idx++;
+    }
+  }
+}
+
+function clsDrawExtras() {
+  for (const ex of CLS_EXTRAS) {
+    if (!ex || !ex.ctx) continue;
+    compositeFrameWhite(ex.ctx, CLS_CW, CLS_CH, CLS_PLT, ex.cfg.dom, ex.off, ex.tail, null);
+  }
+}
+
+function clsResetExtras(startIndices) {
+  for (let i=0; i<CLS_EXTRAS.length; i++) {
+    const ex = CLS_EXTRAS[i];
+    if (!ex) continue;
+    ex.tail=[]; ex.idx=startIndices[i];
+    ex.offCtx.clearRect(0,0,CLS_CW,CLS_CH);
+    drawBgWhite(ex.offCtx, CLS_CW, CLS_CH, CLS_PLT, ex.cfg.dom, ex.cfg.labels, ex.cfg.ticks);
+    if (ex.ctx) ex.ctx.drawImage(ex.off, 0, 0);
+  }
+}
+
 const CLS = {
   running:false, paused:false,
   obsIdx:0, calIdx:0,
@@ -1076,7 +1329,8 @@ function clsInit(){
   const cs=_cmpCommonStart();
   CLS.obsStartIdx=cs.obsStartIdx; CLS.calStartIdx=cs.calStartIdx;
   CLS.obsIdx=cs.obsStartIdx; CLS.calIdx=cs.calStartIdx;
-  CLS.totalFrames=Math.min(OBS_N-cs.obsStartIdx,CAL_N-cs.calStartIdx);
+  CLS.totalFrames=_obs1TotalFrames(cs);
+  clsInitExtras(_obs1ExtraStarts(cs));
   clsDrawBgs();
   CLS.sstCtx.drawImage(CLS.sstOff,0,0);
   CLS.calCtx.drawImage(CLS.calOff,0,0);
@@ -1132,11 +1386,13 @@ function clsLoop(){
       }
       CLS.calIdx++;
     }
+    clsAdvanceExtraStep();
   }
   const tIdx=Math.min(CLS.obsIdx,OBS_N-1);
   const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
   compositeFrameWhite(CLS.sstCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_SST,CLS.sstOff,CLS.obsTail,dispStr);
   compositeFrameWhite(CLS.calCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS.calOff,CLS.calTail,null);
+  clsDrawExtras();
   document.getElementById('cls-time-display').textContent=observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
   const scrub=document.getElementById('cls-scrubber');
   if(scrub) scrub.value=CLS.obsIdx-CLS.obsStartIdx;
@@ -1159,11 +1415,12 @@ function clsStart(){
   const cs=_cmpCommonStart();
   CLS.obsStartIdx=cs.obsStartIdx; CLS.calStartIdx=cs.calStartIdx;
   CLS.obsIdx=cs.obsStartIdx; CLS.calIdx=cs.calStartIdx;
-  CLS.totalFrames=Math.min(OBS_N-cs.obsStartIdx,CAL_N-cs.calStartIdx);
+  CLS.totalFrames=_obs1TotalFrames(cs);
   CLS.obsTail=[]; CLS.calTail=[];
   CLS.running=true; CLS.paused=false;
   CLS.sstOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
   CLS.calOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
+  clsResetExtras(_obs1ExtraStarts(cs));
   clsDrawBgs();
   const scrub=document.getElementById('cls-scrubber');
   if(scrub){scrub.max=CLS.totalFrames-1; scrub.value=0;}
@@ -1189,6 +1446,7 @@ function clsReset(){
   CLS.obsTail=[]; CLS.calTail=[];
   CLS.sstOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
   CLS.calOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
+  clsResetExtras(_obs1ExtraStarts(cs));
   clsDrawBgs();
   CLS.sstCtx.drawImage(CLS.sstOff,0,0);
   CLS.calCtx.drawImage(CLS.calOff,0,0);
@@ -1204,6 +1462,12 @@ function clsRedrawToFrame(targetFrame){
   const obsStart=CLS.obsStartIdx, calStart=CLS.calStartIdx;
   CLS.sstOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
   CLS.calOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
+  for(const ex of CLS_EXTRAS){
+    if(!ex) continue;
+    ex.tail=[]; ex.idx=ex.startIdx;
+    ex.offCtx.clearRect(0,0,CLS_CW,CLS_CH);
+    drawBgWhite(ex.offCtx, CLS_CW, CLS_CH, CLS_PLT, ex.cfg.dom, ex.cfg.labels, ex.cfg.ticks);
+  }
   clsDrawBgs();
   let obsTail=[], calTail=[];
   for(let f=0;f<frame;f++){
@@ -1226,6 +1490,19 @@ function clsRedrawToFrame(targetFrame){
         calTail.shift();
       }
     }
+    for(const ex of CLS_EXTRAS){
+      if(!ex) continue;
+      const idx=ex.startIdx+f;
+      if(idx<ex.cfg.N){
+        const xv=ex.cfg.data.x[idx]-ex.cfg.mean, yv=ex.cfg.data.y[idx];
+        ex.tail.push({x:xv, y:yv});
+        if(ex.tail.length>CLS_TAIL){
+          addToOffWhite(ex.offCtx,ex.tail[0].x,ex.tail[0].y,ex.tail[1].x,ex.tail[1].y,CLS_PLT,ex.cfg.dom);
+          ex.tail.shift();
+        }
+        ex.idx=idx+1;
+      }
+    }
   }
   CLS.obsIdx=obsStart+frame; CLS.calIdx=calStart+frame;
   CLS.obsTail=obsTail; CLS.calTail=calTail;
@@ -1233,6 +1510,7 @@ function clsRedrawToFrame(targetFrame){
   const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
   compositeFrameWhite(CLS.sstCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_SST,CLS.sstOff,CLS.obsTail,dispStr);
   compositeFrameWhite(CLS.calCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS.calOff,CLS.calTail,null);
+  clsDrawExtras();
   document.getElementById('cls-time-display').textContent=observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
   const scrub=document.getElementById('cls-scrubber');
   if(scrub) scrub.value=frame;

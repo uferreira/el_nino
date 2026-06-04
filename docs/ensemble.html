@@ -101,6 +101,22 @@ footer a:hover { text-decoration:underline; }
     <div class="plot-box"><div id="ens-plot-sst" style="height:420px;"></div></div>
     <div class="plot-box"><div id="ens-plot-cal" style="height:420px;"></div></div>
   </div>
+  <div class="two-col" style="margin-top:1.2rem;">
+    <div class="plot-box"><div id="ens-plot-nino3" style="height:420px;"></div></div>
+    <div class="plot-box"><div id="ens-plot-nino34" style="height:420px;"></div></div>
+  </div>
+  <div class="two-col" style="margin-top:1.2rem;">
+    <div class="plot-box"><div id="ens-plot-nino4" style="height:420px;"></div></div>
+    <div class="plot-box"><div id="ens-plot-tal" style="height:420px;"></div></div>
+  </div>
+  <div class="two-col" style="margin-top:1.2rem;">
+    <div class="plot-box"><div id="ens-plot-lalib" style="height:420px;"></div></div>
+    <div class="plot-box"><div id="ens-plot-hon" style="height:420px;"></div></div>
+  </div>
+  <div class="two-col" style="margin-top:1.2rem;">
+    <div class="plot-box"><div id="ens-plot-pal" style="height:420px;"></div></div>
+    <div></div>
+  </div>
   <div style="display:flex;justify-content:center;align-items:center;gap:1.5rem;
               margin:.6rem 0 0;font-size:.85rem;color:var(--muted);">
     <span>Year color:</span>
@@ -201,6 +217,10 @@ const palauData = {
 };
 const PAL_N = palauData.x.length;  // 3396
 const callaoMean = 1093.16;  // mean sea level mm — subtract for anomaly
+const talMean  = TAL_N   > 0 ? talaraData.x.reduce((a,b)=>a+b,0)/TAL_N   : 0;
+const llMean   = LALIB_N > 0 ? laLibData.x.reduce((a,b)=>a+b,0)/LALIB_N  : 0;
+const honMean  = HON_N   > 0 ? honoluluData.x.reduce((a,b)=>a+b,0)/HON_N  : 0;
+const palMean  = PAL_N   > 0 ? palauData.x.reduce((a,b)=>a+b,0)/PAL_N    : 0;
 
 // ═══════════════════════════════════════════════════════
 // 2. ENSEMBLE PRE-COMPUTATION
@@ -232,10 +252,40 @@ for (let i=0; i<CAL_N; i++) {
   calEns[k].years.push(callaoData.year[i]);
 }
 
+const nino3Ens  = Array.from({length:ENS_FRAMES}, ()=>({x:[],y:[],years:[]}));
+const nino34Ens = Array.from({length:ENS_FRAMES}, ()=>({x:[],y:[],years:[]}));
+const nino4Ens  = Array.from({length:ENS_FRAMES}, ()=>({x:[],y:[],years:[]}));
+const talEns    = Array.from({length:ENS_FRAMES}, ()=>({x:[],y:[],years:[]}));
+const llEns     = Array.from({length:ENS_FRAMES}, ()=>({x:[],y:[],years:[]}));
+const honEns    = Array.from({length:ENS_FRAMES}, ()=>({x:[],y:[],years:[]}));
+const palEns    = Array.from({length:ENS_FRAMES}, ()=>({x:[],y:[],years:[]}));
+
+for(let i=0;i<NINO3_N;i++){  const k=(nino3Data.month[i]-1)*5+nino3Data.irest[i]; nino3Ens[k].x.push(nino3Data.x[i]); nino3Ens[k].y.push(nino3Data.y[i]); nino3Ens[k].years.push(nino3Data.year[i]); }
+for(let i=0;i<NINO34_N;i++){ const k=(nino34Data.month[i]-1)*5+nino34Data.irest[i]; nino34Ens[k].x.push(nino34Data.x[i]); nino34Ens[k].y.push(nino34Data.y[i]); nino34Ens[k].years.push(nino34Data.year[i]); }
+for(let i=0;i<NINO4_N;i++){  const k=(nino4Data.month[i]-1)*5+nino4Data.irest[i]; nino4Ens[k].x.push(nino4Data.x[i]); nino4Ens[k].y.push(nino4Data.y[i]); nino4Ens[k].years.push(nino4Data.year[i]); }
+for(let i=0;i<TAL_N;i++){    const k=(talaraData.month[i]-1)*5+talaraData.irest[i]; talEns[k].x.push(talaraData.x[i]-talMean); talEns[k].y.push(talaraData.y[i]); talEns[k].years.push(talaraData.year[i]); }
+for(let i=0;i<LALIB_N;i++){  const k=(laLibData.month[i]-1)*5+laLibData.irest[i]; llEns[k].x.push(laLibData.x[i]-llMean); llEns[k].y.push(laLibData.y[i]); llEns[k].years.push(laLibData.year[i]); }
+for(let i=0;i<HON_N;i++){    const k=(honoluluData.month[i]-1)*5+honoluluData.irest[i]; honEns[k].x.push(honoluluData.x[i]-honMean); honEns[k].y.push(honoluluData.y[i]); honEns[k].years.push(honoluluData.year[i]); }
+for(let i=0;i<PAL_N;i++){    const k=(palauData.month[i]-1)*5+palauData.irest[i]; palEns[k].x.push(palauData.x[i]-palMean); palEns[k].y.push(palauData.y[i]); palEns[k].years.push(palauData.year[i]); }
+
 const obsMinY = Math.min(...observedData.year);
 const obsMaxY = Math.max(...observedData.year);
 const calMinY = Math.min(...callaoData.year);
 const calMaxY = Math.max(...callaoData.year);
+const nino3MinY  = NINO3_N  > 0 ? Math.min(...nino3Data.year)    : 1975;
+const nino3MaxY  = NINO3_N  > 0 ? Math.max(...nino3Data.year)    : 2025;
+const nino34MinY = NINO34_N > 0 ? Math.min(...nino34Data.year)   : 1975;
+const nino34MaxY = NINO34_N > 0 ? Math.max(...nino34Data.year)   : 2025;
+const nino4MinY  = NINO4_N  > 0 ? Math.min(...nino4Data.year)    : 1975;
+const nino4MaxY  = NINO4_N  > 0 ? Math.max(...nino4Data.year)    : 2025;
+const talMinY    = TAL_N    > 0 ? Math.min(...talaraData.year)   : 1975;
+const talMaxY    = TAL_N    > 0 ? Math.max(...talaraData.year)   : 2025;
+const llMinY     = LALIB_N  > 0 ? Math.min(...laLibData.year)    : 1975;
+const llMaxY     = LALIB_N  > 0 ? Math.max(...laLibData.year)    : 2025;
+const honMinY    = HON_N    > 0 ? Math.min(...honoluluData.year) : 1975;
+const honMaxY    = HON_N    > 0 ? Math.max(...honoluluData.year) : 2025;
+const palMinY    = PAL_N    > 0 ? Math.min(...palauData.year)    : 1975;
+const palMaxY    = PAL_N    > 0 ? Math.max(...palauData.year)    : 2025;
 
 function ensColors(yearsArr, minY, maxY) {
   return yearsArr.map(y => yearColor(y, minY, maxY));
@@ -279,12 +329,42 @@ const ensLayoutCal = Object.assign({}, _darkBase, {
          zeroline:true, zerolinecolor:'#666', zerolinewidth:1.5},
 });
 
+function _anomSSTLayout(title) {
+  return Object.assign({}, _darkBase, {
+    title:{text:title, font:{color:'#e8e8f0',size:13}},
+    xaxis:{title:{text:'SST anomaly (°C)'}, range:[-4,4], color:'#888899', gridcolor:'#2a2a40', zeroline:true, zerolinecolor:'#666', zerolinewidth:1.5},
+    yaxis:{title:{text:'dT/dt (°C/month)'}, range:[-1.5,1.5], color:'#888899', gridcolor:'#2a2a40', zeroline:true, zerolinecolor:'#666', zerolinewidth:1.5},
+  });
+}
+function _sshLayout(title, xr, yr) {
+  return Object.assign({}, _darkBase, {
+    title:{text:title, font:{color:'#e8e8f0',size:13}},
+    xaxis:{title:{text:'SSH anomaly (mm)'}, range:xr, color:'#888899', gridcolor:'#2a2a40', zeroline:true, zerolinecolor:'#666', zerolinewidth:1.5},
+    yaxis:{title:{text:'dSL/dt (mm/month)'}, range:yr, color:'#888899', gridcolor:'#2a2a40', zeroline:true, zerolinecolor:'#666', zerolinewidth:1.5},
+  });
+}
+const ensLayoutNino3  = _anomSSTLayout('NINO3 — all years at same instant');
+const ensLayoutNino34 = _anomSSTLayout('NINO3.4 — all years at same instant');
+const ensLayoutNino4  = _anomSSTLayout('NINO4 — all years at same instant');
+const ensLayoutTal    = _sshLayout('Talara SSH — all years at same instant',   [-300,300], [-60,60]);
+const ensLayoutLL     = _sshLayout('La Libertad SSH — all years at same instant', [-300,300], [-60,60]);
+const ensLayoutHon    = _sshLayout('Honolulu SSH — all years at same instant', [-300,300], [-60,60]);
+const ensLayoutPal    = _sshLayout('Palau SSH — all years at same instant',    [-380,380], [-100,100]);
+
 // ═══════════════════════════════════════════════════════
 // 4. YEAR TRACKS (background ovals — one full loop per year)
 // ═══════════════════════════════════════════════════════
 
-const obsYearTracks = {};
-const calYearTracks = {};
+const obsYearTracks = {}, calYearTracks = {}, nino3YearTracks = {}, nino34YearTracks = {}, nino4YearTracks = {}, talYearTracks = {}, llYearTracks = {}, honYearTracks = {}, palYearTracks = {};
+function _addToTracks(tracks, ens) {
+  for (let k=0; k<ENS_FRAMES; k++) {
+    for (let j=0; j<ens[k].years.length; j++) {
+      const yr=ens[k].years[j];
+      if (!tracks[yr]) tracks[yr]={x:[],y:[]};
+      tracks[yr].x.push(ens[k].x[j]); tracks[yr].y.push(ens[k].y[j]);
+    }
+  }
+}
 for (let k=0; k<ENS_FRAMES; k++) {
   for (let j=0; j<obsEns[k].years.length; j++) {
     const yr = obsEns[k].years[j];
@@ -299,6 +379,13 @@ for (let k=0; k<ENS_FRAMES; k++) {
     calYearTracks[yr].y.push(calEns[k].y[j]);
   }
 }
+_addToTracks(nino3YearTracks, nino3Ens);
+_addToTracks(nino34YearTracks, nino34Ens);
+_addToTracks(nino4YearTracks, nino4Ens);
+_addToTracks(talYearTracks, talEns);
+_addToTracks(llYearTracks, llEns);
+_addToTracks(honYearTracks, honEns);
+_addToTracks(palYearTracks, palEns);
 
 function mkBgTraces(yearTracks, minY, maxY) {
   return Object.entries(yearTracks).map(([yr, d]) => ({
@@ -321,22 +408,23 @@ let ensFrame = 0, ensRunning = false, ensDelay = 150, ensTimerId = null;
 let ensLoopMode = true;
 
 // These are set in init after bg traces are built
-let _obsBgLen = 0, _calBgLen = 0;
+let _obsBgLen = 0, _calBgLen = 0, _nino3BgLen = 0, _nino34BgLen = 0, _nino4BgLen = 0, _talBgLen = 0, _llBgLen = 0, _honBgLen = 0, _palBgLen = 0;
+
+function _restyle(id, ens, minY, maxY, bgLen) {
+  const d = ens[ensFrame];
+  Plotly.restyle(id, {x:[d.x], y:[d.y], 'marker.color':[ensColors(d.years, minY, maxY)], text:[d.years.map(String)]}, [bgLen]);
+}
 
 function ensRenderFrame() {
-  const od = obsEns[ensFrame], cd = calEns[ensFrame];
-  Plotly.restyle('ens-plot-sst', {
-    x: [od.x],
-    y: [od.y],
-    'marker.color': [ensColors(od.years, obsMinY, obsMaxY)],
-    text: [od.years.map(String)],
-  }, [_obsBgLen]);
-  Plotly.restyle('ens-plot-cal', {
-    x: [cd.x],
-    y: [cd.y],
-    'marker.color': [ensColors(cd.years, calMinY, calMaxY)],
-    text: [cd.years.map(String)],
-  }, [_calBgLen]);
+  _restyle('ens-plot-sst',   obsEns,   obsMinY,   obsMaxY,   _obsBgLen);
+  _restyle('ens-plot-cal',   calEns,   calMinY,   calMaxY,   _calBgLen);
+  _restyle('ens-plot-nino3', nino3Ens, nino3MinY, nino3MaxY, _nino3BgLen);
+  _restyle('ens-plot-nino34',nino34Ens,nino34MinY,nino34MaxY,_nino34BgLen);
+  _restyle('ens-plot-nino4', nino4Ens, nino4MinY, nino4MaxY, _nino4BgLen);
+  _restyle('ens-plot-tal',   talEns,   talMinY,   talMaxY,   _talBgLen);
+  _restyle('ens-plot-lalib', llEns,    llMinY,    llMaxY,    _llBgLen);
+  _restyle('ens-plot-hon',   honEns,   honMinY,   honMaxY,   _honBgLen);
+  _restyle('ens-plot-pal',   palEns,   palMinY,   palMaxY,   _palBgLen);
   document.getElementById('ens-time-label').textContent = frameLabel(ensFrame);
 }
 
@@ -391,10 +479,21 @@ window.addEventListener('load', () => {
   document.getElementById('ens-legend-text').innerHTML =
     'Blue&nbsp;=&nbsp;' + obsMinY + ' &nbsp;&middot;&nbsp; Red&nbsp;=&nbsp;' + obsMaxY;
 
-  const obsBgTraces = mkBgTraces(obsYearTracks, obsMinY, obsMaxY);
-  const calBgTraces = mkBgTraces(calYearTracks, calMinY, calMaxY);
-  _obsBgLen = obsBgTraces.length;
-  _calBgLen = calBgTraces.length;
+  const obsBgTraces    = mkBgTraces(obsYearTracks,   obsMinY,   obsMaxY);
+  const calBgTraces    = mkBgTraces(calYearTracks,   calMinY,   calMaxY);
+  const nino3BgTraces  = mkBgTraces(nino3YearTracks, nino3MinY, nino3MaxY);
+  const nino34BgTraces = mkBgTraces(nino34YearTracks,nino34MinY,nino34MaxY);
+  const nino4BgTraces  = mkBgTraces(nino4YearTracks, nino4MinY, nino4MaxY);
+  const talBgTraces    = mkBgTraces(talYearTracks,   talMinY,   talMaxY);
+  const llBgTraces     = mkBgTraces(llYearTracks,    llMinY,    llMaxY);
+  const honBgTraces    = mkBgTraces(honYearTracks,   honMinY,   honMaxY);
+  const palBgTraces    = mkBgTraces(palYearTracks,   palMinY,   palMaxY);
+
+  _obsBgLen    = obsBgTraces.length;    _calBgLen   = calBgTraces.length;
+  _nino3BgLen  = nino3BgTraces.length;  _nino34BgLen = nino34BgTraces.length;
+  _nino4BgLen  = nino4BgTraces.length;  _talBgLen   = talBgTraces.length;
+  _llBgLen     = llBgTraces.length;     _honBgLen   = honBgTraces.length;
+  _palBgLen    = palBgTraces.length;
 
   const emptyDots = {
     type:'scatter', mode:'markers',
@@ -403,11 +502,17 @@ window.addEventListener('load', () => {
     text:[],
     hovertemplate:'%{text}: (%{x:.2f}, %{y:.2f})<extra></extra>',
   };
+  const cfg = {responsive:true, displayModeBar:false};
 
-  Plotly.newPlot('ens-plot-sst', [...obsBgTraces, Object.assign({}, emptyDots)],
-    ensLayoutSST, {responsive:true, displayModeBar:false});
-  Plotly.newPlot('ens-plot-cal', [...calBgTraces, Object.assign({}, emptyDots)],
-    ensLayoutCal, {responsive:true, displayModeBar:false});
+  Plotly.newPlot('ens-plot-sst',   [...obsBgTraces,   Object.assign({}, emptyDots)], ensLayoutSST,   cfg);
+  Plotly.newPlot('ens-plot-cal',   [...calBgTraces,   Object.assign({}, emptyDots)], ensLayoutCal,   cfg);
+  Plotly.newPlot('ens-plot-nino3', [...nino3BgTraces, Object.assign({}, emptyDots)], ensLayoutNino3, cfg);
+  Plotly.newPlot('ens-plot-nino34',[...nino34BgTraces,Object.assign({}, emptyDots)], ensLayoutNino34,cfg);
+  Plotly.newPlot('ens-plot-nino4', [...nino4BgTraces, Object.assign({}, emptyDots)], ensLayoutNino4, cfg);
+  Plotly.newPlot('ens-plot-tal',   [...talBgTraces,   Object.assign({}, emptyDots)], ensLayoutTal,   cfg);
+  Plotly.newPlot('ens-plot-lalib', [...llBgTraces,    Object.assign({}, emptyDots)], ensLayoutLL,    cfg);
+  Plotly.newPlot('ens-plot-hon',   [...honBgTraces,   Object.assign({}, emptyDots)], ensLayoutHon,   cfg);
+  Plotly.newPlot('ens-plot-pal',   [...palBgTraces,   Object.assign({}, emptyDots)], ensLayoutPal,   cfg);
 
   document.getElementById('ens-time-label').textContent = frameLabel(0);
 });
