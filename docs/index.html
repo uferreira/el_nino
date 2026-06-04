@@ -128,7 +128,6 @@ footer a:hover { text-decoration:underline; }
 .site-nav .nav-link:hover{background:rgba(255,255,255,.1);}
 .site-nav .nav-link.active{background:var(--accent);color:#fff;}
 </style>
-<script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
 </head>
 <body>
 
@@ -214,42 +213,61 @@ footer a:hover { text-decoration:underline; }
 </section>
 
 <!-- ══════════════════════════════════════════════════════
-     SECTION 2: Classic Phase Diagrams (white-bg Plotly)
+     SECTION 2: Classic Phase Diagrams — white-bg canvas
      ══════════════════════════════════════════════════════ -->
 <section id="classic">
 <div class="container">
   <h2>Classic Phase Diagrams</h2>
   <p class="section-desc">
-    12 monthly points per year (one clean oval loop per year) &mdash; white background matching the original research notebook.
-    Gray: all years. Red highlight cycles year by year.
+    White-background style matching the original research notebook &mdash; full trajectory builds incrementally in gray; red tail marks the last 60 sub-points; blue dot is the current position. SST on the absolute scale (&deg;C), Callao as sea-level anomaly (mm).
   </p>
   <div class="controls" style="margin-bottom:1rem;">
-    <div class="ctrl-head">Year Highlight Animation</div>
+    <div class="ctrl-head">Animation Controls</div>
+    <div class="param-grid">
+      <div class="param-row">
+        <label>Steps per frame <span id="cls-lbl-spf">1</span></label>
+        <div class="param-inline">
+          <input type="range" id="cls-sl-spf" min="1" max="20" step="1" value="1">
+        </div>
+      </div>
+      <div class="param-row">
+        <label>Frame delay ms <span id="cls-lbl-delay">30</span></label>
+        <div class="param-inline">
+          <input type="range" id="cls-sl-delay" min="0" max="200" step="5" value="30">
+        </div>
+      </div>
+    </div>
     <div class="btn-row">
-      <button id="cls-play-btn" onclick="clsPlay()">&#9654; Play</button>
-      <button id="cls-pause-btn" class="secondary" onclick="clsPause()" disabled>&#9646;&#9646; Pause</button>
-      <button id="cls-reset-btn" class="danger" onclick="clsReset()">&#8635; Reset</button>
-      <button id="cls-loop-btn" class="secondary" onclick="clsToggleLoop()">Loop &#8635;</button>
-      <span style="margin-left:.8rem;font-size:.82rem;color:var(--muted);">Speed:</span>
-      <input type="range" id="cls-speed-sl" min="100" max="2000" step="100" value="600"
-             style="width:130px;accent-color:var(--accent);"
-             oninput="clsSetDelay(this.value)">
-      <span id="cls-speed-lbl" style="font-family:monospace;font-size:.82rem;color:var(--accent);">600ms/year</span>
-    </div>
-    <div style="text-align:center;font-family:monospace;font-size:1.3rem;color:#cc2222;
-                font-weight:700;margin-top:.6rem;letter-spacing:.05em;">
-      <span id="cls-year-label">&mdash;</span>
+      <button id="cls-run" onclick="clsStart()">&#9654; Run</button>
+      <button id="cls-pause" class="secondary" onclick="clsPause()" disabled>&#9646;&#9646; Pause</button>
+      <button id="cls-reset" class="danger" onclick="clsReset()">&#8635; Reset</button>
     </div>
   </div>
-  <div class="two-col">
-    <div><div id="classic-sst" style="height:480px;border-radius:6px;overflow:hidden;"></div></div>
-    <div><div id="classic-cal" style="height:480px;border-radius:6px;overflow:hidden;"></div></div>
+  <div class="status-bar" id="cls-status"><span class="st-ready">Ready &mdash; click Run to animate the classic attractor</span></div>
+  <div class="two-col" style="margin-bottom:.6rem;">
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">
+        SST NINO1+2 absolute (&deg;C)
+      </div>
+      <canvas id="cls-sst-canvas" class="phasecanvas" width="700" height="480" style="background:white;"></canvas>
+    </div>
+    <div>
+      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">
+        Callao SSH anomaly (mm)
+      </div>
+      <canvas id="cls-cal-canvas" class="phasecanvas" width="700" height="480" style="background:white;"></canvas>
+    </div>
   </div>
-  <p id="classic-caption" style="color:var(--muted);font-size:.82rem;margin-top:.7rem;text-align:center;">
-    Gray: all years 1975&ndash;<span id="classic-gray-end">2024</span>
-    &nbsp;&middot;&nbsp; Red: <span id="classic-mrcy">2025</span>
-    &nbsp;&middot;&nbsp; White background style matching original research notebook.
-  </p>
+  <div style="margin:.5rem 0 1rem;">
+    <input type="range" id="cls-scrubber" min="0" max="100" value="0"
+           style="width:100%;cursor:pointer;accent-color:var(--accent);"
+           title="Drag to scrub through time">
+    <div id="cls-time-display"
+         style="text-align:center;font-family:monospace;font-size:.82rem;
+                color:var(--muted);margin-top:.25rem;letter-spacing:.04em">
+      Jan 1975
+    </div>
+  </div>
 </div>
 </section>
 
@@ -864,164 +882,300 @@ function makeOff(w, h) {
 
 window.addEventListener('load', () => {
   obs1Init();
-  classicInit();
+  clsInit();
 });
 
 // ═══════════════════════════════════════════════════════
-// 10. CLASSIC PHASE DIAGRAMS (white-bg Plotly)
+// 10. CLASSIC PHASE DIAGRAMS — white-bg canvas
 // ═══════════════════════════════════════════════════════
-function classicInit() {
-  // Find most recent year with all 12 months present (irest===0 = monthly sample)
-  function findMRCY(data, N) {
-    const mpy = {};
-    for (let i = 0; i < N; i++) {
-      if (data.irest[i] !== 0) continue;
-      const y = data.year[i];
-      if (!mpy[y]) mpy[y] = new Set();
-      mpy[y].add(data.month[i]);
+
+const CLS_CW=700, CLS_CH=480;
+const CLS_PLT={l:56,r:680,t:34,b:446};
+const CLS_DOM_SST={xmin:17.5,xmax:32.5,ymin:-2.5,ymax:2.5};
+const CLS_DOM_CAL={xmin:-300, xmax:300,  ymin:-60,  ymax:60};
+const CLS_LABELS_SST={x:'SST NINO1+2 (°C)', y:'dT/dt'};
+const CLS_LABELS_CAL={x:'SSH anomaly (mm)',  y:'dSL/dt'};
+const SST_ABS_TICKS={x:[18,20,22,24,26,28,30,32],y:[-2,-1,0,1,2]};
+const CLS_TAIL=60;
+
+const CLS = {
+  running:false, paused:false,
+  obsIdx:0, calIdx:0,
+  obsStartIdx:0, calStartIdx:0,
+  totalFrames:0,
+  wasRunningBeforeScrub:false,
+  spf:1, delay:30,
+  obsTail:[], calTail:[],
+  rafId:null,
+  sstCanvas:null, sstCtx:null, sstOff:null, sstOffCtx:null,
+  calCanvas:null, calCtx:null, calOff:null, calOffCtx:null,
+};
+
+function drawBgWhite(ctx, CW, CH, PLT, DOM, labels, ticks) {
+  const mx = x => PLT.l + (x-DOM.xmin)/(DOM.xmax-DOM.xmin)*(PLT.r-PLT.l);
+  const my = y => PLT.b - (y-DOM.ymin)/(DOM.ymax-DOM.ymin)*(PLT.b-PLT.t);
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,CW,CH);
+  ctx.strokeStyle='#dddddd'; ctx.lineWidth=0.5;
+  if(ticks){
+    ticks.x.forEach(x=>{ctx.beginPath();ctx.moveTo(mx(x),PLT.t);ctx.lineTo(mx(x),PLT.b);ctx.stroke();});
+    ticks.y.forEach(y=>{ctx.beginPath();ctx.moveTo(PLT.l,my(y));ctx.lineTo(PLT.r,my(y));ctx.stroke();});
+  } else {
+    for(let x=Math.ceil(DOM.xmin);x<=Math.floor(DOM.xmax);x++){ctx.beginPath();ctx.moveTo(mx(x),PLT.t);ctx.lineTo(mx(x),PLT.b);ctx.stroke();}
+    for(let y=Math.ceil(DOM.ymin);y<=Math.floor(DOM.ymax);y++){ctx.beginPath();ctx.moveTo(PLT.l,my(y));ctx.lineTo(PLT.r,my(y));ctx.stroke();}
+  }
+  ctx.strokeStyle='rgba(100,100,100,0.5)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  const x0z=mx(0); if(x0z>=PLT.l&&x0z<=PLT.r){ctx.beginPath();ctx.moveTo(x0z,PLT.t);ctx.lineTo(x0z,PLT.b);ctx.stroke();}
+  const y0z=my(0); if(y0z>=PLT.t&&y0z<=PLT.b){ctx.beginPath();ctx.moveTo(PLT.l,y0z);ctx.lineTo(PLT.r,y0z);ctx.stroke();}
+  ctx.setLineDash([]);
+  ctx.strokeStyle='#999999'; ctx.lineWidth=1;
+  ctx.strokeRect(PLT.l,PLT.t,PLT.r-PLT.l,PLT.b-PLT.t);
+  ctx.fillStyle='#555555'; ctx.font='10px monospace'; ctx.textAlign='center';
+  if(ticks){
+    ticks.x.forEach(x=>ctx.fillText(x,mx(x),PLT.b+14));
+  } else {
+    for(let x=Math.ceil(DOM.xmin);x<=Math.floor(DOM.xmax);x+=2) ctx.fillText(x,mx(x),PLT.b+14);
+  }
+  ctx.fillStyle='#333333'; ctx.fillText(labels.x,(PLT.l+PLT.r)/2,CH-3);
+  ctx.textAlign='right'; ctx.fillStyle='#555555';
+  if(ticks){
+    ticks.y.forEach(y=>ctx.fillText(y.toFixed(0),PLT.l-5,my(y)+4));
+  } else {
+    for(let y=Math.ceil(DOM.ymin);y<=Math.floor(DOM.ymax);y++) ctx.fillText(y.toFixed(0),PLT.l-5,my(y)+4);
+  }
+  ctx.save();
+  ctx.fillStyle='#333333'; ctx.translate(11,(PLT.t+PLT.b)/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.font='10px monospace'; ctx.fillText(labels.y,0,0);
+  ctx.restore();
+}
+
+function addToOffWhite(offCtx, x1, y1, x2, y2, PLT, DOM) {
+  const mx = x => PLT.l + (x-DOM.xmin)/(DOM.xmax-DOM.xmin)*(PLT.r-PLT.l);
+  const my = y => PLT.b - (y-DOM.ymin)/(DOM.ymax-DOM.ymin)*(PLT.b-PLT.t);
+  offCtx.beginPath();
+  offCtx.strokeStyle='rgba(150,150,150,0.25)'; offCtx.lineWidth=0.9;
+  offCtx.moveTo(mx(x1),my(y1)); offCtx.lineTo(mx(x2),my(y2)); offCtx.stroke();
+}
+
+function compositeFrameWhite(ctx, CW, CH, PLT, DOM, offCanvas, tail, timeStr) {
+  const mx = x => PLT.l + (x-DOM.xmin)/(DOM.xmax-DOM.xmin)*(PLT.r-PLT.l);
+  const my = y => PLT.b - (y-DOM.ymin)/(DOM.ymax-DOM.ymin)*(PLT.b-PLT.t);
+  ctx.drawImage(offCanvas,0,0);
+  const n=tail.length;
+  for(let i=1;i<n;i++){
+    const f=i/n;
+    ctx.beginPath();
+    ctx.strokeStyle=`rgba(204,0,0,${(0.2+0.8*f).toFixed(2)})`;
+    ctx.lineWidth=0.7+1.5*f;
+    ctx.moveTo(mx(tail[i-1].x),my(tail[i-1].y));
+    ctx.lineTo(mx(tail[i].x),my(tail[i].y));
+    ctx.stroke();
+    if(f>0.4){
+      ctx.beginPath();
+      ctx.arc(mx(tail[i].x),my(tail[i].y),1.5,0,2*Math.PI);
+      ctx.fillStyle=`rgba(204,0,0,${(0.3+0.7*f).toFixed(2)})`;
+      ctx.fill();
     }
-    let mrcy = 0;
-    for (const [yr, months] of Object.entries(mpy)) {
-      if (months.size === 12 && parseInt(yr) > mrcy) mrcy = parseInt(yr);
+  }
+  if(n>0){
+    const cx=mx(tail[n-1].x), cy=my(tail[n-1].y);
+    ctx.beginPath(); ctx.arc(cx,cy,9,0,2*Math.PI);
+    ctx.fillStyle='rgba(51,136,255,0.15)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx,cy,5,0,2*Math.PI);
+    ctx.fillStyle='#3388ff'; ctx.fill();
+    ctx.strokeStyle='#1155cc'; ctx.lineWidth=1.2; ctx.stroke();
+  }
+  if(timeStr){
+    ctx.fillStyle='rgba(255,255,255,0.88)';
+    ctx.fillRect(PLT.l+4,PLT.t+4,92,22);
+    ctx.fillStyle='#222222'; ctx.font='bold 12px monospace'; ctx.textAlign='left';
+    ctx.fillText(timeStr,PLT.l+8,PLT.t+20);
+  }
+}
+
+function clsDrawBgs(){
+  drawBgWhite(CLS.sstCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_SST,CLS_LABELS_SST,SST_ABS_TICKS);
+  drawBgWhite(CLS.calCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS_LABELS_CAL,CAL_SSH_TICKS);
+}
+
+function clsStatus(){
+  const el=document.getElementById('cls-status'); if(!el) return;
+  const f=CLS.obsIdx-CLS.obsStartIdx;
+  const pct=CLS.totalFrames>0?(f/CLS.totalFrames*100).toFixed(1):'0.0';
+  const cls=CLS.paused?'st-paused':(CLS.running?'st-running':'st-done');
+  const st=CLS.paused?'&#9646;&#9646; Paused':(CLS.running?'&#9654; Running':'&#9632; Done');
+  el.innerHTML=`<span class="${cls}">${st}</span> &nbsp;·&nbsp; ${f}/${CLS.totalFrames} pts (${pct}%)`;
+}
+
+function clsInit(){
+  CLS.sstCanvas=document.getElementById('cls-sst-canvas');
+  CLS.sstCtx=CLS.sstCanvas.getContext('2d');
+  CLS.sstOff=makeOff(CLS_CW,CLS_CH);
+  CLS.sstOffCtx=CLS.sstOff.getContext('2d');
+  CLS.calCanvas=document.getElementById('cls-cal-canvas');
+  CLS.calCtx=CLS.calCanvas.getContext('2d');
+  CLS.calOff=makeOff(CLS_CW,CLS_CH);
+  CLS.calOffCtx=CLS.calOff.getContext('2d');
+  const cs=_cmpCommonStart();
+  CLS.obsStartIdx=cs.obsStartIdx; CLS.calStartIdx=cs.calStartIdx;
+  CLS.obsIdx=cs.obsStartIdx; CLS.calIdx=cs.calStartIdx;
+  CLS.totalFrames=Math.min(OBS_N-cs.obsStartIdx,CAL_N-cs.calStartIdx);
+  clsDrawBgs();
+  const slSpf=document.getElementById('cls-sl-spf');
+  const slDelay=document.getElementById('cls-sl-delay');
+  if(slSpf) slSpf.addEventListener('input',()=>{CLS.spf=parseInt(slSpf.value)||1; document.getElementById('cls-lbl-spf').textContent=slSpf.value;});
+  if(slDelay) slDelay.addEventListener('input',()=>{CLS.delay=parseInt(slDelay.value)||0; document.getElementById('cls-lbl-delay').textContent=slDelay.value;});
+  const scrubEl=document.getElementById('cls-scrubber');
+  if(scrubEl){
+    scrubEl.addEventListener('mousedown',()=>{
+      CLS.wasRunningBeforeScrub=CLS.running&&!CLS.paused;
+      if(CLS.wasRunningBeforeScrub){CLS.paused=true; if(CLS.rafId) cancelAnimationFrame(CLS.rafId); document.getElementById('cls-pause').innerHTML='&#9654; Resume';}
+    });
+    scrubEl.addEventListener('input',function(){
+      if(!CLS.running&&CLS.totalFrames===0) return;
+      clsRedrawToFrame(parseInt(this.value));
+    });
+    scrubEl.addEventListener('mouseup',function(){
+      if(CLS.wasRunningBeforeScrub&&CLS.running){CLS.paused=false; document.getElementById('cls-pause').innerHTML='&#9646;&#9646; Pause'; CLS.rafId=setTimeout(()=>requestAnimationFrame(clsLoop),CLS.delay);}
+      CLS.wasRunningBeforeScrub=false;
+    });
+    scrubEl.addEventListener('touchstart',()=>{
+      CLS.wasRunningBeforeScrub=CLS.running&&!CLS.paused;
+      if(CLS.wasRunningBeforeScrub){CLS.paused=true; if(CLS.rafId) cancelAnimationFrame(CLS.rafId);}
+    },{passive:true});
+    scrubEl.addEventListener('touchend',function(){
+      if(CLS.wasRunningBeforeScrub&&CLS.running){CLS.paused=false; CLS.rafId=setTimeout(()=>requestAnimationFrame(clsLoop),CLS.delay);}
+      CLS.wasRunningBeforeScrub=false;
+    });
+  }
+}
+
+function clsLoop(){
+  if(!CLS.running||CLS.paused) return;
+  const spf=CLS.spf;
+  for(let i=0;i<spf;i++){
+    if(CLS.obsIdx>=OBS_N){clsFinish(); return;}
+    const ox=observedData.x[CLS.obsIdx]; // absolute temperature — no mean subtraction
+    const oy=observedData.y[CLS.obsIdx];
+    CLS.obsTail.push({x:ox,y:oy});
+    if(CLS.obsTail.length>CLS_TAIL){
+      addToOffWhite(CLS.sstOffCtx,CLS.obsTail[0].x,CLS.obsTail[0].y,CLS.obsTail[1].x,CLS.obsTail[1].y,CLS_PLT,CLS_DOM_SST);
+      CLS.obsTail.shift();
     }
-    return mrcy;
-  }
-
-  const obsMRCY = findMRCY(observedData, OBS_N);
-  const calMRCY = findMRCY(callaoData, CAL_N);
-
-  const grayEnd = document.getElementById('classic-gray-end');
-  const mrcyEl  = document.getElementById('classic-mrcy');
-  if (grayEnd) grayEnd.textContent = String(obsMRCY - 1);
-  if (mrcyEl)  mrcyEl.textContent  = String(obsMRCY);
-
-  // Monthly-only yearMap (12 points per year — clean oval loops)
-  function buildYearMap(data, N, meanX) {
-    const ym = {};
-    for (let i = 0; i < N; i++) {
-      if (data.irest[i] !== 0) continue;
-      const y = data.year[i];
-      if (!ym[y]) ym[y] = {x:[], y:[]};
-      ym[y].x.push(data.x[i] - meanX);
-      ym[y].y.push(data.y[i]);
+    CLS.obsIdx++;
+    if(CLS.calIdx<CAL_N){
+      const cx=callaoData.x[CLS.calIdx]-callaoMean;
+      const cy=callaoData.y[CLS.calIdx];
+      CLS.calTail.push({x:cx,y:cy});
+      if(CLS.calTail.length>CLS_TAIL){
+        addToOffWhite(CLS.calOffCtx,CLS.calTail[0].x,CLS.calTail[0].y,CLS.calTail[1].x,CLS.calTail[1].y,CLS_PLT,CLS_DOM_CAL);
+        CLS.calTail.shift();
+      }
+      CLS.calIdx++;
     }
-    return ym;
   }
+  const tIdx=Math.min(CLS.obsIdx,OBS_N-1);
+  const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
+  clsDrawBgs();
+  compositeFrameWhite(CLS.sstCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_SST,CLS.sstOff,CLS.obsTail,dispStr);
+  compositeFrameWhite(CLS.calCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS.calOff,CLS.calTail,null);
+  document.getElementById('cls-time-display').textContent=observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
+  const scrub=document.getElementById('cls-scrubber');
+  if(scrub) scrub.value=CLS.obsIdx-CLS.obsStartIdx;
+  clsStatus();
+  if(CLS.running) CLS.rafId=setTimeout(()=>requestAnimationFrame(clsLoop),CLS.delay);
+}
 
-  const obsYearMap  = buildYearMap(observedData, OBS_N, obsMean);
-  const calYearMap  = buildYearMap(callaoData,   CAL_N, callaoMean);
-  const obsYearList = Object.keys(obsYearMap).map(Number).sort();
-  const calYearList = Object.keys(calYearMap).map(Number).sort();
+function clsFinish(){
+  CLS.running=false; CLS.paused=false;
+  if(CLS.rafId) cancelAnimationFrame(CLS.rafId);
+  setBtn('cls-run',false); setBtn('cls-pause',true);
+  document.getElementById('cls-pause').innerHTML='&#9646;&#9646; Pause';
+  clsStatus();
+}
 
-  // Gray traces — all years except MRCY
-  function buildGrayTraces(yearMap, yearList, mrcy) {
-    return yearList
-      .filter(yr => yr !== mrcy)
-      .map(yr => ({
-        type:'scatter', mode:'lines',
-        x:yearMap[yr].x, y:yearMap[yr].y,
-        line:{color:'rgba(100,100,100,0.35)', width:0.8},
-        showlegend:false, name:String(yr),
-        hovertemplate: yr + ': (%{x:.2f}, %{y:.2f})<extra></extra>',
-      }));
+function clsStart(){
+  if(CLS.running) return;
+  CLS.spf=parseInt(document.getElementById('cls-sl-spf')?.value)||1;
+  CLS.delay=parseInt(document.getElementById('cls-sl-delay')?.value)||30;
+  const cs=_cmpCommonStart();
+  CLS.obsStartIdx=cs.obsStartIdx; CLS.calStartIdx=cs.calStartIdx;
+  CLS.obsIdx=cs.obsStartIdx; CLS.calIdx=cs.calStartIdx;
+  CLS.totalFrames=Math.min(OBS_N-cs.obsStartIdx,CAL_N-cs.calStartIdx);
+  CLS.obsTail=[]; CLS.calTail=[];
+  CLS.running=true; CLS.paused=false;
+  CLS.sstOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
+  CLS.calOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
+  clsDrawBgs();
+  const scrub=document.getElementById('cls-scrubber');
+  if(scrub){scrub.max=CLS.totalFrames-1; scrub.value=0;}
+  document.getElementById('cls-time-display').textContent='Jan '+cs.startYear;
+  setBtn('cls-run',true); setBtn('cls-pause',false);
+  document.getElementById('cls-pause').innerHTML='&#9646;&#9646; Pause';
+  CLS.rafId=setTimeout(()=>requestAnimationFrame(clsLoop),CLS.delay);
+}
+
+function clsPause(){
+  if(!CLS.running) return;
+  CLS.paused=!CLS.paused;
+  const btn=document.getElementById('cls-pause');
+  if(CLS.paused){cancelAnimationFrame(CLS.rafId); btn.innerHTML='&#9654; Resume';}
+  else{btn.innerHTML='&#9646;&#9646; Pause'; CLS.rafId=setTimeout(()=>requestAnimationFrame(clsLoop),CLS.delay);}
+  clsStatus();
+}
+
+function clsReset(){
+  clsFinish();
+  const cs=_cmpCommonStart();
+  CLS.obsIdx=cs.obsStartIdx; CLS.calIdx=cs.calStartIdx;
+  CLS.obsTail=[]; CLS.calTail=[];
+  CLS.sstOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
+  CLS.calOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
+  clsDrawBgs();
+  const scrub=document.getElementById('cls-scrubber');
+  if(scrub) scrub.value=0;
+  document.getElementById('cls-time-display').textContent='Jan 1975';
+  document.getElementById('cls-status').innerHTML='<span class="st-ready">Ready</span>';
+}
+
+function clsRedrawToFrame(targetFrame){
+  if(!CLS.sstOffCtx) return;
+  const frame=Math.max(0,Math.min(targetFrame,CLS.totalFrames-1));
+  const obsStart=CLS.obsStartIdx, calStart=CLS.calStartIdx;
+  CLS.sstOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
+  CLS.calOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
+  let obsTail=[], calTail=[];
+  for(let f=0;f<frame;f++){
+    const oi=obsStart+f, ci=calStart+f;
+    if(oi<OBS_N){
+      const ox=observedData.x[oi]; // absolute
+      const oy=observedData.y[oi];
+      obsTail.push({x:ox,y:oy});
+      if(obsTail.length>CLS_TAIL){
+        addToOffWhite(CLS.sstOffCtx,obsTail[0].x,obsTail[0].y,obsTail[1].x,obsTail[1].y,CLS_PLT,CLS_DOM_SST);
+        obsTail.shift();
+      }
+    }
+    if(ci<CAL_N){
+      const cx=callaoData.x[ci]-callaoMean;
+      const cy=callaoData.y[ci];
+      calTail.push({x:cx,y:cy});
+      if(calTail.length>CLS_TAIL){
+        addToOffWhite(CLS.calOffCtx,calTail[0].x,calTail[0].y,calTail[1].x,calTail[1].y,CLS_PLT,CLS_DOM_CAL);
+        calTail.shift();
+      }
+    }
   }
-
-  const obsGrayTraces = buildGrayTraces(obsYearMap, obsYearList, obsMRCY);
-  const calGrayTraces = buildGrayTraces(calYearMap, calYearList, calMRCY);
-
-  const mkEmptyRed = () => ({
-    type:'scatter', mode:'lines+markers',
-    x:[], y:[],
-    line:{color:'#cc2222', width:2.5},
-    marker:{color:'#cc2222', size:6, symbol:'circle'},
-    showlegend:true, name:'',
-  });
-
-  function makeWhiteLayout(title, xTitle, yTitle, xrange, yrange) {
-    return {
-      paper_bgcolor:'white', plot_bgcolor:'white',
-      font:{color:'#222', family:'Arial, sans-serif'},
-      title:{text:title, font:{color:'#222', size:13}},
-      xaxis:{
-        title:xTitle, range:xrange, color:'#333',
-        linecolor:'#999', linewidth:1, mirror:true,
-        gridcolor:'#ddd', gridwidth:1,
-        zeroline:true, zerolinecolor:'#aaa', zerolinewidth:1.5,
-        tickcolor:'#999',
-      },
-      yaxis:{
-        title:yTitle, range:yrange, color:'#333',
-        linecolor:'#999', linewidth:1, mirror:true,
-        gridcolor:'#ddd', gridwidth:1,
-        zeroline:true, zerolinecolor:'#aaa', zerolinewidth:1.5,
-        tickcolor:'#999',
-      },
-      margin:{l:65, r:20, t:50, b:55},
-      hovermode:'closest',
-      showlegend:true,
-      legend:{font:{color:'#222', size:11}, bgcolor:'white',
-              bordercolor:'#ccc', borderwidth:1},
-    };
-  }
-
-  const obsLayout = makeWhiteLayout('SST NINO1+2 Phase Diagram',
-    'SST anomaly (°C)', 'dT/dt (°C/month)', [-7.5, 7.5], [-2.5, 2.5]);
-  const calLayout = makeWhiteLayout('Callao SSH Phase Diagram',
-    'SSH anomaly (mm)', 'dSL/dt (mm/month)', [-300, 300], [-60, 60]);
-
-  Plotly.newPlot('classic-sst', [...obsGrayTraces, mkEmptyRed()],
-    obsLayout, {responsive:true, displayModeBar:false});
-  Plotly.newPlot('classic-cal', [...calGrayTraces, mkEmptyRed()],
-    calLayout, {responsive:true, displayModeBar:false});
-
-  // ── Animation state ──────────────────────────────────────────────────────
-  const CLS = {obsIdx:0, calIdx:0, running:false, delay:600, loop:true, rafId:null};
-
-  function clsFrame() {
-    const obsYr = obsYearList[CLS.obsIdx];
-    const calYr = calYearList[CLS.calIdx];
-    document.getElementById('cls-year-label').textContent = String(obsYr);
-    Plotly.restyle('classic-sst',
-      {x:[obsYearMap[obsYr].x], y:[obsYearMap[obsYr].y], name:[String(obsYr)]},
-      [obsGrayTraces.length]);
-    Plotly.restyle('classic-cal',
-      {x:[calYearMap[calYr].x], y:[calYearMap[calYr].y], name:[String(calYr)]},
-      [calGrayTraces.length]);
-    CLS.obsIdx = (CLS.obsIdx + 1) % obsYearList.length;
-    CLS.calIdx = (CLS.calIdx + 1) % calYearList.length;
-    if (!CLS.loop && CLS.obsIdx === 0) { window.clsPause(); return; }
-    CLS.rafId = setTimeout(() => requestAnimationFrame(clsFrame), CLS.delay);
-  }
-
-  window.clsPlay = function() {
-    if (CLS.running) return;
-    CLS.running = true;
-    document.getElementById('cls-play-btn').disabled  = true;
-    document.getElementById('cls-pause-btn').disabled = false;
-    CLS.rafId = setTimeout(() => requestAnimationFrame(clsFrame), CLS.delay);
-  };
-  window.clsPause = function() {
-    CLS.running = false;
-    clearTimeout(CLS.rafId);
-    document.getElementById('cls-play-btn').disabled  = false;
-    document.getElementById('cls-pause-btn').disabled = true;
-  };
-  window.clsReset = function() {
-    window.clsPause();
-    CLS.obsIdx = 0; CLS.calIdx = 0;
-    document.getElementById('cls-year-label').textContent = '—';
-    Plotly.restyle('classic-sst', {x:[[]], y:[[]], name:['']}, [obsGrayTraces.length]);
-    Plotly.restyle('classic-cal', {x:[[]], y:[[]], name:['']}, [calGrayTraces.length]);
-  };
-  window.clsSetDelay = function(val) {
-    CLS.delay = parseInt(val);
-    document.getElementById('cls-speed-lbl').textContent = val + 'ms/year';
-  };
-  window.clsToggleLoop = function() {
-    CLS.loop = !CLS.loop;
-    document.getElementById('cls-loop-btn').textContent =
-      CLS.loop ? 'Loop ↻' : 'One cycle →';
-  };
+  CLS.obsIdx=obsStart+frame; CLS.calIdx=calStart+frame;
+  CLS.obsTail=obsTail; CLS.calTail=calTail;
+  const tIdx=Math.min(CLS.obsIdx,OBS_N-1);
+  const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
+  clsDrawBgs();
+  compositeFrameWhite(CLS.sstCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_SST,CLS.sstOff,CLS.obsTail,dispStr);
+  compositeFrameWhite(CLS.calCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS.calOff,CLS.calTail,null);
+  document.getElementById('cls-time-display').textContent=observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
+  const scrub=document.getElementById('cls-scrubber');
+  if(scrub) scrub.value=frame;
+  clsStatus();
 }
 
 // ═══════════════════════════════════════════════════════
