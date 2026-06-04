@@ -59,6 +59,12 @@ footer a:hover { text-decoration:underline; }
   <a href="ensemble.html" class="nav-link active">Year Ensemble</a>
   <a href="compare.html" class="nav-link">Compare</a>
 </nav>
+    <div style="margin-top:.5rem;display:inline-flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--muted);">
+      <label for="g-dot-size">Dot size</label>
+      <input type="range" id="g-dot-size" min="1" max="8" step="0.5" value="3"
+             style="width:70px;accent-color:var(--accent);">
+      <span id="g-dot-lbl">3</span>
+    </div>
   </div>
 </header>
 
@@ -140,6 +146,7 @@ footer a:hover { text-decoration:underline; }
 </footer>
 
 <script>
+let G_DOT = 3.0;
 // ═══════════════════════════════════════════════════════
 // 1. EMBEDDED OBSERVED DATA (same as index.html)
 // ═══════════════════════════════════════════════════════
@@ -515,6 +522,23 @@ window.addEventListener('load', () => {
   Plotly.newPlot('ens-plot-pal',   [...palBgTraces,   Object.assign({}, emptyDots)], ensLayoutPal,   cfg);
 
   document.getElementById('ens-time-label').textContent = frameLabel(0);
+
+  const _ENS_PLOTS = ['ens-plot-sst','ens-plot-cal','ens-plot-nino3','ens-plot-nino34',
+                      'ens-plot-nino4','ens-plot-tal','ens-plot-lalib','ens-plot-hon','ens-plot-pal'];
+  const _ENS_BGLENS = [_obsBgLen,_calBgLen,_nino3BgLen,_nino34BgLen,
+                       _nino4BgLen,_talBgLen,_llBgLen,_honBgLen,_palBgLen];
+  const dotSl = document.getElementById('g-dot-size');
+  if (dotSl) {
+    dotSl.addEventListener('input', function() {
+      G_DOT = parseFloat(this.value);
+      document.getElementById('g-dot-lbl').textContent = G_DOT;
+      _ENS_PLOTS.forEach((id, i) => {
+        const el = document.getElementById(id);
+        if (el && el.data && el.data.length > 0)
+          Plotly.restyle(id, {'marker.size': G_DOT * 2 + 1}, [_ENS_BGLENS[i]]);
+      });
+    });
+  }
 });
 </script>
 </body>

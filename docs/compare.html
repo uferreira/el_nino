@@ -87,6 +87,12 @@ input:checked + .toggle-slider:before { transform:translateX(16px); background:#
   <a href="ensemble.html" class="nav-link">Year Ensemble</a>
   <a href="compare.html" class="nav-link active">Compare</a>
 </nav>
+    <div style="margin-top:.5rem;display:inline-flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--muted);">
+      <label for="g-dot-size">Dot size</label>
+      <input type="range" id="g-dot-size" min="1" max="8" step="0.5" value="3"
+             style="width:70px;accent-color:var(--accent);">
+      <span id="g-dot-lbl">3</span>
+    </div>
   </div>
 </header>
 
@@ -521,7 +527,7 @@ function cmpRenderFrame(params) {
     // Current dot
     const tip = tail[tail.length-1];
     cmpCtx.beginPath();
-    cmpCtx.arc(tip.px, tip.py, 4, 0, 2*Math.PI);
+    cmpCtx.arc(tip.px, tip.py, G_DOT+1, 0, 2*Math.PI);
     cmpCtx.fillStyle = color;
     cmpCtx.fill();
   }
@@ -727,12 +733,20 @@ function cmpBuildSelector() {
 // ─────────────────────────────────────────────────────────────
 // Init
 // ─────────────────────────────────────────────────────────────
+let G_DOT = 3.0;
 (function init() {
   cmpInitCanvas();
   cmpBuildSelector();
   cmpWireSliders();
   document.getElementById('cmp-norm-toggle').addEventListener('change', cmpReset);
   document.getElementById('cmp-align-toggle').addEventListener('change', cmpReset);
+  const dotSl = document.getElementById('g-dot-size');
+  if (dotSl) {
+    dotSl.addEventListener('input', function() {
+      G_DOT = parseFloat(this.value);
+      document.getElementById('g-dot-lbl').textContent = G_DOT;
+    });
+  }
   // Draw empty white canvas
   cmpCtx.fillStyle = '#ffffff';
   cmpCtx.fillRect(0, 0, CMP_CW, CMP_CH);

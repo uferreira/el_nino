@@ -143,6 +143,12 @@ footer a:hover { text-decoration:underline; }
   <a href="ensemble.html" class="nav-link">Year Ensemble</a>
   <a href="compare.html" class="nav-link">Compare</a>
 </nav>
+    <div style="margin-top:.5rem;display:inline-flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--muted);">
+      <label for="g-dot-size">Dot size</label>
+      <input type="range" id="g-dot-size" min="1" max="8" step="0.5" value="3"
+             style="width:70px;accent-color:var(--accent);">
+      <span id="g-dot-lbl">3</span>
+    </div>
   </div>
 </header>
 
@@ -1114,8 +1120,30 @@ function init3D() {
   });
 }
 
+let G_DOT = 3.0;
 window.addEventListener('load', () => {
   init3D();
+  const dotSl = document.getElementById('g-dot-size');
+  if (dotSl) {
+    dotSl.addEventListener('input', function() {
+      G_DOT = parseFloat(this.value);
+      document.getElementById('g-dot-lbl').textContent = G_DOT;
+      const _FA_ANIM_PLOTS = [
+        'plot-static-sst-accel-anim','plot-static-cal-accel-anim',
+        'plot-static-sst-phase-anim','plot-static-cal-phase-anim',
+      ].concat(FA3D.psExtras.filter(e=>e.N>0).flatMap(e=>[
+        'plot-static-'+e.id+'-accel-anim',
+        'plot-static-'+e.id+'-phase-anim',
+      ]));
+      _FA_ANIM_PLOTS.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.data && el.data.length >= 3) {
+          Plotly.restyle(id, {'marker.size': G_DOT * 3}, [2]);
+          Plotly.restyle(id, {'marker.size': G_DOT}, [1]);
+        }
+      });
+    });
+  }
 });
 
 // ═══════════════════════════════════════════════════════

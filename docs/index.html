@@ -142,6 +142,12 @@ footer a:hover { text-decoration:underline; }
   <a href="ensemble.html" class="nav-link">Year Ensemble</a>
   <a href="compare.html" class="nav-link">Compare</a>
 </nav>
+    <div style="margin-top:.5rem;display:inline-flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--muted);">
+      <label for="g-dot-size">Dot size</label>
+      <input type="range" id="g-dot-size" min="1" max="8" step="0.5" value="3"
+             style="width:70px;accent-color:var(--accent);">
+      <span id="g-dot-lbl">3</span>
+    </div>
   </div>
 </header>
 
@@ -1085,9 +1091,9 @@ function compositeFrame(ctx, CW, CH, PLT, DOM, offCanvas, tail, timeStr) {
   // Blue dot + glow at tail tip
   if (n > 0) {
     const cx=mx(tail[n-1].x), cy=my(tail[n-1].y);
-    ctx.beginPath(); ctx.arc(cx,cy,9,0,2*Math.PI);
+    ctx.beginPath(); ctx.arc(cx,cy,G_DOT+6,0,2*Math.PI);
     ctx.fillStyle='rgba(51,136,255,0.12)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx,cy,5,0,2*Math.PI);
+    ctx.beginPath(); ctx.arc(cx,cy,G_DOT+2,0,2*Math.PI);
     ctx.fillStyle='#3388ff'; ctx.fill();
     ctx.strokeStyle='#88ccff'; ctx.lineWidth=1.2; ctx.stroke();
   }
@@ -1124,9 +1130,17 @@ function makeOff(w, h) {
 
 // ═══════════════════════════════════════════════════════
 
+let G_DOT = 3.0;
 window.addEventListener('load', () => {
   obs1Init();
   clsInit();
+  const dotSl = document.getElementById('g-dot-size');
+  if (dotSl) {
+    dotSl.addEventListener('input', function() {
+      G_DOT = parseFloat(this.value);
+      document.getElementById('g-dot-lbl').textContent = G_DOT;
+    });
+  }
 });
 
 // ═══════════════════════════════════════════════════════
@@ -1262,14 +1276,14 @@ function addToOffWhite(offCtx, x1, y1, x2, y2, PLT, DOM) {
   const mx = x => PLT.l + (x-DOM.xmin)/(DOM.xmax-DOM.xmin)*(PLT.r-PLT.l);
   const my = y => PLT.b - (y-DOM.ymin)/(DOM.ymax-DOM.ymin)*(PLT.b-PLT.t);
   offCtx.beginPath();
-  offCtx.strokeStyle='rgba(150,150,150,0.25)'; offCtx.lineWidth=0.9;
+  offCtx.strokeStyle='rgba(80,80,80,0.55)'; offCtx.lineWidth=0.9;
   offCtx.moveTo(mx(x1),my(y1)); offCtx.lineTo(mx(x2),my(y2)); offCtx.stroke();
 }
 
 function compositeFrameWhite(ctx, CW, CH, PLT, DOM, offCanvas, tail, timeStr) {
   const mx = x => PLT.l + (x-DOM.xmin)/(DOM.xmax-DOM.xmin)*(PLT.r-PLT.l);
   const my = y => PLT.b - (y-DOM.ymin)/(DOM.ymax-DOM.ymin)*(PLT.b-PLT.t);
-  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,CW,CH);
+  ctx.clearRect(0,0,CW,CH);
   ctx.drawImage(offCanvas,0,0);
   const n=tail.length;
   for(let i=1;i<n;i++){
@@ -1282,16 +1296,16 @@ function compositeFrameWhite(ctx, CW, CH, PLT, DOM, offCanvas, tail, timeStr) {
     ctx.stroke();
     if(f>0.4){
       ctx.beginPath();
-      ctx.arc(mx(tail[i].x),my(tail[i].y),1.5,0,2*Math.PI);
+      ctx.arc(mx(tail[i].x),my(tail[i].y),G_DOT*0.9,0,2*Math.PI);
       ctx.fillStyle=`rgba(204,0,0,${(0.3+0.7*f).toFixed(2)})`;
       ctx.fill();
     }
   }
   if(n>0){
     const cx=mx(tail[n-1].x), cy=my(tail[n-1].y);
-    ctx.beginPath(); ctx.arc(cx,cy,9,0,2*Math.PI);
+    ctx.beginPath(); ctx.arc(cx,cy,G_DOT+6,0,2*Math.PI);
     ctx.fillStyle='rgba(51,136,255,0.15)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx,cy,5,0,2*Math.PI);
+    ctx.beginPath(); ctx.arc(cx,cy,G_DOT+2,0,2*Math.PI);
     ctx.fillStyle='#3388ff'; ctx.fill();
     ctx.strokeStyle='#1155cc'; ctx.lineWidth=1.2; ctx.stroke();
   }
@@ -1322,16 +1336,19 @@ function clsInit(){
   CLS.sstCtx=CLS.sstCanvas.getContext('2d');
   CLS.sstOff=makeOff(CLS_CW,CLS_CH);
   CLS.sstOffCtx=CLS.sstOff.getContext('2d');
+  CLS.sstOffCtx.fillStyle='#ffffff'; CLS.sstOffCtx.fillRect(0,0,CLS_CW,CLS_CH);
+  drawBgWhite(CLS.sstOffCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_SST,CLS_LABELS_SST,SST_ABS_TICKS);
   CLS.calCanvas=document.getElementById('cls-cal-canvas');
   CLS.calCtx=CLS.calCanvas.getContext('2d');
   CLS.calOff=makeOff(CLS_CW,CLS_CH);
   CLS.calOffCtx=CLS.calOff.getContext('2d');
+  CLS.calOffCtx.fillStyle='#ffffff'; CLS.calOffCtx.fillRect(0,0,CLS_CW,CLS_CH);
+  drawBgWhite(CLS.calOffCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS_LABELS_CAL,CAL_SSH_TICKS);
   const cs=_cmpCommonStart();
   CLS.obsStartIdx=cs.obsStartIdx; CLS.calStartIdx=cs.calStartIdx;
   CLS.obsIdx=cs.obsStartIdx; CLS.calIdx=cs.calStartIdx;
   CLS.totalFrames=_obs1TotalFrames(cs);
   clsInitExtras(_obs1ExtraStarts(cs));
-  clsDrawBgs();
   CLS.sstCtx.drawImage(CLS.sstOff,0,0);
   CLS.calCtx.drawImage(CLS.calOff,0,0);
   const slSpf=document.getElementById('cls-sl-spf');
@@ -1460,15 +1477,16 @@ function clsRedrawToFrame(targetFrame){
   if(!CLS.sstOffCtx) return;
   const frame=Math.max(0,Math.min(targetFrame,CLS.totalFrames-1));
   const obsStart=CLS.obsStartIdx, calStart=CLS.calStartIdx;
-  CLS.sstOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
-  CLS.calOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
+  CLS.sstOffCtx.fillStyle='#ffffff'; CLS.sstOffCtx.fillRect(0,0,CLS_CW,CLS_CH);
+  drawBgWhite(CLS.sstOffCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_SST,CLS_LABELS_SST,SST_ABS_TICKS);
+  CLS.calOffCtx.fillStyle='#ffffff'; CLS.calOffCtx.fillRect(0,0,CLS_CW,CLS_CH);
+  drawBgWhite(CLS.calOffCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS_LABELS_CAL,CAL_SSH_TICKS);
   for(const ex of CLS_EXTRAS){
     if(!ex) continue;
     ex.tail=[]; ex.idx=ex.startIdx;
-    ex.offCtx.clearRect(0,0,CLS_CW,CLS_CH);
+    ex.offCtx.fillStyle='#ffffff'; ex.offCtx.fillRect(0,0,CLS_CW,CLS_CH);
     drawBgWhite(ex.offCtx, CLS_CW, CLS_CH, CLS_PLT, ex.cfg.dom, ex.cfg.labels, ex.cfg.ticks);
   }
-  clsDrawBgs();
   let obsTail=[], calTail=[];
   for(let f=0;f<frame;f++){
     const oi=obsStart+f, ci=calStart+f;
