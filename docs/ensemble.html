@@ -1,9 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>El Niño Familiar Attractor — Phase Diagrams</title>
+<title>El Ni&#241;o Familiar Attractor — Year Ensemble</title>
+<script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 :root {
@@ -18,220 +19,86 @@ header p.subtitle { color:var(--muted); font-size:1.05rem; }
 section { padding:2.5rem 0; border-bottom:1px solid var(--border); }
 section:last-of-type { border-bottom:none; }
 h2 { font-size:1.4rem; font-weight:600; color:var(--accent); margin-bottom:.5rem; }
-h3.sec-sub { font-size:1rem; font-weight:600; color:var(--muted); margin:1.4rem 0 .6rem; text-transform:uppercase; letter-spacing:.06em; font-size:.82rem; }
 p.section-desc { color:var(--muted); margin-bottom:1.5rem; max-width:780px; }
+.science-box { background:var(--surface); border-left:3px solid var(--accent); border-radius:0 6px 6px 0; padding:1rem 1.3rem; margin-bottom:1.5rem; color:var(--muted); font-size:.9rem; max-width:820px; }
+.science-box strong { color:var(--text); }
 .plot-box { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:.5rem; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; }
-.three-col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; }
 @media(max-width:720px){ .two-col{ grid-template-columns:1fr; } }
-@media(max-width:960px){ .three-col{ grid-template-columns:1fr; } }
 .controls { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:1.2rem 1.4rem; margin-bottom:1rem; }
 .ctrl-head { font-size:.82rem; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:1rem; }
-.param-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.9rem 1.4rem; }
-.param-row { display:flex; flex-direction:column; gap:.3rem; }
-.param-row label { font-size:.78rem; font-weight:600; color:var(--muted); display:flex; justify-content:space-between; }
-.param-row label span { color:var(--accent); font-family:monospace; font-size:.82rem; }
-.param-row input[type=range] { -webkit-appearance:none; width:100%; height:4px; background:var(--border); border-radius:2px; outline:none; }
-.param-row input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; }
-.param-row input[type=number] { background:var(--surface); border:1px solid var(--border); border-radius:4px; color:var(--text); font-size:.82rem; padding:.2rem .4rem; width:86px; }
-.param-inline { display:flex; align-items:center; gap:.5rem; }
-.btn-row { margin-top:1rem; display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; }
+.btn-row { display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; }
 button { background:var(--accent); color:#fff; border:none; border-radius:5px; padding:.45rem 1.1rem; font-size:.85rem; font-weight:600; cursor:pointer; transition:opacity .15s; }
 button:hover:not(:disabled) { opacity:.85; }
 button:disabled { opacity:.4; cursor:not-allowed; }
 button.secondary { background:var(--surface); border:1px solid var(--border); color:var(--text); }
 button.danger { background:#3a1010; border:1px solid #662222; color:#ff8888; }
-.status-bar { font-family:monospace; font-size:.82rem; color:var(--muted); background:var(--surface); border:1px solid var(--border); border-radius:5px; padding:.4rem .8rem; margin-bottom:1rem; min-height:1.8rem; }
-.st-running { color:#44cc88; } .st-paused { color:#ffcc44; } .st-done { color:var(--accent); } .st-ready { color:var(--muted); }
-canvas.phasecanvas { display:block; width:100%; height:auto; border-radius:6px; border:1px solid var(--border); background:#0a0a0e; }
-.science-box { background:var(--surface); border-left:3px solid var(--accent); border-radius:0 6px 6px 0; padding:1rem 1.3rem; margin-bottom:1.5rem; color:var(--muted); font-size:.9rem; max-width:820px; }
-.science-box strong { color:var(--text); }
-.stats-bar { display:flex; gap:1.5rem; flex-wrap:wrap; margin-bottom:1rem; font-size:.82rem; color:var(--muted); }
-.stats-bar span { display:flex; align-items:center; gap:.4rem; }
-.stats-bar strong { color:var(--text); font-family:monospace; }
-.quadrant-legend { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; max-width:440px; margin-bottom:1.5rem; font-size:.82rem; }
-.ql-item { background:var(--surface); border:1px solid var(--border); border-radius:5px; padding:.5rem .7rem; }
-.ql-item .phase { font-weight:700; }
-.ql-item .phase.warm { color:var(--hot); }
-.ql-item .phase.cold { color:var(--cold); }
-#cmp-timelabel { text-align:center; font-family:monospace; font-size:1.1rem; color:#88ccff; font-weight:700; margin:.6rem 0; letter-spacing:.04em; }
-select.month-sel { background:var(--surface); border:1px solid var(--border); border-radius:4px; color:var(--text); font-size:.85rem; padding:.3rem .6rem; cursor:pointer; }
-.poin-wrap { margin-top:1.4rem; }
-.poin-label { display:flex; align-items:center; gap:1rem; margin-bottom:.7rem; flex-wrap:wrap; }
-.poin-count { font-family:monospace; font-size:.82rem; color:var(--muted); }
+#ens-time-label { text-align:center; font-family:monospace; font-size:2rem; color:#88ccff; font-weight:700; margin:1rem 0 .3rem; letter-spacing:.04em; }
+.ens-legend { text-align:center; font-size:.85rem; color:var(--muted); margin-bottom:1rem; }
 footer { text-align:center; padding:2rem 1rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); }
 footer a { color:var(--accent); text-decoration:none; }
 footer a:hover { text-decoration:underline; }
-
-/* ── Help panel & floating button ─────────────────────────────────────────── */
-#help-btn {
-  position:fixed; bottom:2rem; right:2rem;
-  width:48px; height:48px; border-radius:50%;
-  background:var(--accent); color:#fff; border:none;
-  font-size:1.4rem; cursor:pointer; z-index:1000;
-  box-shadow:0 4px 12px rgba(0,0,0,0.4);
-  display:flex; align-items:center; justify-content:center;
-  transition:opacity .15s;
-}
-#help-btn:hover { opacity:.85; }
-#help-panel {
-  position:fixed; top:0; right:-420px; width:420px; height:100vh;
-  background:var(--card); border-left:1px solid var(--border);
-  overflow-y:auto; padding:2rem; z-index:999;
-  transition:right 0.3s ease;
-}
-#help-panel.open { right:0; }
-#help-close {
-  position:absolute; top:1rem; right:1rem; background:none;
-  border:none; color:var(--muted); font-size:1.5rem; cursor:pointer;
-  line-height:1; padding:.1rem .4rem; border-radius:4px;
-}
-#help-close:hover { color:var(--text); background:var(--surface); }
-#help-panel > h2 {
-  font-size:1.05rem; color:var(--accent); margin-bottom:1.2rem;
-  border-bottom:1px solid var(--border); padding-bottom:.6rem;
-  padding-right:2rem;
-}
-#help-panel details { border-bottom:1px solid var(--border); padding:.65rem 0; }
-#help-panel details:last-of-type { border-bottom:none; }
-#help-panel summary {
-  font-size:.92rem; font-weight:600; color:var(--accent);
-  cursor:pointer; list-style:none; padding:.15rem 0;
-  user-select:none;
-}
-#help-panel summary::-webkit-details-marker { display:none; }
-#help-panel details[open] > summary { color:var(--hot); }
-#help-panel .hd {
-  color:var(--text); font-size:.86rem; line-height:1.65;
-  margin-top:.55rem;
-}
-#help-panel .hd p { margin:.4rem 0; }
-#help-panel .hd ul { margin:.35rem 0; padding-left:1.15rem; }
-#help-panel .hd li { margin:.2rem 0; }
-#help-panel code {
-  background:var(--surface); padding:.1rem .32rem;
-  border-radius:3px; font-family:monospace; font-size:.8rem;
-  color:var(--text);
-}
-#help-panel pre {
-  background:var(--surface); padding:.65rem .8rem;
-  border-radius:5px; font-family:monospace; font-size:.78rem;
-  overflow-x:auto; border:1px solid var(--border);
-  margin:.45rem 0; line-height:1.55; color:var(--text);
-}
-#help-panel a { color:var(--accent); text-decoration:none; }
-#help-panel a:hover { text-decoration:underline; }
-/* ── Site navigation ─────────────────────── */
+/* Site navigation */
 .site-nav{display:flex;gap:1.2rem;justify-content:center;padding:.5rem 0 .2rem;}
 .site-nav .nav-link{color:var(--fg);text-decoration:none;font-size:.92rem;
   padding:.3rem .8rem;border-radius:4px;transition:background .2s;}
 .site-nav .nav-link:hover{background:rgba(255,255,255,.1);}
 .site-nav .nav-link.active{background:var(--accent);color:#fff;}
 </style>
-<script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
 </head>
 <body>
 
 <header>
   <div class="container">
-    <h1>El Niño Familiar Attractor</h1>
-    <p class="subtitle">Observed ENSO dynamics vs Duffing double-well model &nbsp;·&nbsp; NINO1+2 SST 1975–2026 &nbsp;·&nbsp; Callao SL 1970–2026</p>
+    <h1>El Ni&ntilde;o Familiar Attractor</h1>
+    <p class="subtitle">Observed ENSO dynamics vs Duffing double-well model &nbsp;&middot;&nbsp; NINO1+2 SST 1975&ndash;2026 &nbsp;&middot;&nbsp; Callao SL 1970&ndash;2026</p>
     <nav class="site-nav">
-  <a href="index.html" class="nav-link active">Phase Diagrams</a>
+  <a href="index.html" class="nav-link">Phase Diagrams</a>
   <a href="animations.html" class="nav-link">Animations</a>
   <a href="familiar_attractor.html" class="nav-link">Familiar Attractor</a>
-  <a href="ensemble.html" class="nav-link">Year Ensemble</a>
+  <a href="ensemble.html" class="nav-link active">Year Ensemble</a>
 </nav>
   </div>
 </header>
 
 <!-- ══════════════════════════════════════════════════════
-     SECTION 1: Observed ENSO Attractors — animated canvas
+     Year Ensemble animation
      ══════════════════════════════════════════════════════ -->
-<section id="observed">
+<section id="ensemble">
 <div class="container">
-  <h2>Observed ENSO Attractors — SST and Sea Level</h2>
+  <h2>Year Ensemble</h2>
   <div class="science-box">
-    <strong>What is a phase diagram?</strong>
-    Both panels plot a climate variable T against its rate of change dT/dt.
-    Left: NINO1+2 sea surface temperature anomaly (°C, mean removed) — El Niño events appear
-    as large excursions to the right. Right: Callao tide-gauge sea level anomaly (mm) — sea
-    level rises sharply during El Niño as Kelvin waves suppress coastal upwelling.
-    Both variables trace the same ENSO familiar attractor on the same calendar.
+    <strong>All years at the same instant.</strong>
+    Each dot is one year. At every frame, all years are shown simultaneously at the same
+    calendar position (month + sub-monthly step). Watch the whole cloud of years move
+    together through phase space as the annual cycle advances.
+    60 frames = 12 months &times; 5 sub-steps (one dot per year per frame).
+    Color runs <span style="color:#3388ff;font-weight:600">blue</span> (earliest year)
+    &rarr; <span style="color:#ff5533;font-weight:600">red</span> (most recent).
+    Frames with fewer dots indicate months not yet published for recent years.
   </div>
 
   <div class="controls">
-    <div class="ctrl-head">Animation Speed</div>
-    <div class="param-grid">
-      <div class="param-row">
-        <label>Steps per frame <span id="obs1-lbl-spf">1</span></label>
-        <div class="param-inline">
-          <input type="range" id="obs1-sl-spf" min="1" max="20" step="1" value="1">
-        </div>
-      </div>
-      <div class="param-row">
-        <label>Frame delay ms <span id="obs1-lbl-delay">30</span></label>
-        <div class="param-inline">
-          <input type="range" id="obs1-sl-delay" min="0" max="200" step="5" value="30">
-        </div>
-      </div>
-    </div>
+    <div class="ctrl-head">Animation Controls</div>
     <div class="btn-row">
-      <button id="obs1-run" onclick="obs1Start()">&#9654; Run</button>
-      <button id="obs1-pause" class="secondary" onclick="obs1Pause()" disabled>&#9646;&#9646; Pause</button>
-      <button id="obs1-reset" class="danger" onclick="obs1Reset()">&#8635; Reset</button>
+      <button id="ens-play-btn" onclick="ensPlay()">&#9654; Play</button>
+      <button id="ens-pause-btn" class="secondary" onclick="ensPause()" disabled>&#9646;&#9646; Pause</button>
+      <button id="ens-reset-btn" class="danger" onclick="ensReset()">&#8635; Reset</button>
+      <span style="margin-left:.8rem;font-size:.82rem;color:var(--muted);">Speed&nbsp;(ms/frame):</span>
+      <input type="range" id="ens-speed-sl" min="50" max="500" step="25" value="150"
+             style="width:130px;accent-color:var(--accent);"
+             oninput="ensSetDelay(this.value)">
+      <span id="ens-speed-lbl" style="font-family:monospace;font-size:.82rem;color:var(--accent);">150ms</span>
     </div>
   </div>
 
-  <div class="status-bar" id="obs1-status"><span class="st-ready">Ready — click Run to animate the ENSO attractor</span></div>
+  <div id="ens-time-label">Jan 1</div>
+  <div class="ens-legend" id="ens-legend-text">Blue = earliest year &nbsp;&middot;&nbsp; Red = most recent</div>
 
-  <div class="two-col" style="margin-bottom:.6rem;">
-    <div>
-      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">
-        SST NINO1+2 anomaly (°C)
-      </div>
-      <canvas id="obs1-sst-canvas" class="phasecanvas" width="700" height="480"></canvas>
-    </div>
-    <div>
-      <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">
-        Callao SSH anomaly (mm)
-      </div>
-      <canvas id="obs1-cal-canvas" class="phasecanvas" width="700" height="480"></canvas>
-    </div>
-  </div>
-
-  <div style="margin:.5rem 0 1rem;">
-    <input type="range" id="obs1-scrubber" min="0" max="100" value="0"
-           style="width:100%;cursor:pointer;accent-color:var(--accent);"
-           title="Drag to scrub through time">
-    <div id="obs1-time-display"
-         style="text-align:center;font-family:monospace;font-size:.82rem;
-                color:var(--muted);margin-top:.25rem;letter-spacing:.04em">
-      Jan 1975
-    </div>
-  </div>
-</div>
-</section>
-
-<!-- ══════════════════════════════════════════════════════
-     SECTION 2: Classic Phase Diagrams (white-bg Plotly)
-     ══════════════════════════════════════════════════════ -->
-<section id="classic">
-<div class="container">
-  <h2>Classic Phase Diagrams</h2>
-  <p class="section-desc">
-    All years overlaid in a static view &mdash; white background matching the original research notebook.
-    Gray: all years except the most recent complete year. Red: most recent complete year with monthly markers.
-  </p>
   <div class="two-col">
-    <div><div id="classic-sst" style="height:480px;border-radius:6px;overflow:hidden;"></div></div>
-    <div><div id="classic-cal" style="height:480px;border-radius:6px;overflow:hidden;"></div></div>
+    <div class="plot-box"><div id="ens-plot-sst" style="height:420px;"></div></div>
+    <div class="plot-box"><div id="ens-plot-cal" style="height:420px;"></div></div>
   </div>
-  <p id="classic-caption" style="color:var(--muted);font-size:.82rem;margin-top:.7rem;text-align:center;">
-    Gray: all years 1975&ndash;<span id="classic-gray-end">2024</span>
-    &nbsp;&middot;&nbsp; Red: <span id="classic-mrcy">2025</span>
-    &nbsp;&middot;&nbsp; White background style matching original research notebook.
-  </p>
 </div>
 </section>
 
@@ -239,176 +106,16 @@ footer a:hover { text-decoration:underline; }
   <div class="container">
     <p>
       Data: <a href="https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices" target="_blank">NOAA CPC NINO1+2 SST</a>
-      &nbsp;·&nbsp; <a href="https://uhslc.soest.hawaii.edu" target="_blank">UHSLC</a>
-      &nbsp;·&nbsp; Fourier low-pass filter HN1=10 HN2=9 months NDOTS=5
-    </p>
-    <p style="margin-top:.5rem">
-      Duffing equation: Blair Fraser, <em>Applied Math 303 — Double Well Oscillator</em> (DoubleWell.21.5).
-      Rasmusson &amp; Carpenter (1982) · Wyrtki (1985) · Lorenz (1963) · Takens (1981).
+      &nbsp;&middot;&nbsp; <a href="https://uhslc.soest.hawaii.edu" target="_blank">UHSLC</a>
+      &nbsp;&middot;&nbsp; Fourier low-pass filter HN1=10 HN2=9 months NDOTS=5
     </p>
   </div>
 </footer>
 
-<!-- ════════════════════════════════════════════════════════════════════════
-     FLOATING HELP BUTTON & SLIDE-IN PANEL
-     ════════════════════════════════════════════════════════════════════════ -->
-<button id="help-btn" onclick="toggleHelp()" title="Help &amp; About">?</button>
-
-<div id="help-panel">
-  <button id="help-close" onclick="toggleHelp()" title="Close">&#x2715;</button>
-  <h2>Help &amp; About</h2>
-
-  <details open>
-    <summary>🌊 What is this?</summary>
-    <div class="hd">
-      <p>This interactive website visualises the El Niño–Southern Oscillation (ENSO) as a
-      <strong>familiar attractor</strong> in phase space.</p>
-      <p>The phase diagram plots a climate variable <em>T</em> (sea surface temperature or sea level)
-      against its rate of change dT/dt. The resulting trajectory — the ENSO attractor —
-      reveals the low-dimensional, quasi-chaotic structure of El Niño dynamics.</p>
-      <p>Live data: NOAA CPC SST (1975–present) and UHSLC tide gauge sea level at
-      Callao, Peru (1970–present).</p>
-      <p>
-        Website: <a href="https://uferreira.github.io/el_nino/" target="_blank">uferreira.github.io/el_nino</a><br>
-        Source: <a href="https://github.com/uferreira/el_nino" target="_blank">github.com/uferreira/el_nino</a>
-      </p>
-    </div>
-  </details>
-
-  <details>
-    <summary>📊 The Phase Diagram</summary>
-    <div class="hd">
-      <p>The x-axis shows the filtered climate variable T; the y-axis shows its rate of
-      change dT/dt (°C/month or mm/month).</p>
-      <p>The <strong>color gradient</strong> runs blue (earliest data) → red (most recent),
-      so you can trace the direction of time.</p>
-      <p>Reading the diagram:</p>
-      <ul>
-        <li><strong>Right</strong> (T high): warm El Niño phase</li>
-        <li><strong>Left</strong> (T low): cool La Niña phase</li>
-        <li><strong>Top</strong> (dT/dt &gt; 0): temperature rising — El Niño developing</li>
-        <li><strong>Bottom</strong> (dT/dt &lt; 0): temperature falling — El Niño decaying</li>
-      </ul>
-      <p>The trajectory loops clockwise. Strong El Niño events (1982–83, 1997–98, 2015–16)
-      appear as large excursions to the right.</p>
-    </div>
-  </details>
-
-  <details>
-    <summary>🔬 The Fourier Filter</summary>
-    <div class="hd">
-      <p>A Fourier low-pass filter removes variability faster than ~9 months, isolating
-      the ENSO signal (2–7 year periods).</p>
-      <ul>
-        <li><strong>HN1 = 10 months</strong> — pass edge: longer periods pass through</li>
-        <li><strong>HN2 = 9 months</strong> — stop edge: shorter periods suppressed</li>
-        <li><strong>NDOTS = 5</strong> — sub-points per month for smoother curves</li>
-      </ul>
-      <p>The filter is a faithful translation of a Fortran 77 reference program, verified
-      to agree within 0.005°C. The derivative dT/dt is computed analytically from the
-      Fourier representation — zero phase distortion, exact timing.</p>
-    </div>
-  </details>
-
-  <details>
-    <summary>🎮 Duffing Equation Simulator</summary>
-    <div class="hd">
-      <p>The simplest nonlinear oscillator that reproduces the ENSO attractor:</p>
-      <pre>X'' = K1·X + K3·X³ + FA·cos(W·t + FF) + B·X'</pre>
-      <ul>
-        <li><strong>K1</strong> — linear restoring: positive → double-well potential</li>
-        <li><strong>K3</strong> — cubic restoring: negative → prevents divergence</li>
-        <li><strong>FA</strong> — annual forcing amplitude (trade winds)</li>
-        <li><strong>FF</strong> — forcing phase: timing of the annual forcing</li>
-        <li><strong>B</strong> — damping: energy dissipation (must be negative)</li>
-      </ul>
-      <p>Default values are fitted to match the observed SST attractor.</p>
-      <p><strong>Steps/frame</strong>: integration steps per animation frame — higher = faster.<br>
-      <strong>Frame delay</strong>: ms between frames — higher = slower, easier to watch.</p>
-    </div>
-  </details>
-
-  <details>
-    <summary>📅 Synchronized Comparison</summary>
-    <div class="hd">
-      <p>SST (left), Callao sea level (middle), and the Duffing model (right) animate
-      simultaneously from 1975 to present. Both observed datasets are time-aligned to
-      1975/01 so the same El Niño events appear at the same time in all three panels.</p>
-      <p><strong>Timeline scrubber:</strong> drag the bar below the canvases to jump to
-      any point in time. The Poincaré section updates as you scrub.</p>
-      <p>Key events to watch:</p>
-      <ul>
-        <li>1982–83 — first major El Niño in the record</li>
-        <li>1997–98 — the strongest El Niño of the 20th century</li>
-        <li>2015–16 — second strongest on record</li>
-        <li>2023–24 — strong recent event</li>
-      </ul>
-    </div>
-  </details>
-
-  <details>
-    <summary>🌀 Poincaré Section</summary>
-    <div class="hd">
-      <p>Samples the phase diagram once per selected calendar month — one dot per year
-      per dataset.</p>
-      <p>
-        <span style="color:#3388ff;font-weight:600">Blue</span> = SST observed &nbsp;·&nbsp;
-        <span style="color:#44cc88;font-weight:600">Green</span> = Callao observed &nbsp;·&nbsp;
-        <span style="color:#ff5533;font-weight:600">Red</span> = Duffing model
-      </p>
-      <p>Use the month dropdown to focus on a specific season. A periodic system would
-      show 12 neat vertical columns. The scatter reveals the chaotic nature of ENSO:
-      no two annual cycles are identical.</p>
-    </div>
-  </details>
-
-  <details>
-    <summary>🔮 3D Familiar Attractor</summary>
-    <div class="hd">
-      <p>The phase diagram extruded through time — the vertical axis is the calendar year.
-      Each dot is one monthly data point, colored by calendar month (12 colors = Jan–Dec).</p>
-      <p>Click and drag to rotate the 3D view and reveal the fractal cross-section of the
-      attractor. Vertical scatter within each month's column measures chaos directly.</p>
-      <p>The Duffing model (right) reproduces the general shape but not the exact trajectory —
-      deterministic chaos amplifies tiny differences over time.</p>
-    </div>
-  </details>
-
-  <details>
-    <summary>📡 Data Sources</summary>
-    <div class="hd">
-      <p><strong>SST — NINO1+2 (0–10°S, 90–80°W)</strong><br>
-      <a href="https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices" target="_blank">NOAA CPC sstoi.indices</a>
-      · 1975–present · updated monthly</p>
-      <p><strong>Sea Level — Callao, Peru (12°S 77°W)</strong><br>
-      <a href="https://uhslc.soest.hawaii.edu" target="_blank">UHSLC</a> Fast Delivery + RAPID near-real-time
-      · 1970–present · updated within days</p>
-      <p>Automatic refresh: data updates on the 1st of every month via GitHub Actions.</p>
-    </div>
-  </details>
-
-  <details>
-    <summary>💻 Run it yourself</summary>
-    <div class="hd">
-      <pre>git clone https://github.com/uferreira/el_nino.git
-cd el_nino
-python3 -m venv venv
-source venv/bin/activate
-pip install -e .
-python scripts/update_website.py</pre>
-      <p>To update data and regenerate the website:</p>
-      <pre>python scripts/update_website.py
-git add docs/index.html
-git commit -m "Update data"
-git push</pre>
-      <p>Full documentation: <a href="https://github.com/uferreira/el_nino" target="_blank">github.com/uferreira/el_nino</a></p>
-    </div>
-  </details>
-</div>
-
 <script>
 // ═══════════════════════════════════════════════════════
-// 1. EMBEDDED OBSERVED DATA
+// 1. EMBEDDED OBSERVED DATA (same as index.html)
+// ═══════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════
 const observedData = {
   x:     [23.67,24.03,24.38,24.69,24.96,25.18,25.34,25.43,25.45,25.42,25.32,25.18,24.99,24.78,24.54,24.29,24.04,23.78,23.53,23.28,23.03,22.78,22.53,22.27,22.01,21.74,21.46,21.17,20.88,20.59,20.32,20.05,19.81,19.60,19.42,19.28,19.18,19.12,19.11,19.13,19.18,19.25,19.35,19.47,19.59,19.73,19.87,20.02,20.18,20.35,20.54,20.75,20.98,21.25,21.55,21.89,22.26,22.66,23.09,23.52,23.96,24.40,24.81,25.20,25.54,25.83,26.07,26.25,26.37,26.43,26.44,26.39,26.31,26.19,26.04,25.87,25.69,25.51,25.31,25.12,24.92,24.71,24.50,24.28,24.06,23.82,23.58,23.33,23.08,22.82,22.57,22.34,22.12,21.92,21.75,21.62,21.51,21.44,21.41,21.40,21.43,21.47,21.53,21.61,21.69,21.78,21.88,21.98,22.09,22.21,22.35,22.50,22.68,22.89,23.13,23.40,23.70,24.02,24.36,24.72,25.07,25.42,25.75,26.04,26.30,26.51,26.66,26.76,26.80,26.78,26.71,26.59,26.42,26.23,26.00,25.76,25.50,25.24,24.97,24.70,24.42,24.15,23.87,23.59,23.30,23.00,22.71,22.40,22.10,21.81,21.52,21.25,20.99,20.76,20.57,20.40,20.27,20.18,20.12,20.09,20.10,20.12,20.17,20.24,20.32,20.40,20.50,20.61,20.73,20.86,21.01,21.19,21.38,21.61,21.87,22.16,22.48,22.83,23.19,23.57,23.95,24.32,24.67,25.00,25.28,25.52,25.71,25.84,25.91,25.93,25.90,25.81,25.68,25.52,25.34,25.13,24.90,24.67,24.43,24.19,23.94,23.69,23.44,23.19,22.92,22.66,22.39,22.12,21.84,21.58,21.32,21.07,20.84,20.64,20.47,20.32,20.22,20.14,20.10,20.09,20.11,20.16,20.22,20.30,20.40,20.50,20.62,20.74,20.88,21.03,21.20,21.40,21.61,21.86,22.14,22.44,22.78,23.14,23.52,23.91,24.30,24.69,25.06,25.40,25.70,25.96,26.16,26.31,26.40,26.44,26.42,26.36,26.25,26.11,25.94,25.75,25.55,25.33,25.11,24.88,24.65,24.41,24.17,23.93,23.69,23.43,23.18,22.92,22.66,22.40,22.16,21.92,21.71,21.51,21.35,21.21,21.11,21.03,20.99,20.98,21.00,21.04,21.10,21.17,21.26,21.36,21.46,21.58,21.71,21.85,22.00,22.18,22.38,22.61,22.86,23.15,23.46,23.79,24.14,24.50,24.87,25.22,25.55,25.86,26.12,26.35,26.51,26.63,26.69,26.69,26.63,26.53,26.39,26.21,26.00,25.77,25.53,25.27,25.00,24.73,24.46,24.19,23.91,23.63,23.35,23.06,22.77,22.48,22.19,21.90,21.63,21.37,21.13,20.91,20.72,20.56,20.44,20.34,20.29,20.26,20.26,20.29,20.33,20.40,20.48,20.57,20.67,20.78,20.91,21.05,21.21,21.39,21.60,21.84,22.10,22.40,22.72,23.06,23.43,23.80,24.18,24.54,24.89,25.22,25.50,25.74,25.93,26.06,26.14,26.16,26.13,26.05,25.92,25.76,25.58,25.36,25.13,24.89,24.64,24.39,24.13,23.87,23.60,23.33,23.06,22.78,22.50,22.22,21.94,21.66,21.39,21.13,20.90,20.68,20.49,20.33,20.20,20.11,20.05,20.01,20.01,20.03,20.06,20.12,20.19,20.28,20.37,20.48,20.60,20.73,20.89,21.07,21.27,21.50,21.76,22.05,22.37,22.71,23.08,23.45,23.83,24.20,24.55,24.88,25.18,25.43,25.63,25.78,25.88,25.93,25.92,25.87,25.78,25.66,25.51,25.33,25.15,24.95,24.75,24.55,24.34,24.13,23.93,23.72,23.51,23.30,23.09,22.88,22.68,22.48,22.29,22.12,21.96,21.83,21.73,21.66,21.62,21.62,21.64,21.70,21.78,21.89,22.02,22.16,22.32,22.49,22.68,22.87,23.08,23.29,23.53,23.79,24.06,24.37,24.70,25.05,25.43,25.83,26.25,26.67,27.09,27.50,27.89,28.25,28.56,28.84,29.05,29.21,29.31,29.36,29.34,29.28,29.17,29.02,28.83,28.62,28.39,28.14,27.88,27.61,27.33,27.05,26.76,26.46,26.16,25.85,25.54,25.22,24.90,24.59,24.28,23.98,23.70,23.44,23.20,22.99,22.81,22.66,22.53,22.44,22.37,22.33,22.30,22.29,22.30,22.32,22.34,22.39,22.44,22.51,22.60,22.70,22.84,23.00,23.19,23.41,23.65,23.92,24.21,24.51,24.81,25.10,25.38,25.63,25.85,26.02,26.15,26.23,26.25,26.22,26.14,26.01,25.85,25.65,25.42,25.17,24.90,24.63,24.34,24.06,23.77,23.48,23.19,22.90,22.61,22.32,22.03,21.74,21.46,21.18,20.91,20.66,20.43,20.22,20.04,19.89,19.77,19.69,19.63,19.61,19.61,19.64,19.69,19.76,19.85,19.94,20.06,20.18,20.32,20.47,20.64,20.83,21.05,21.29,21.57,21.87,22.19,22.54,22.90,23.27,23.64,24.01,24.35,24.67,24.95,25.19,25.38,25.51,25.59,25.62,25.59,25.51,25.39,25.24,25.05,24.84,24.61,24.36,24.11,23.85,23.59,23.32,23.05,22.78,22.51,22.23,21.95,21.68,21.40,21.13,20.87,20.63,20.40,20.19,20.01,19.86,19.74,19.65,19.60,19.57,19.57,19.59,19.64,19.70,19.78,19.87,19.98,20.10,20.23,20.38,20.55,20.74,20.96,21.20,21.47,21.77,22.09,22.44,22.80,23.18,23.55,23.92,24.27,24.60,24.89,25.14,25.34,25.48,25.58,25.62,25.60,25.55,25.44,25.31,25.14,24.95,24.74,24.52,24.29,24.06,23.82,23.58,23.34,23.10,22.86,22.61,22.37,22.12,21.88,21.65,21.42,21.21,21.02,20.85,20.71,20.59,20.51,20.46,20.44,20.45,20.48,20.54,20.62,20.72,20.84,20.96,21.11,21.26,21.43,21.61,21.82,22.04,22.29,22.56,22.86,23.19,23.54,23.92,24.31,24.70,25.10,25.49,25.86,26.20,26.51,26.77,26.98,27.14,27.25,27.30,27.29,27.24,27.14,27.00,26.83,26.64,26.42,26.19,25.95,25.70,25.45,25.19,24.93,24.66,24.39,24.12,23.84,23.57,23.29,23.02,22.75,22.50,22.27,22.05,21.86,21.69,21.56,21.45,21.37,21.32,21.29,21.28,21.30,21.33,21.38,21.43,21.50,21.59,21.68,21.79,21.92,22.06,22.24,22.43,22.65,22.90,23.18,23.47,23.78,24.10,24.42,24.73,25.02,25.29,25.52,25.71,25.85,25.94,25.97,25.95,25.88,25.77,25.61,25.41,25.19,24.94,24.67,24.39,24.10,23.81,23.52,23.22,22.92,22.63,22.33,22.03,21.74,21.44,21.15,20.87,20.60,20.35,20.11,19.90,19.72,19.57,19.44,19.35,19.29,19.27,19.27,19.29,19.34,19.41,19.49,19.60,19.71,19.84,19.99,20.15,20.34,20.54,20.77,21.03,21.32,21.63,21.97,22.33,22.71,23.09,23.48,23.86,24.22,24.56,24.86,25.12,25.33,25.49,25.59,25.65,25.64,25.59,25.50,25.37,25.21,25.02,24.82,24.60,24.36,24.13,23.88,23.64,23.39,23.14,22.88,22.63,22.37,22.11,21.86,21.61,21.37,21.14,20.93,20.74,20.58,20.44,20.33,20.25,20.20,20.18,20.18,20.20,20.25,20.31,20.39,20.49,20.59,20.71,20.84,20.99,21.15,21.34,21.55,21.79,22.05,22.34,22.65,22.98,23.33,23.68,24.04,24.39,24.72,25.02,25.29,25.51,25.69,25.82,25.89,25.91,25.87,25.79,25.67,25.50,25.31,25.09,24.86,24.60,24.34,24.08,23.81,23.54,23.26,22.99,22.71,22.43,22.15,21.88,21.61,21.34,21.09,20.85,20.63,20.43,20.26,20.11,20.00,19.91,19.86,19.83,19.84,19.87,19.91,19.98,20.07,20.17,20.28,20.41,20.56,20.72,20.90,21.11,21.33,21.59,21.87,22.18,22.51,22.87,23.24,23.62,24.00,24.37,24.73,25.06,25.36,25.61,25.82,25.98,26.08,26.13,26.13,26.08,25.99,25.86,25.70,25.51,25.31,25.09,24.86,24.62,24.38,24.14,23.90,23.65,23.40,23.15,22.91,22.66,22.41,22.18,21.95,21.73,21.53,21.36,21.20,21.08,20.98,20.91,20.88,20.87,20.88,20.92,20.98,21.06,21.15,21.25,21.37,21.51,21.65,21.82,22.00,22.20,22.42,22.67,22.95,23.25,23.57,23.91,24.27,24.64,25.00,25.36,25.69,26.01,26.28,26.51,26.70,26.83,26.91,26.94,26.91,26.83,26.71,26.55,26.36,26.15,25.91,25.66,25.40,25.13,24.86,24.59,24.31,24.03,23.75,23.47,23.19,22.91,22.63,22.37,22.11,21.87,21.64,21.43,21.26,21.10,20.98,20.89,20.82,20.79,20.78,20.80,20.84,20.90,20.97,21.06,21.16,21.28,21.42,21.57,21.74,21.93,22.15,22.39,22.66,22.95,23.27,23.61,23.96,24.33,24.69,25.05,25.38,25.70,25.98,26.21,26.40,26.54,26.62,26.65,26.63,26.56,26.45,26.29,26.11,25.90,25.67,25.43,25.17,24.91,24.65,24.38,24.11,23.83,23.56,23.28,23.00,22.73,22.46,22.19,21.94,21.69,21.47,21.26,21.08,20.93,20.80,20.71,20.64,20.60,20.59,20.60,20.63,20.68,20.75,20.83,20.92,21.03,21.15,21.29,21.45,21.63,21.84,22.07,22.33,22.61,22.91,23.24,23.58,23.93,24.28,24.62,24.94,25.24,25.51,25.73,25.91,26.03,26.11,26.13,26.09,26.02,25.89,25.73,25.54,25.33,25.09,24.84,24.59,24.32,24.05,23.78,23.51,23.23,22.96,22.69,22.41,22.15,21.88,21.62,21.38,21.14,20.93,20.74,20.57,20.43,20.32,20.24,20.18,20.16,20.16,20.19,20.24,20.31,20.40,20.50,20.61,20.74,20.89,21.05,21.23,21.44,21.67,21.92,22.20,22.50,22.83,23.18,23.54,23.91,24.28,24.64,24.99,25.31,25.59,25.83,26.03,26.17,26.26,26.30,26.28,26.22,26.11,25.96,25.78,25.58,25.35,25.11,24.86,24.60,24.33,24.06,23.79,23.51,23.24,22.96,22.69,22.41,22.14,21.87,21.62,21.37,21.15,20.94,20.76,20.60,20.47,20.37,20.29,20.25,20.23,20.23,20.25,20.29,20.35,20.42,20.51,20.61,20.72,20.85,21.00,21.17,21.36,21.58,21.82,22.09,22.38,22.69,23.01,23.35,23.68,24.00,24.31,24.59,24.84,25.04,25.20,25.31,25.37,25.37,25.32,25.23,25.09,24.92,24.71,24.48,24.23,23.96,23.69,23.41,23.13,22.84,22.56,22.28,21.99,21.71,21.44,21.16,20.90,20.64,20.39,20.17,19.96,19.77,19.61,19.48,19.39,19.32,19.28,19.28,19.30,19.36,19.43,19.53,19.65,19.78,19.94,20.11,20.30,20.51,20.74,20.99,21.28,21.59,21.92,22.29,22.68,23.09,23.52,23.96,24.41,24.84,25.26,25.66,26.03,26.35,26.63,26.86,27.04,27.16,27.24,27.27,27.25,27.20,27.12,27.00,26.87,26.73,26.57,26.40,26.23,26.05,25.88,25.69,25.51,25.33,25.14,24.96,24.78,24.60,24.43,24.27,24.13,24.01,23.90,23.82,23.77,23.74,23.73,23.75,23.80,23.86,23.94,24.04,24.15,24.27,24.40,24.55,24.71,24.88,25.06,25.26,25.49,25.73,26.00,26.28,26.59,26.91,27.24,27.58,27.91,28.23,28.54,28.81,29.04,29.23,29.38,29.46,29.50,29.48,29.40,29.27,29.10,28.89,28.64,28.36,28.07,27.75,27.42,27.09,26.75,26.40,26.05,25.70,25.35,25.00,24.65,24.31,23.96,23.63,23.30,22.99,22.70,22.43,22.18,21.96,21.77,21.61,21.48,21.37,21.30,21.25,21.22,21.21,21.22,21.25,21.30,21.36,21.44,21.54,21.66,21.81,21.98,22.17,22.40,22.65,22.92,23.22,23.53,23.85,24.17,24.49,24.79,25.07,25.31,25.52,25.68,25.80,25.86,25.87,25.83,25.75,25.62,25.45,25.26,25.04,24.80,24.54,24.28,24.01,23.73,23.45,23.18,22.90,22.62,22.35,22.07,21.80,21.54,21.28,21.04,20.81,20.59,20.40,20.23,20.09,19.98,19.89,19.84,19.81,19.81,19.83,19.88,19.94,20.02,20.12,20.23,20.36,20.51,20.67,20.85,21.06,21.28,21.54,21.81,22.11,22.44,22.78,23.14,23.51,23.87,24.23,24.57,24.89,25.17,25.41,25.61,25.75,25.84,25.88,25.87,25.81,25.71,25.57,25.39,25.19,24.97,24.73,24.48,24.23,23.97,23.70,23.44,23.17,22.90,22.64,22.37,22.11,21.85,21.60,21.36,21.14,20.93,20.74,20.58,20.44,20.33,20.24,20.19,20.16,20.16,20.18,20.22,20.28,20.36,20.45,20.56,20.69,20.83,20.99,21.17,21.36,21.59,21.83,22.10,22.40,22.72,23.05,23.40,23.76,24.11,24.46,24.79,25.10,25.37,25.60,25.79,25.92,26.01,26.04,26.01,25.95,25.83,25.68,25.50,25.28,25.05,24.81,24.55,24.28,24.01,23.74,23.46,23.19,22.91,22.64,22.37,22.10,21.84,21.59,21.34,21.12,20.91,20.72,20.55,20.41,20.30,20.22,20.17,20.14,20.14,20.17,20.22,20.29,20.37,20.48,20.60,20.73,20.89,21.06,21.25,21.47,21.70,21.97,22.26,22.57,22.90,23.26,23.63,24.01,24.38,24.75,25.11,25.43,25.73,25.98,26.19,26.35,26.46,26.51,26.51,26.47,26.38,26.25,26.09,25.90,25.69,25.46,25.22,24.97,24.72,24.46,24.20,23.94,23.68,23.42,23.16,22.91,22.66,22.41,22.17,21.95,21.75,21.56,21.40,21.26,21.14,21.06,21.00,20.96,20.96,20.97,21.01,21.06,21.14,21.22,21.33,21.44,21.58,21.73,21.90,22.09,22.30,22.54,22.80,23.08,23.39,23.71,24.05,24.39,24.74,25.07,25.39,25.68,25.94,26.16,26.33,26.45,26.53,26.54,26.51,26.43,26.31,26.14,25.95,25.72,25.48,25.22,24.94,24.67,24.38,24.09,23.81,23.52,23.23,22.95,22.66,22.38,22.11,21.85,21.59,21.35,21.13,20.93,20.75,20.60,20.48,20.38,20.32,20.28,20.26,20.28,20.31,20.37,20.44,20.53,20.64,20.76,20.90,21.06,21.24,21.44,21.67,21.92,22.20,22.49,22.82,23.16,23.51,23.88,24.24,24.60,24.93,25.25,25.53,25.77,25.97,26.12,26.21,26.25,26.25,26.19,26.09,25.95,25.78,25.58,25.36,25.13,24.88,24.62,24.36,24.10,23.83,23.56,23.30,23.03,22.77,22.51,22.25,22.00,21.77,21.54,21.33,21.15,20.98,20.84,20.73,20.64,20.58,20.54,20.54,20.55,20.59,20.64,20.71,20.80,20.91,21.02,21.16,21.31,21.48,21.67,21.89,22.13,22.39,22.67,22.98,23.30,23.64,23.98,24.32,24.65,24.97,25.26,25.52,25.73,25.90,26.02,26.09,26.11,26.07,25.99,25.86,25.69,25.49,25.27,25.02,24.75,24.47,24.19,23.90,23.61,23.31,23.02,22.73,22.44,22.15,21.87,21.59,21.33,21.07,20.83,20.61,20.41,20.23,20.08,19.96,19.87,19.80,19.77,19.76,19.78,19.82,19.88,19.96,20.06,20.18,20.32,20.47,20.65,20.84,21.06,21.31,21.57,21.87,22.19,22.54,22.90,23.28,23.66,24.05,24.43,24.80,25.14,25.45,25.72,25.94,26.12,26.25,26.32,26.35,26.32,26.26,26.15,26.01,25.84,25.65,25.45,25.23,25.00,24.76,24.53,24.29,24.05,23.80,23.56,23.32,23.09,22.85,22.63,22.41,22.21,22.02,21.84,21.69,21.56,21.46,21.38,21.33,21.30,21.29,21.31,21.35,21.40,21.47,21.55,21.65,21.77,21.89,22.04,22.20,22.38,22.58,22.80,23.05,23.32,23.60,23.91,24.22,24.54,24.86,25.17,25.46,25.73,25.96,26.15,26.30,26.39,26.44,26.43,26.37,26.27,26.11,25.92,25.70,25.45,25.18,24.89,24.59,24.28,23.97,23.66,23.34,23.03,22.72,22.42,22.11,21.82,21.53,21.25,20.99,20.74,20.51,20.30,20.12,19.96,19.84,19.74,19.67,19.63,19.62,19.63,19.67,19.73,19.82,19.92,20.04,20.18,20.34,20.51,20.71,20.94,21.19,21.46,21.76,22.09,22.43,22.80,23.18,23.57,23.96,24.34,24.70,25.05,25.36,25.63,25.85,26.03,26.16,26.23,26.26,26.23,26.17,26.06,25.92,25.74,25.55,25.34,25.12,24.88,24.64,24.40,24.15,23.90,23.66,23.41,23.17,22.92,22.69,22.46,22.24,22.03,21.84,21.67,21.51,21.38,21.28,21.20,21.15,21.12,21.12,21.14,21.18,21.24,21.32,21.41,21.52,21.65,21.79,21.95,22.13,22.33,22.55,22.80,23.07,23.36,23.67,24.00,24.34,24.69,25.04,25.38,25.70,26.00,26.27,26.50,26.68,26.81,26.90,26.93,26.91,26.84,26.73,26.58,26.40,26.19,25.95,25.70,25.44,25.17,24.89,24.61,24.33,24.05,23.78,23.50,23.23,22.96,22.70,22.45,22.21,21.98,21.77,21.58,21.41,21.26,21.15,21.05,20.99,20.95,20.93,20.94,20.98,21.03,21.10,21.19,21.29,21.41,21.55,21.70,21.88,22.07,22.29,22.53,22.80,23.08,23.39,23.71,24.05,24.39,24.73,25.06,25.38,25.66,25.92,26.14,26.31,26.43,26.50,26.52,26.49,26.41,26.29,26.12,25.92,25.69,25.44,25.17,24.89,24.60,24.31,24.01,23.71,23.41,23.11,22.82,22.53,22.24,21.96,21.69,21.43,21.18,20.95,20.74,20.56,20.40,20.26,20.15,20.07,20.02,19.99,19.99,20.01,20.05,20.11,20.19,20.29,20.41,20.54,20.70,20.87,21.07,21.29,21.54,21.81,22.10,22.41,22.75,23.09,23.45,23.80,24.15,24.48,24.79,25.06,25.30,25.49,25.64,25.74,25.78,25.78,25.73,25.63,25.50,25.33,25.14,24.92,24.68,24.44,24.18,23.92,23.66,23.40,23.13,22.87,22.62,22.36,22.11,21.87,21.64,21.42,21.21,21.02,20.86,20.71,20.58,20.49,20.42,20.37,20.35,20.36,20.40,20.45,20.53,20.62,20.73,20.86,21.01,21.18,21.36,21.56,21.79,22.04,22.31,22.60,22.92,23.26,23.61,23.98,24.35,24.72,25.08,25.42,25.74,26.03,26.28,26.48,26.64,26.74,26.79,26.79,26.75,26.65,26.52,26.34,26.14,25.92,25.68,25.42,25.15,24.88,24.60,24.32,24.04,23.76,23.48,23.20,22.93,22.66,22.40,22.15,21.91,21.69,21.48,21.30,21.14,21.00,20.89,20.80,20.74,20.70,20.69,20.70,20.73,20.77,20.83,20.91,21.01,21.12,21.26,21.41,21.58,21.78,22.00,22.24,22.50,22.79,23.09,23.40,23.72,24.04,24.35,24.65,24.92,25.16,25.36,25.53,25.64,25.70,25.72,25.68,25.60,25.47,25.31,25.11,24.88,24.64,24.37,24.10,23.81,23.53,23.24,22.95,22.67,22.38,22.11,21.83,21.57,21.31,21.07,20.84,20.62,20.42,20.24,20.09,19.96,19.85,19.77,19.73,19.71,19.71,19.74,19.79,19.87,19.97,20.08,20.22,20.37,20.54,20.73,20.95,21.18,21.44,21.72,22.03,22.35,22.70,23.06,23.44,23.82,24.20,24.58,24.93,25.26,25.56,25.83,26.04,26.21,26.33,26.40,26.42,26.38,26.31,26.19,26.03,25.85,25.64,25.42,25.18,24.93,24.67,24.41,24.15,23.89,23.63,23.37,23.12,22.87,22.63,22.40,22.18,21.97,21.78,21.61,21.45,21.33,21.22,21.14,21.09,21.07,21.07,21.09,21.14,21.21,21.29,21.40,21.53,21.67,21.83,22.02,22.22,22.44,22.69,22.96,23.26,23.58,23.91,24.27,24.64,25.01,25.38,25.75,26.10,26.43,26.72,26.98,27.19,27.36,27.48,27.55,27.56,27.53,27.46,27.34,27.19,27.01,26.80,26.58,26.34,26.10,25.84,25.59,25.33,25.07,24.81,24.56,24.31,24.07,23.83,23.60,23.38,23.17,22.98,22.80,22.65,22.51,22.40,22.32,22.26,22.22,22.21,22.22,22.25,22.30,22.37,22.46,22.56,22.68,22.82,22.98,23.15,23.35,23.57,23.81,24.07,24.35,24.65,24.96,25.29,25.62,25.95,26.27,26.57,26.85,27.10,27.31,27.48,27.60,27.67,27.68,27.65,27.57,27.45,27.28,27.08,26.85,26.60,26.33,26.05,25.75,25.45,25.15,24.85,24.55,24.26,23.97,23.68,23.40,23.13,22.87,22.62,22.39,22.18,21.98,21.80,21.65,21.52,21.42,21.35,21.30,21.28,21.28,21.31,21.35,21.42,21.51,21.61,21.74,21.88,22.04,22.23,22.43,22.66,22.91,23.18,23.48,23.79,24.11,24.45,24.79,25.14,25.47,25.78,26.07,26.33,26.56,26.73,26.86,26.94,26.97,26.95,26.87,26.75,26.59,26.40,26.17,25.92,25.64,25.36,25.06,24.75,24.44,24.13,23.82,23.51,23.21,22.91,22.61,22.32,22.05,21.78,21.53,21.29,21.07,20.87,20.69,20.54,20.42,20.32,20.24,20.19,20.17,20.17,20.19,20.23,20.29,20.38,20.48,20.60,20.75,20.91,21.10,21.31,21.55,21.81,22.10,22.40,22.72,23.05,23.40,23.74,24.07,24.40,24.70,24.97,25.20,25.40,25.55,25.65,25.71,25.71,25.67,25.59,25.47,25.31,25.13,24.92,24.69,24.45,24.20,23.95,23.69,23.44,23.18,22.94,22.69,22.45,22.22,22.00,21.79,21.59,21.40,21.23,21.08,20.95,20.84,20.75,20.69,20.65,20.64,20.65,20.68,20.74,20.82,20.91,21.03,21.16,21.32,21.49,21.68,21.88,22.11,22.36,22.63,22.92,23.24,23.56,23.91,24.26,24.61,24.96,25.31,25.63,25.93,26.20,26.44,26.63,26.77,26.86,26.90,26.89,26.83,26.72,26.58,26.39,26.18,25.93,25.67,25.39,25.11,24.81,24.51,24.21,23.92,23.62,23.33,23.05,22.77,22.50,22.24,21.99,21.76,21.54,21.34,21.16,21.01,20.87,20.76,20.68,20.62,20.58,20.57,20.59,20.62,20.68,20.75,20.85,20.97,21.10,21.26,21.44,21.64,21.86,22.10,22.37,22.66,22.96,23.28,23.61,23.95,24.28,24.61,24.92,25.20,25.46,25.68,25.86,26.00,26.08,26.12,26.10,26.04,25.93,25.78,25.60,25.38,25.14,24.88,24.60,24.32,24.02,23.73,23.43,23.13,22.84,22.56,22.28,22.01,21.75,21.49,21.26,21.03,20.82,20.63,20.46,20.31,20.19,20.09,20.01,19.96,19.93,19.93,19.96,20.00,20.07,20.16,20.27,20.40,20.55,20.73,20.92,21.14,21.38,21.64,21.93,22.23,22.56,22.90,23.24,23.60,23.95,24.30,24.63,24.94,25.22,25.47,25.67,25.83,25.95,26.01,26.02,25.98,25.90,25.78,25.62,25.43,25.22,24.98,24.72,24.46,24.19,23.91,23.63,23.36,23.09,22.82,22.56,22.30,22.05,21.82,21.59,21.38,21.18,20.99,20.82,20.68,20.55,20.44,20.36,20.30,20.27,20.25,20.26,20.28,20.33,20.40,20.49,20.59,20.71,20.86,21.02,21.21,21.41,21.64,21.88,22.14,22.42,22.71,23.02,23.32,23.62,23.92,24.20,24.46,24.68,24.88,25.03,25.14,25.20,25.22,25.18,25.10,24.98,24.81,24.61,24.38,24.13,23.85,23.57,23.27,22.97,22.67,22.38,22.08,21.80,21.53,21.26,21.01,20.77,20.55,20.34,20.15,19.98,19.83,19.70,19.60,19.52,19.47,19.44,19.44,19.47,19.53,19.61,19.72,19.86,20.02,20.21,20.42,20.65,20.90,21.19,21.49,21.82,22.17,22.54,22.93,23.34,23.77,24.20,24.64,25.07,25.50,25.92,26.31,26.67,27.00,27.28,27.52,27.71,27.86,27.95,27.99,27.98,27.92,27.83,27.70,27.54,27.36,27.15,26.93,26.70,26.46,26.22,25.98,25.74,25.50,25.27,25.04,24.81,24.60,24.39,24.19,24.00,23.82,23.66,23.51,23.38,23.27,23.17,23.10,23.04,23.01,22.99,22.99,23.02,23.06,23.12,23.20,23.30,23.42,23.56,23.71,23.89,24.09,24.30,24.53,24.77,25.03,25.29,25.56,25.82,26.07,26.31,26.53,26.72,26.88,27.00,27.08,27.11,27.10,27.03,26.93,26.78,26.58,26.36,26.10,25.81,25.50,25.18,24.85,24.51,24.18,23.85,23.52,23.20,22.90,22.60,22.32,22.06,21.80,21.57,21.35,21.15,20.97,20.81,20.66,20.54,20.45,20.37,20.33,20.30,20.30,20.33,20.39,20.47,20.57,20.70,20.85,21.03,21.23,21.46,21.70,21.97,22.25,22.56,22.88,23.22,23.56,23.91,24.27,24.62,24.96,25.28,25.59,25.87,26.11,26.32,26.48,26.60,26.66,26.68,26.65,26.58,26.45,26.29,26.09,25.86,25.60,25.32,25.03,24.73,24.43,24.12,23.82,23.53,23.24,22.97,22.71,22.46,22.23,22.01,21.81,21.62,21.44,21.28,21.14,21.02,20.91,20.83,20.77,20.73,20.72,20.74,20.78,20.85,20.95,21.07,21.23,21.41,21.62,21.85,22.11,22.39,22.70,23.02,23.35,23.70,24.06,24.43,24.80,25.17,25.53,25.87,26.21,26.52,26.80,27.06,27.27,27.45,27.59,27.68,27.73,27.73,27.68,27.59,27.47,27.30,27.11,26.90,26.67,26.43],
@@ -428,548 +135,153 @@ const callaoData = {
 const CAL_N = callaoData.x.length;  // 3376
 const callaoMean = 1093.16;  // mean sea level mm — subtract for anomaly
 
-// irest = i % 5  (NDOTS=5, verified from data file)
-// month is the original monthly point when i % 5 === 0
+// ═══════════════════════════════════════════════════════
+// 2. ENSEMBLE PRE-COMPUTATION
+// ═══════════════════════════════════════════════════════
 
-// Build hover and colour arrays for Plotly (Section 1 only)
-const MO_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const obsMean = observedData.x.reduce((a,b)=>a+b,0) / OBS_N;
 
-const Q_COLORS = ['#FF6B35','#4ECDC4','#45B7D1','#96CEB4'];
-function seasonColorAlpha(month, alpha) {
-  const c = Q_COLORS[Math.floor((month-1)/3)];
-  const r=parseInt(c.slice(1,3),16), g=parseInt(c.slice(3,5),16), b=parseInt(c.slice(5,7),16);
-  return 'rgba('+r+','+g+','+b+','+alpha+')';
+// blue (earliest) -> red (most recent) via HSL hue
+function yearColor(yr, minY, maxY) {
+  const f = (maxY === minY) ? 0 : (yr - minY) / (maxY - minY);
+  const hue = Math.round((1 - f) * 240);
+  return `hsl(${hue},80%,55%)`;
+}
+
+const ENS_FRAMES = 60;  // 12 months x 5 irest
+const obsEns = Array.from({length:ENS_FRAMES}, ()=>({x:[],y:[],years:[]}));
+const calEns = Array.from({length:ENS_FRAMES}, ()=>({x:[],y:[],years:[]}));
+
+for (let i=0; i<OBS_N; i++) {
+  const k = (observedData.month[i]-1)*5 + observedData.irest[i];
+  obsEns[k].x.push(observedData.x[i] - obsMean);
+  obsEns[k].y.push(observedData.y[i]);
+  obsEns[k].years.push(observedData.year[i]);
+}
+for (let i=0; i<CAL_N; i++) {
+  const k = (callaoData.month[i]-1)*5 + callaoData.irest[i];
+  calEns[k].x.push(callaoData.x[i] - callaoMean);
+  calEns[k].y.push(callaoData.y[i]);
+  calEns[k].years.push(callaoData.year[i]);
+}
+
+const obsMinY = Math.min(...observedData.year);
+const obsMaxY = Math.max(...observedData.year);
+const calMinY = Math.min(...callaoData.year);
+const calMaxY = Math.max(...callaoData.year);
+
+function ensColors(yearsArr, minY, maxY) {
+  return yearsArr.map(y => yearColor(y, minY, maxY));
+}
+
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun',
+                     'Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAY = [1, 7, 13, 19, 25];
+function frameLabel(k) {
+  const month = Math.floor(k / 5) + 1;
+  const ir    = k % 5;
+  return MONTH_NAMES[month - 1] + ' ' + DAY[ir];
 }
 
 // ═══════════════════════════════════════════════════════
-// 2. SECTION 1 — Observed attractors animated canvas
+// 3. PLOTLY LAYOUTS
 // ═══════════════════════════════════════════════════════
-const obsMean = observedData.x.reduce((a,b)=>a+b,0)/OBS_N;
 
-const OBS1_CW=700, OBS1_CH=480;
-const OBS1_PLT={l:56,r:680,t:34,b:446};
-const OBS1_DOM_SST={xmin:-7.5,xmax:7.5,ymin:-2.5,ymax:2.5};
-const OBS1_DOM_CAL={xmin:-300, xmax:300, ymin:-60,  ymax:60};
-const OBS1_LABELS_SST={x:'SST anomaly (°C)', y:'dT/dt'};
-const OBS1_LABELS_CAL={x:'SSH anom (mm)',    y:'dSL/dt'};
-const CAL_SSH_TICKS={x:[-300,-200,-100,0,100,200,300],y:[-60,-40,-20,0,20,40,60]};
-const SST_ANOM_TICKS={x:[-6,-4,-2,0,2,4,6],y:[-2,-1,0,1,2]};
-const OBS1_TAIL=60;
-
-const OBS1 = {
-  running:false, paused:false,
-  obsIdx:0, calIdx:0,
-  obsStartIdx:0, calStartIdx:0,
-  totalFrames:0,
-  wasRunningBeforeScrub:false,
-  spf:1, delay:30,
-  obsTail:[], calTail:[],
-  rafId:null,
-  sstCanvas:null, sstCtx:null, sstOff:null, sstOffCtx:null,
-  calCanvas:null, calCtx:null, calOff:null, calOffCtx:null,
+const _darkBase = {
+  paper_bgcolor:'#0a0a0e', plot_bgcolor:'#12121a',
+  font:{color:'#e8e8f0'},
+  margin:{l:70, r:24, t:54, b:58},
+  hovermode:'closest', showlegend:false,
 };
-
-function setBtn(id, disabled) {
-  const el = document.getElementById(id);
-  if (el) el.disabled = disabled;
-}
-
-function obs1DrawBgs() {
-  drawBg(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1_LABELS_SST, SST_ANOM_TICKS);
-  drawBg(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1_LABELS_CAL, CAL_SSH_TICKS);
-}
-
-function _cmpCommonStart() {
-  // Find the later of the two dataset start dates (1975/01 for SST,
-  // 1970/01 for Callao) so both canvases animate in sync.
-  const obsY0 = observedData.year[0], obsM0 = observedData.month[0];
-  const calY0 = callaoData.year[0],   calM0 = callaoData.month[0];
-  let startYear, startMonth;
-  if (obsY0 > calY0 || (obsY0===calY0 && obsM0>calM0)) {
-    startYear=obsY0; startMonth=obsM0;
-  } else {
-    startYear=calY0; startMonth=calM0;
-  }
-  let obsStartIdx=0;
-  for (let i=0;i<OBS_N;i++){
-    if(observedData.year[i]>startYear ||
-       (observedData.year[i]===startYear && observedData.month[i]>=startMonth)){
-      obsStartIdx=i; break;
-    }
-  }
-  let calStartIdx=0;
-  for (let i=0;i<CAL_N;i++){
-    if(callaoData.year[i]>startYear ||
-       (callaoData.year[i]===startYear && callaoData.month[i]>=startMonth)){
-      calStartIdx=i; break;
-    }
-  }
-  return {startYear, startMonth, obsStartIdx, calStartIdx};
-}
-
-function obs1Init() {
-  OBS1.sstCanvas = document.getElementById('obs1-sst-canvas');
-  OBS1.sstCtx    = OBS1.sstCanvas.getContext('2d');
-  OBS1.sstOff    = makeOff(OBS1_CW, OBS1_CH);
-  OBS1.sstOffCtx = OBS1.sstOff.getContext('2d');
-
-  OBS1.calCanvas = document.getElementById('obs1-cal-canvas');
-  OBS1.calCtx    = OBS1.calCanvas.getContext('2d');
-  OBS1.calOff    = makeOff(OBS1_CW, OBS1_CH);
-  OBS1.calOffCtx = OBS1.calOff.getContext('2d');
-
-  const cs = _cmpCommonStart();
-  OBS1.obsStartIdx = cs.obsStartIdx;
-  OBS1.calStartIdx = cs.calStartIdx;
-  OBS1.totalFrames = Math.min(OBS_N-cs.obsStartIdx, CAL_N-cs.calStartIdx);
-  OBS1.obsIdx = cs.obsStartIdx;
-  OBS1.calIdx = cs.calStartIdx;
-
-  obs1DrawBgs();
-
-  const slSpf   = document.getElementById('obs1-sl-spf');
-  const slDelay = document.getElementById('obs1-sl-delay');
-  if (slSpf)   slSpf.addEventListener('input',  ()=>{ OBS1.spf=parseInt(slSpf.value)||1;    document.getElementById('obs1-lbl-spf').textContent=slSpf.value; });
-  if (slDelay) slDelay.addEventListener('input', ()=>{ OBS1.delay=parseInt(slDelay.value)||0; document.getElementById('obs1-lbl-delay').textContent=slDelay.value; });
-
-  const scrubEl = document.getElementById('obs1-scrubber');
-  if (scrubEl) {
-    scrubEl.addEventListener('mousedown', () => {
-      OBS1.wasRunningBeforeScrub = OBS1.running && !OBS1.paused;
-      if (OBS1.wasRunningBeforeScrub) {
-        OBS1.paused = true;
-        if (OBS1.rafId) cancelAnimationFrame(OBS1.rafId);
-        document.getElementById('obs1-pause').innerHTML='&#9654; Resume';
-      }
-    });
-    scrubEl.addEventListener('input', function() {
-      if (!OBS1.running && OBS1.totalFrames === 0) return;
-      obs1RedrawToFrame(parseInt(this.value));
-    });
-    scrubEl.addEventListener('mouseup', function() {
-      if (OBS1.wasRunningBeforeScrub && OBS1.running) {
-        OBS1.paused = false;
-        document.getElementById('obs1-pause').innerHTML='&#9646;&#9646; Pause';
-        OBS1.rafId = setTimeout(()=>requestAnimationFrame(obs1Loop), OBS1.delay);
-      }
-      OBS1.wasRunningBeforeScrub = false;
-    });
-    scrubEl.addEventListener('touchstart', () => {
-      OBS1.wasRunningBeforeScrub = OBS1.running && !OBS1.paused;
-      if (OBS1.wasRunningBeforeScrub) {
-        OBS1.paused = true;
-        if (OBS1.rafId) cancelAnimationFrame(OBS1.rafId);
-      }
-    }, {passive:true});
-    scrubEl.addEventListener('touchend', function() {
-      if (OBS1.wasRunningBeforeScrub && OBS1.running) {
-        OBS1.paused = false;
-        OBS1.rafId = setTimeout(()=>requestAnimationFrame(obs1Loop), OBS1.delay);
-      }
-      OBS1.wasRunningBeforeScrub = false;
-    });
-  }
-}
-
-function obs1Loop() {
-  if (!OBS1.running || OBS1.paused) return;
-  const spf = OBS1.spf;
-  for (let i=0; i<spf; i++) {
-    if (OBS1.obsIdx >= OBS_N) { obs1Finish(); return; }
-    const ox = observedData.x[OBS1.obsIdx] - obsMean;
-    const oy = observedData.y[OBS1.obsIdx];
-    pushTail(OBS1.obsTail, ox, oy, observedData.month[OBS1.obsIdx], OBS1_TAIL, OBS1.sstOffCtx, OBS1_PLT, OBS1_DOM_SST);
-    OBS1.obsIdx++;
-    if (OBS1.calIdx < CAL_N) {
-      const cx = callaoData.x[OBS1.calIdx] - callaoMean;
-      const cy = callaoData.y[OBS1.calIdx];
-      pushTail(OBS1.calTail, cx, cy, callaoData.month[OBS1.calIdx], OBS1_TAIL, OBS1.calOffCtx, OBS1_PLT, OBS1_DOM_CAL);
-      OBS1.calIdx++;
-    }
-  }
-  const tIdx = Math.min(OBS1.obsIdx, OBS_N-1);
-  const dispStr = MO_NAMES[observedData.month[tIdx]-1] + ' ' + observedData.year[tIdx];
-  obs1DrawBgs();
-  compositeFrame(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1.sstOff, OBS1.obsTail, dispStr);
-  compositeFrame(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1.calOff, OBS1.calTail, null);
-  document.getElementById('obs1-time-display').textContent =
-    observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
-  const scrub = document.getElementById('obs1-scrubber');
-  if (scrub) scrub.value = OBS1.obsIdx - OBS1.obsStartIdx;
-  obs1Status();
-  if (OBS1.running) OBS1.rafId = setTimeout(()=>requestAnimationFrame(obs1Loop), OBS1.delay);
-}
-
-function obs1Status() {
-  const el = document.getElementById('obs1-status');
-  if (!el) return;
-  const f = OBS1.obsIdx - OBS1.obsStartIdx;
-  const pct = OBS1.totalFrames > 0 ? (f/OBS1.totalFrames*100).toFixed(1) : '0.0';
-  const cls = OBS1.paused?'st-paused':(OBS1.running?'st-running':'st-done');
-  const st  = OBS1.paused?'&#9646;&#9646; Paused':(OBS1.running?'&#9654; Running':'&#9632; Done');
-  el.innerHTML=`<span class="${cls}">${st}</span> &nbsp;·&nbsp; ${f}/${OBS1.totalFrames} pts (${pct}%)`;
-}
-
-function obs1Start() {
-  if (OBS1.running) return;
-  OBS1.spf   = parseInt(document.getElementById('obs1-sl-spf')?.value)||1;
-  OBS1.delay = parseInt(document.getElementById('obs1-sl-delay')?.value)||30;
-  const cs = _cmpCommonStart();
-  OBS1.obsStartIdx = cs.obsStartIdx; OBS1.calStartIdx = cs.calStartIdx;
-  OBS1.obsIdx = cs.obsStartIdx;      OBS1.calIdx = cs.calStartIdx;
-  OBS1.totalFrames = Math.min(OBS_N-cs.obsStartIdx, CAL_N-cs.calStartIdx);
-  OBS1.obsTail=[]; OBS1.calTail=[];
-  OBS1.running=true; OBS1.paused=false;
-  OBS1.sstOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
-  OBS1.calOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
-  obs1DrawBgs();
-  const scrub = document.getElementById('obs1-scrubber');
-  if (scrub) { scrub.max=OBS1.totalFrames-1; scrub.value=0; }
-  document.getElementById('obs1-time-display').textContent = 'Jan '+cs.startYear;
-  setBtn('obs1-run',true); setBtn('obs1-pause',false);
-  document.getElementById('obs1-pause').innerHTML='&#9646;&#9646; Pause';
-  OBS1.rafId = setTimeout(()=>requestAnimationFrame(obs1Loop), OBS1.delay);
-}
-
-function obs1Pause() {
-  if (!OBS1.running) return;
-  OBS1.paused = !OBS1.paused;
-  const btn = document.getElementById('obs1-pause');
-  if (OBS1.paused) {
-    cancelAnimationFrame(OBS1.rafId);
-    btn.innerHTML='&#9654; Resume';
-  } else {
-    btn.innerHTML='&#9646;&#9646; Pause';
-    OBS1.rafId = setTimeout(()=>requestAnimationFrame(obs1Loop), OBS1.delay);
-  }
-  obs1Status();
-}
-
-function obs1Finish() {
-  OBS1.running=false; OBS1.paused=false;
-  if (OBS1.rafId) cancelAnimationFrame(OBS1.rafId);
-  setBtn('obs1-run',false); setBtn('obs1-pause',true);
-  document.getElementById('obs1-pause').innerHTML='&#9646;&#9646; Pause';
-  obs1Status();
-}
-
-function obs1Reset() {
-  obs1Finish();
-  const cs = _cmpCommonStart();
-  OBS1.obsIdx = cs.obsStartIdx; OBS1.calIdx = cs.calStartIdx;
-  OBS1.obsTail=[]; OBS1.calTail=[];
-  OBS1.sstOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
-  OBS1.calOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
-  obs1DrawBgs();
-  const scrub = document.getElementById('obs1-scrubber');
-  if (scrub) scrub.value=0;
-  document.getElementById('obs1-time-display').textContent = 'Jan 1975';
-  document.getElementById('obs1-status').innerHTML='<span class="st-ready">Ready</span>';
-}
-
-function obs1RedrawToFrame(targetFrame) {
-  if (!OBS1.sstOffCtx) return;
-  const frame = Math.max(0, Math.min(targetFrame, OBS1.totalFrames-1));
-  const obsStart = OBS1.obsStartIdx, calStart = OBS1.calStartIdx;
-  OBS1.sstOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
-  OBS1.calOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
-  let obsTail=[], calTail=[];
-  for (let f=0; f<frame; f++) {
-    const oi=obsStart+f, ci=calStart+f;
-    if (oi<OBS_N) {
-      const ox=observedData.x[oi]-obsMean, oy=observedData.y[oi];
-      pushTail(obsTail, ox, oy, observedData.month[oi], OBS1_TAIL, OBS1.sstOffCtx, OBS1_PLT, OBS1_DOM_SST);
-    }
-    if (ci<CAL_N) {
-      const cx=callaoData.x[ci]-callaoMean, cy=callaoData.y[ci];
-      pushTail(calTail, cx, cy, callaoData.month[ci], OBS1_TAIL, OBS1.calOffCtx, OBS1_PLT, OBS1_DOM_CAL);
-    }
-  }
-  OBS1.obsIdx=obsStart+frame; OBS1.calIdx=calStart+frame;
-  OBS1.obsTail=obsTail; OBS1.calTail=calTail;
-  const tIdx=Math.min(OBS1.obsIdx, OBS_N-1);
-  const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
-  obs1DrawBgs();
-  compositeFrame(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1.sstOff, OBS1.obsTail, dispStr);
-  compositeFrame(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1.calOff, OBS1.calTail, null);
-  document.getElementById('obs1-time-display').textContent =
-    observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
-  const scrub = document.getElementById('obs1-scrubber');
-  if (scrub) scrub.value = frame;
-  obs1Status();
-}
-
-// 4. CANVAS DRAWING UTILITIES  (shared by S2 and CMP)
-// ═══════════════════════════════════════════════════════
-
-function monthLabel(step, startYear) {
-  // step = integer, t = step * dt.  dt=0.1 for S2, dt=0.2 for CMP model.
-  // For S2: months elapsed = step * 0.1  but we pass Math.floor(t)
-  const mo = step % 12;
-  const yr = startYear + Math.floor(step / 12);
-  return MO_NAMES[mo] + ' ' + yr;
-}
-
-/** Draw background (black + grid + zero-axes + border + tick labels) onto ctx.
- *  PLT = {l,r,t,b}  plot area in canvas pixels.
- *  DOMAIN = {xmin,xmax,ymin,ymax}
- *  labels = {x:string, y:string}
- */
-function drawBg(ctx, CW, CH, PLT, DOM, labels, ticks) {
-  const mx = x => PLT.l + (x-DOM.xmin)/(DOM.xmax-DOM.xmin)*(PLT.r-PLT.l);
-  const my = y => PLT.b - (y-DOM.ymin)/(DOM.ymax-DOM.ymin)*(PLT.b-PLT.t);
-
-  ctx.fillStyle = '#0a0a0e';
-  ctx.fillRect(0, 0, CW, CH);
-
-  // Grid — use explicit ticks if provided, else every integer
-  ctx.strokeStyle = '#1a1a2a'; ctx.lineWidth = 0.5;
-  if (ticks) {
-    ticks.x.forEach(x => { ctx.beginPath(); ctx.moveTo(mx(x),PLT.t); ctx.lineTo(mx(x),PLT.b); ctx.stroke(); });
-    ticks.y.forEach(y => { ctx.beginPath(); ctx.moveTo(PLT.l,my(y)); ctx.lineTo(PLT.r,my(y)); ctx.stroke(); });
-  } else {
-    for (let x=Math.ceil(DOM.xmin); x<=Math.floor(DOM.xmax); x++) {
-      ctx.beginPath(); ctx.moveTo(mx(x),PLT.t); ctx.lineTo(mx(x),PLT.b); ctx.stroke();
-    }
-    for (let y=Math.ceil(DOM.ymin); y<=Math.floor(DOM.ymax); y++) {
-      ctx.beginPath(); ctx.moveTo(PLT.l,my(y)); ctx.lineTo(PLT.r,my(y)); ctx.stroke();
-    }
-  }
-
-  // Zero axes (dashed)
-  ctx.strokeStyle='#363650'; ctx.lineWidth=1.2;
-  ctx.setLineDash([5,4]);
-  ctx.beginPath(); ctx.moveTo(mx(0),PLT.t); ctx.lineTo(mx(0),PLT.b); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(PLT.l,my(0)); ctx.lineTo(PLT.r,my(0)); ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Border
-  ctx.strokeStyle='#363650'; ctx.lineWidth=1;
-  ctx.strokeRect(PLT.l,PLT.t,PLT.r-PLT.l,PLT.b-PLT.t);
-
-  // X tick labels
-  ctx.fillStyle='#555568'; ctx.font='10px monospace'; ctx.textAlign='center';
-  if (ticks) {
-    ticks.x.forEach(x => ctx.fillText(x, mx(x), PLT.b+14));
-  } else {
-    for (let x=Math.ceil(DOM.xmin); x<=Math.floor(DOM.xmax); x+=2) {
-      ctx.fillText(x, mx(x), PLT.b+14);
-    }
-  }
-  ctx.fillStyle='#3a3a50';
-  ctx.fillText(labels.x, (PLT.l+PLT.r)/2, CH-3);
-
-  // Y tick labels
-  ctx.textAlign='right';
-  ctx.fillStyle='#555568';
-  if (ticks) {
-    ticks.y.forEach(y => ctx.fillText(y.toFixed(0), PLT.l-5, my(y)+4));
-  } else {
-    for (let y=Math.ceil(DOM.ymin); y<=Math.floor(DOM.ymax); y++) {
-      ctx.fillText(y.toFixed(0), PLT.l-5, my(y)+4);
-    }
-  }
-  ctx.save();
-  ctx.fillStyle='#3a3a50';
-  ctx.translate(11,(PLT.t+PLT.b)/2); ctx.rotate(-Math.PI/2);
-  ctx.textAlign='center'; ctx.font='10px monospace';
-  ctx.fillText(labels.y, 0, 0);
-  ctx.restore();
-}
-
-/** Composite one phase-diagram frame.
- *  offCanvas = offscreen canvas holding gray history.
- *  tail      = array of {x,y} recent points.
- *  curX/curY = current position (may differ slightly from tail tip due to float).
- *  timeStr   = string to display top-left ("Jan 1975") or null.
- */
-function compositeFrame(ctx, CW, CH, PLT, DOM, offCanvas, tail, timeStr) {
-  const mx = x => PLT.l + (x-DOM.xmin)/(DOM.xmax-DOM.xmin)*(PLT.r-PLT.l);
-  const my = y => PLT.b - (y-DOM.ymin)/(DOM.ymax-DOM.ymin)*(PLT.b-PLT.t);
-
-  // Gray history from offscreen
-  ctx.drawImage(offCanvas, 0, 0);
-
-  // Red tail — per-segment brightness gradient
-  const n = tail.length;
-  for (let i=1; i<n; i++) {
-    const f = i/n;
-    ctx.beginPath();
-    ctx.strokeStyle = `rgba(255,${Math.round(80*(1-f))},${Math.round(40*(1-f))},${(0.25+0.75*f).toFixed(2)})`;
-    ctx.lineWidth = 0.7 + 1.5*f;
-    ctx.moveTo(mx(tail[i-1].x), my(tail[i-1].y));
-    ctx.lineTo(mx(tail[i].x),   my(tail[i].y));
-    ctx.stroke();
-  }
-
-  // Blue dot + glow at tail tip
-  if (n > 0) {
-    const cx=mx(tail[n-1].x), cy=my(tail[n-1].y);
-    ctx.beginPath(); ctx.arc(cx,cy,9,0,2*Math.PI);
-    ctx.fillStyle='rgba(51,136,255,0.12)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx,cy,5,0,2*Math.PI);
-    ctx.fillStyle='#3388ff'; ctx.fill();
-    ctx.strokeStyle='#88ccff'; ctx.lineWidth=1.2; ctx.stroke();
-  }
-
-  // Time label top-left
-  if (timeStr) {
-    ctx.fillStyle='rgba(10,10,14,0.70)';
-    ctx.fillRect(PLT.l+4, PLT.t+4, 82, 22);
-    ctx.fillStyle='#e8e8f0'; ctx.font='bold 12px monospace'; ctx.textAlign='left';
-    ctx.fillText(timeStr, PLT.l+8, PLT.t+20);
-  }
-}
-
-function addToOff(offCtx, x1, y1, x2, y2, month, PLT, DOM) {
-  const mx = x => PLT.l + (x-DOM.xmin)/(DOM.xmax-DOM.xmin)*(PLT.r-PLT.l);
-  const my = y => PLT.b - (y-DOM.ymin)/(DOM.ymax-DOM.ymin)*(PLT.b-PLT.t);
-  offCtx.beginPath();
-  offCtx.strokeStyle=seasonColorAlpha(month, 0.35); offCtx.lineWidth=0.9;
-  offCtx.moveTo(mx(x1),my(y1)); offCtx.lineTo(mx(x2),my(y2)); offCtx.stroke();
-}
-
-function pushTail(tail, x, y, month, tailLen, offCtx, PLT, DOM) {
-  tail.push({x, y, month});
-  if (tail.length > tailLen) {
-    addToOff(offCtx, tail[0].x, tail[0].y, tail[1].x, tail[1].y, tail[0].month, PLT, DOM);
-    tail.shift();
-  }
-}
-
-function makeOff(w, h) {
-  const c = document.createElement('canvas');
-  c.width=w; c.height=h; return c;
-}
-
-// ═══════════════════════════════════════════════════════
-
-window.addEventListener('load', () => {
-  obs1Init();
-  classicInit();
+const ensLayoutSST = Object.assign({}, _darkBase, {
+  title:{text:'SST NINO1+2 — all years at same instant', font:{color:'#e8e8f0',size:13}},
+  xaxis:{title:{text:'SST anomaly (°C)'}, range:[-7.5,7.5],
+         color:'#888899', gridcolor:'#2a2a40',
+         zerolinecolor:'#4488ff', zerolinewidth:1.5},
+  yaxis:{title:{text:'dT/dt (°C/month)'}, range:[-2.5,2.5],
+         color:'#888899', gridcolor:'#2a2a40',
+         zerolinecolor:'#555577', zerolinewidth:1},
+});
+const ensLayoutCal = Object.assign({}, _darkBase, {
+  title:{text:'Callao SSH — all years at same instant', font:{color:'#e8e8f0',size:13}},
+  xaxis:{title:{text:'SSH anomaly (mm)'}, range:[-300,300],
+         color:'#888899', gridcolor:'#2a2a40',
+         zerolinecolor:'#4488ff', zerolinewidth:1.5},
+  yaxis:{title:{text:'dSL/dt (mm/month)'}, range:[-60,60],
+         color:'#888899', gridcolor:'#2a2a40',
+         zerolinecolor:'#555577', zerolinewidth:1},
 });
 
 // ═══════════════════════════════════════════════════════
-// 10. CLASSIC PHASE DIAGRAMS (white-bg Plotly)
+// 4. ANIMATION
 // ═══════════════════════════════════════════════════════
-function classicInit() {
-  // Find most recent year with all 12 months present (irest===0 = monthly sample)
-  function findMRCY(data, N) {
-    const monthsPerYear = {};
-    for (let i = 0; i < N; i++) {
-      if (data.irest[i] !== 0) continue;
-      const y = data.year[i];
-      if (!monthsPerYear[y]) monthsPerYear[y] = new Set();
-      monthsPerYear[y].add(data.month[i]);
-    }
-    let mrcy = 0;
-    for (const [yr, months] of Object.entries(monthsPerYear)) {
-      if (months.size === 12 && parseInt(yr) > mrcy) mrcy = parseInt(yr);
-    }
-    return mrcy;
-  }
 
-  const obsMRCY = findMRCY(observedData, OBS_N);
-  const calMRCY = findMRCY(callaoData, CAL_N);
+let ensFrame = 0, ensRunning = false, ensDelay = 150, ensTimerId = null;
 
-  // Update caption spans
-  const grayEnd = document.getElementById('classic-gray-end');
-  const mrcyEl  = document.getElementById('classic-mrcy');
-  if (grayEnd) grayEnd.textContent = String(obsMRCY - 1);
-  if (mrcyEl)  mrcyEl.textContent  = String(obsMRCY);
+function _ensTrace(ensArr, minY, maxY) {
+  const d = ensArr[ensFrame];
+  return [{
+    type:'scatter', mode:'markers',
+    x:d.x, y:d.y,
+    marker:{size:7, color:ensColors(d.years, minY, maxY), opacity:0.85},
+    text:d.years,
+    hovertemplate:'%{text}: (%{x:.2f}, %{y:.2f})<extra></extra>',
+  }];
+}
 
-  // Build per-year traces
-  function buildTraces(data, N, meanX, mrcy) {
-    const yearMap = {};
-    for (let i = 0; i < N; i++) {
-      const y = data.year[i];
-      if (!yearMap[y]) yearMap[y] = {x:[], y:[], ir:[]};
-      yearMap[y].x.push(data.x[i] - meanX);
-      yearMap[y].y.push(data.y[i]);
-      yearMap[y].ir.push(data.irest[i]);
-    }
-    const traces = [];
-    const years  = Object.keys(yearMap).map(Number).sort();
-    for (const yr of years) {
-      if (yr === mrcy) continue;
-      const d = yearMap[yr];
-      traces.push({
-        type:'scatter', mode:'lines',
-        x:d.x, y:d.y,
-        line:{color:'rgba(100,100,100,0.35)', width:0.8},
-        showlegend:false, name:String(yr),
-        hovertemplate: yr + ': (%{x:.2f}, %{y:.2f})<extra></extra>',
-      });
-    }
-    // Most recent complete year last (renders on top)
-    if (yearMap[mrcy]) {
-      const d = yearMap[mrcy];
-      const mSz = d.ir.map(ir => ir === 0 ? 7 : 0);
-      traces.push({
-        type:'scatter', mode:'lines+markers',
-        x:d.x, y:d.y,
-        line:{color:'#cc2222', width:2.5},
-        marker:{color:'#cc2222', size:mSz, symbol:'circle'},
-        showlegend:true, name:String(mrcy),
-        hovertemplate: mrcy + ': (%{x:.2f}, %{y:.2f})<extra></extra>',
-      });
-    }
-    return traces;
-  }
+function ensRenderFrame() {
+  Plotly.react('ens-plot-sst', _ensTrace(obsEns, obsMinY, obsMaxY), ensLayoutSST);
+  Plotly.react('ens-plot-cal', _ensTrace(calEns, calMinY, calMaxY), ensLayoutCal);
+  document.getElementById('ens-time-label').textContent = frameLabel(ensFrame);
+}
 
-  function makeWhiteLayout(title, xTitle, yTitle, xrange, yrange) {
-    return {
-      paper_bgcolor:'white', plot_bgcolor:'white',
-      font:{color:'#222', family:'Arial, sans-serif'},
-      title:{text:title, font:{color:'#222', size:13}},
-      xaxis:{
-        title:xTitle, range:xrange, color:'#333',
-        linecolor:'#999', linewidth:1, mirror:true,
-        gridcolor:'#ddd', gridwidth:1,
-        zeroline:true, zerolinecolor:'#aaa', zerolinewidth:1.5,
-        tickcolor:'#999',
-      },
-      yaxis:{
-        title:yTitle, range:yrange, color:'#333',
-        linecolor:'#999', linewidth:1, mirror:true,
-        gridcolor:'#ddd', gridwidth:1,
-        zeroline:true, zerolinecolor:'#aaa', zerolinewidth:1.5,
-        tickcolor:'#999',
-      },
-      margin:{l:65, r:20, t:50, b:55},
-      hovermode:'closest',
-      showlegend:true,
-      legend:{font:{color:'#222', size:11}, bgcolor:'white',
-              bordercolor:'#ccc', borderwidth:1},
-    };
-  }
+function ensLoop() {
+  if (!ensRunning) return;
+  ensFrame = (ensFrame + 1) % ENS_FRAMES;
+  ensRenderFrame();
+  ensTimerId = setTimeout(ensLoop, ensDelay);
+}
 
-  Plotly.newPlot('classic-sst',
-    buildTraces(observedData, OBS_N, obsMean, obsMRCY),
-    makeWhiteLayout('SST NINO1+2 Phase Diagram',
-      'SST anomaly (°C)', 'dT/dt (°C/month)', [-7.5, 7.5], [-2.5, 2.5]),
-    {responsive:true, displayModeBar:false});
+function ensPlay() {
+  if (ensRunning) return;
+  ensRunning = true;
+  document.getElementById('ens-play-btn').disabled  = true;
+  document.getElementById('ens-pause-btn').disabled = false;
+  ensTimerId = setTimeout(ensLoop, ensDelay);
+}
 
-  Plotly.newPlot('classic-cal',
-    buildTraces(callaoData, CAL_N, callaoMean, calMRCY),
-    makeWhiteLayout('Callao SSH Phase Diagram',
-      'SSH anomaly (mm)', 'dSL/dt (mm/month)', [-300, 300], [-60, 60]),
-    {responsive:true, displayModeBar:false});
+function ensPause() {
+  ensRunning = false;
+  clearTimeout(ensTimerId);
+  document.getElementById('ens-play-btn').disabled  = false;
+  document.getElementById('ens-pause-btn').disabled = true;
+}
+
+function ensReset() {
+  ensPause();
+  ensFrame = 0;
+  ensRenderFrame();
+}
+
+function ensSetDelay(val) {
+  ensDelay = parseInt(val);
+  document.getElementById('ens-speed-lbl').textContent = val + 'ms';
 }
 
 // ═══════════════════════════════════════════════════════
-// 11. HELP PANEL
+// 5. INIT
 // ═══════════════════════════════════════════════════════
-function toggleHelp() {
-  document.getElementById('help-panel').classList.toggle('open');
-}
-document.addEventListener('click', function(e) {
-  const panel = document.getElementById('help-panel');
-  const btn   = document.getElementById('help-btn');
-  if (panel && panel.classList.contains('open') &&
-      !panel.contains(e.target) && e.target !== btn) {
-    panel.classList.remove('open');
-  }
+
+window.addEventListener('load', () => {
+  document.getElementById('ens-legend-text').innerHTML =
+    'Blue&nbsp;=&nbsp;' + obsMinY + ' &nbsp;&middot;&nbsp; Red&nbsp;=&nbsp;' + obsMaxY;
+
+  // Initial plot — frame 0
+  Plotly.newPlot('ens-plot-sst', _ensTrace(obsEns, obsMinY, obsMaxY),
+    ensLayoutSST, {responsive:true, displayModeBar:false});
+  Plotly.newPlot('ens-plot-cal', _ensTrace(calEns, calMinY, calMaxY),
+    ensLayoutCal, {responsive:true, displayModeBar:false});
+  document.getElementById('ens-time-label').textContent = frameLabel(0);
 });
 </script>
 </body>
