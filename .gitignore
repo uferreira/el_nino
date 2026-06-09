@@ -25,3 +25,6 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# Draft source files
+about_us_Fabio.txt
