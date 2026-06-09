@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Victor de Amorim d'&Aacute;vila &mdash; Profile</title>
+<style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+:root {
+  --bg:#0a0a0e; --surface:#12121a; --card:#1a1a28; --border:#2a2a40;
+  --text:#e8e8f0; --muted:#888899; --accent:#4488ff; --hot:#ff5533; --cold:#3388ff;
+  --fg:#e8e8f0;
+}
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+.container { max-width:1280px; margin:0 auto; padding:0 1.2rem; }
+header { text-align:center; padding:3rem 1rem 2rem; background:linear-gradient(180deg,#0d0d18 0%,var(--bg) 100%); border-bottom:1px solid var(--border); }
+header h1 { font-size:clamp(1.8rem,5vw,3rem); font-weight:700; background:linear-gradient(135deg,var(--cold),var(--hot)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:.5rem; }
+header p.subtitle { color:var(--muted); font-size:1.05rem; }
+footer { text-align:center; padding:2rem 1rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); margin-top:3rem; }
+footer a { color:var(--accent); text-decoration:none; }
+footer a:hover { text-decoration:underline; }
+.esra-header { text-align:center; padding:.6rem 1rem .3rem; border-bottom:1px solid var(--border); background:var(--surface); }
+.esra-full { display:block; font-size:clamp(.9rem,2vw,1.1rem); font-weight:600; color:var(--text); letter-spacing:.04em; }
+.esra-abbr { font-size:.75rem; letter-spacing:.25em; color:var(--accent); text-transform:uppercase; }
+.site-nav { display:flex; gap:1.2rem; justify-content:center; padding:.5rem 0 .2rem; }
+.site-nav .nav-link { color:var(--fg); text-decoration:none; font-size:.92rem; padding:.35rem .85rem; border-radius:5px; transition:background .15s; }
+.site-nav .nav-link:hover { background:rgba(255,255,255,.1); }
+.site-nav .nav-link.active { background:var(--accent); color:#fff; }
+.profile-body { max-width:860px; margin:2rem auto; padding:0 1.5rem 3rem; }
+.back-link { display:inline-block; margin-bottom:2rem; color:var(--accent); text-decoration:none; font-size:.9rem; }
+.back-link:hover { text-decoration:underline; }
+.profile-body h1 { font-size:clamp(1.5rem,3vw,2rem); font-weight:700; color:var(--text); margin-bottom:.3rem; line-height:1.2; }
+.profile-role { font-size:.95rem; color:var(--muted); font-style:italic; margin-bottom:.3rem; line-height:1.5; }
+.profile-retired { font-size:.88rem; color:var(--hot); font-weight:600; margin-bottom:1.5rem; letter-spacing:.03em; }
+.profile-body h2 { font-size:1.15rem; font-weight:600; color:var(--accent); margin:2rem 0 .75rem; padding-bottom:.4rem; border-bottom:1px solid var(--border); }
+.profile-body p { color:var(--muted); margin-bottom:.9rem; font-size:.93rem; line-height:1.65; }
+.profile-body ul { list-style:none; padding:0; margin-bottom:.9rem; }
+.profile-body ul li { color:var(--muted); font-size:.93rem; line-height:1.6; margin-bottom:.35rem; padding-left:1.1rem; position:relative; }
+.profile-body ul li::before { content:"—"; position:absolute; left:0; color:var(--accent); }
+.profile-table { width:100%; border-collapse:collapse; margin:.75rem 0 1.5rem; font-size:.88rem; }
+.profile-table th { background:var(--surface); color:var(--muted); text-align:left; padding:.5rem .8rem; font-weight:600; font-size:.78rem; text-transform:uppercase; letter-spacing:.06em; border-bottom:2px solid var(--border); }
+.profile-table td { padding:.55rem .8rem; border-bottom:1px solid var(--border); color:var(--text); vertical-align:top; line-height:1.45; }
+.profile-table tr:last-child td { border-bottom:none; }
+.profile-table td:first-child { color:var(--muted); white-space:nowrap; font-family:'Consolas','Courier New',monospace; font-size:.83rem; }
+</style>
+</head>
+<body>
+<div class="esra-header">
+  <span class="esra-full">Earth Science Research Alliance</span>
+  <span class="esra-abbr">ESRA</span>
+</div>
+<header>
+  <div class="container">
+    <h1>El Ni&ntilde;o Familiar Attractor</h1>
+    <p class="subtitle">Researcher Profile</p>
+    <nav class="site-nav">
+  <a href="index.html" class="nav-link">Home</a>
+  <a href="phase_diagrams.html" class="nav-link">Phase Diagrams</a>
+  <a href="animations.html" class="nav-link">Animations</a>
+  <a href="familiar_attractor.html" class="nav-link">Familiar Attractor</a>
+  <a href="ensemble.html" class="nav-link">Year Ensemble</a>
+  <a href="compare.html" class="nav-link">Compare</a>
+  <a href="about.html" class="nav-link active">About Us</a>
+</nav>
+  </div>
+</header>
+
+<div class="profile-body">
+  <a href="about.html" class="back-link">&larr; Back to About Us</a>
+
+  <h1>Victor de Amorim d'&Aacute;vila</h1>
+  <p class="profile-role">Professor Emeritus (retired) &middot; Physical Oceanographer &middot; Astrophysicist</p>
+  <p class="profile-retired">Retired &middot; Rio de Janeiro State University (UERJ) and Observat&oacute;rio Nacional, Brazil</p>
+
+  <p>Victor de Amorim d'&Aacute;vila served as Professor at the Faculty of Oceanography of the Rio de Janeiro State University (UERJ) and Senior Researcher at the Observat&oacute;rio Nacional, where he worked from 1976 until his retirement. His career spanned astrophysics, astrometry, physical oceanography, and nonlinear fluid dynamics. He was one of the pioneers of phase-space methods for ENSO analysis in Brazil, having supervised the original Pacific Warm Pool research that underpins this project, and co-authored foundational work on mathematical models for El Ni&ntilde;o dynamics.</p>
+
+  <h2>Experience</h2>
+  <table class="profile-table">
+    <thead><tr><th>Period</th><th>Role</th><th>Organisation</th></tr></thead>
+    <tbody>
+      <tr><td>1981 &ndash; 2026</td><td>Professor Emeritus (retired), Faculty of Oceanography</td><td>UERJ, Rio de Janeiro, Brazil</td></tr>
+      <tr><td>1976 &ndash; 2026</td><td>Senior Researcher, Astrometry &amp; Astrophysics (retired)</td><td>Observat&oacute;rio Nacional, Brazil</td></tr>
+      <tr><td>2000 &ndash; 2001</td><td>Principal Investigator, &ldquo;A Mathematical Model for El Ni&ntilde;o&rdquo;</td><td>UERJ / FAPERJ</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Education</h2>
+  <table class="profile-table">
+    <thead><tr><th>Degree</th><th>Institution</th><th>Year</th></tr></thead>
+    <tbody>
+      <tr><td>Doctor of Science, Physics &mdash; Thesis: <em>Hydrodynamics of Shock Waves in Supernovae</em></td><td>Centro Brasileiro de Pesquisas F&iacute;sicas (CBPF)</td><td>1992&ndash;1995</td></tr>
+      <tr><td>Master of Science, Astronomy &mdash; Thesis: <em>Lunar Observations with the Danjon Astrolabe</em></td><td>University of S&atilde;o Paulo (USP)</td><td>1973&ndash;1975</td></tr>
+      <tr><td>Bachelor of Science, Physics</td><td>University of S&atilde;o Paulo (USP)</td><td>1969&ndash;1972</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Tools &amp; Technologies</h2>
+  <p><strong>Languages:</strong> Fortran &middot; MATLAB &middot; Python</p>
+  <p><strong>Domains:</strong> Physical Oceanography &middot; Astrophysics &middot; Astrometry &middot; Nonlinear Fluid Dynamics &middot; ENSO Dynamics &middot; Ocean&ndash;Atmosphere Interaction</p>
+
+  <h2>Selected Publications</h2>
+  <ul>
+    <li>d'&Aacute;vila, V.A., Machado, F.V. &mdash; <em>A Phase Diagram for the Description of El Ni&ntilde;o.</em> 1st Brazilian Oceanography Symposium, 2002.</li>
+    <li>Machado, F.V., d'&Aacute;vila, V.A. &mdash; <em>The Centroid of the Pacific Warm Pool as an Indicator of El Ni&ntilde;o and La Ni&ntilde;a Phenomena.</em> Revista Brasileira de Meteorologia, 29(3), 443&ndash;456, 2014.</li>
+    <li>Machado, F.V., d'&Aacute;vila, V.A. &mdash; <em>Wavelet Analysis of the Zonal Displacement of the Pacific Warm Pool.</em> Revista Brasileira de Meteorologia, 2018.</li>
+    <li>d'&Aacute;vila, V.A. &mdash; <em>Fluidodin&acirc;mica N&atilde;o Linear.</em> Amazon, 2018.</li>
+    <li>d'&Aacute;vila, V.A. &mdash; <em>Hydrodynamics of Shock Waves in Supernovae.</em> LAP LAMBERT Academic Publishing, 2012.</li>
+    <li>Rapizo, H., d'&Aacute;vila, V.A., Violante-Carvalho, N., Pinho, U.F. et al. &mdash; <em>Simple Techniques for Retrieval of Wind Wave Periods and Directions from Optical Image Sequences.</em> Journal of Coastal Research, 32, 1227, 2016.</li>
+  </ul>
+
+  <h2>Languages</h2>
+  <p>Portuguese (native) &middot; English (fluent) &middot; Spanish (fluent) &middot; French (fluent)</p>
+
+  <h2>Contact</h2>
+  <p>Faculty of Oceanography, UERJ, Rio de Janeiro, Brazil</p>
+</div>
+
+<footer>
+  <p>Source code and data pipeline on <a href="https://github.com/uferreira/el_nino" target="_blank" rel="noopener">GitHub</a></p>
+</footer>
+
+</body>
+</html>

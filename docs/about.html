@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>El Niño Familiar Attractor — About Us</title>
+<title>El Ni&ntilde;o Familiar Attractor &mdash; About Us</title>
 <style>
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 :root {
@@ -12,51 +12,44 @@
   --fg:#e8e8f0;
 }
 body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+.container { max-width:1280px; margin:0 auto; padding:0 1.2rem; }
 header { text-align:center; padding:3rem 1rem 2rem; background:linear-gradient(180deg,#0d0d18 0%,var(--bg) 100%); border-bottom:1px solid var(--border); }
 header h1 { font-size:clamp(1.8rem,5vw,3rem); font-weight:700; background:linear-gradient(135deg,var(--cold),var(--hot)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:.5rem; }
 header p.subtitle { color:var(--muted); font-size:1.05rem; }
-.container { max-width:1280px; margin:0 auto; padding:0 1.2rem; }
-.site-nav{display:flex;gap:1.2rem;justify-content:center;padding:.5rem 0 .2rem;}
-.site-nav .nav-link{color:var(--fg);text-decoration:none;font-size:.92rem;
-  padding:.35rem .85rem;border-radius:5px;transition:background .15s;}
-.site-nav .nav-link:hover{background:rgba(255,255,255,.1);}
-.site-nav .nav-link.active{background:var(--accent);color:#fff;}
 footer { text-align:center; padding:2rem 1rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); margin-top:3rem; }
 footer a { color:var(--accent); text-decoration:none; }
 footer a:hover { text-decoration:underline; }
-
-/* Page content */
-.page-section { padding:3rem 1.5rem; max-width:1100px; margin:0 auto; }
-.section-intro { text-align:center; margin-bottom:2.5rem; }
-.section-intro h2 { font-size:1.8rem; font-weight:700; color:var(--accent); margin-bottom:.75rem; }
-.section-intro p { color:var(--muted); max-width:700px; margin:0 auto; font-size:1rem; line-height:1.7; }
-
-/* Team grid */
-.team-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:2rem; max-width:1100px; margin:0 auto; }
-.researcher-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1.8rem; display:flex; flex-direction:column; gap:1rem; }
-.card-name { font-size:1.25rem; font-weight:700; color:var(--accent); }
-.card-title { font-size:.88rem; color:var(--muted); font-style:italic; line-height:1.4; }
-.card-bio { font-size:.92rem; color:var(--text); line-height:1.65; }
-.card-section-label { font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); margin-bottom:.4rem; }
-.tag-row { display:flex; flex-wrap:wrap; gap:.4rem; }
-.tag { background:rgba(68,136,255,.15); border:1px solid rgba(68,136,255,.35); color:var(--accent); font-size:.75rem; font-weight:600; padding:.2rem .55rem; border-radius:4px; }
-.pub-list { list-style:none; display:flex; flex-direction:column; gap:.55rem; }
-.pub-list li { font-size:.82rem; color:var(--muted); line-height:1.45; }
-.pub-list li em { color:var(--text); }
-.card-contact { font-size:.82rem; color:var(--muted); display:flex; flex-direction:column; gap:.25rem; }
-.card-contact a { color:var(--accent); text-decoration:none; }
-.card-contact a:hover { text-decoration:underline; }
-.card-divider { border:none; border-top:1px solid var(--border); margin:0; }
+.esra-header { text-align:center; padding:.6rem 1rem .3rem; border-bottom:1px solid var(--border); background:var(--surface); }
+.esra-full { display:block; font-size:clamp(.9rem,2vw,1.1rem); font-weight:600; color:var(--text); letter-spacing:.04em; }
+.esra-abbr { font-size:.75rem; letter-spacing:.25em; color:var(--accent); text-transform:uppercase; }
+.site-nav { display:flex; gap:1.2rem; justify-content:center; padding:.5rem 0 .2rem; }
+.site-nav .nav-link { color:var(--fg); text-decoration:none; font-size:.92rem; padding:.35rem .85rem; border-radius:5px; transition:background .15s; }
+.site-nav .nav-link:hover { background:rgba(255,255,255,.1); }
+.site-nav .nav-link.active { background:var(--accent); color:#fff; }
+.team-list { max-width:820px; margin:2.5rem auto; padding:0 1.5rem; }
+.team-row { padding:1.8rem 0; border-bottom:1px solid var(--border); }
+.team-row:last-child { border-bottom:none; }
+.team-name { font-size:1.2rem; font-weight:700; color:var(--accent); margin-bottom:.15rem; }
+.team-name a { color:inherit; text-decoration:none; }
+.team-name a:hover { text-decoration:underline; }
+.team-affil { font-size:.88rem; color:var(--muted); font-style:italic; margin-bottom:.65rem; }
+.team-bio { font-size:.95rem; color:var(--text); margin-bottom:.8rem; }
+.profile-link { font-size:.85rem; font-weight:600; color:var(--accent); text-decoration:none; }
+.profile-link:hover { text-decoration:underline; }
 </style>
 </head>
 <body>
+<div class="esra-header">
+  <span class="esra-full">Earth Science Research Alliance</span>
+  <span class="esra-abbr">ESRA</span>
+</div>
 <header>
   <div class="container">
-    <div style="text-align:center;padding:.4rem 0 .2rem;font-size:.78rem;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;">Earth Science Research Alliance (ESRA)</div>
     <h1>El Ni&ntilde;o Familiar Attractor</h1>
     <p class="subtitle">About the Research Team</p>
     <nav class="site-nav">
-  <a href="index.html" class="nav-link">Phase Diagrams</a>
+  <a href="index.html" class="nav-link">Home</a>
+  <a href="phase_diagrams.html" class="nav-link">Phase Diagrams</a>
   <a href="animations.html" class="nav-link">Animations</a>
   <a href="familiar_attractor.html" class="nav-link">Familiar Attractor</a>
   <a href="ensemble.html" class="nav-link">Year Ensemble</a>
@@ -66,112 +59,24 @@ footer a:hover { text-decoration:underline; }
   </div>
 </header>
 
-<div class="page-section">
-  <div class="section-intro">
-    <h2>Our Team</h2>
-    <p>The Earth Science Research Alliance (ESRA) is an international collaboration focused on reconstructing the low-dimensional attractor of the El Niño–Southern Oscillation from ocean observables. Our work combines physical oceanography, nonlinear dynamics, and scientific software development to make ENSO phase-space analysis accessible and reproducible.</p>
+<div class="team-list">
+  <div class="team-row">
+    <div class="team-name"><a href="about_uggo.html">Uggo Ferreira de Pinho</a></div>
+    <div class="team-affil">Senior Ocean Engineer and Physical Oceanographer, Institute of Marine Research (IMR), Bergen, Norway</div>
+    <p class="team-bio">Developer of the data pipeline and phase-space analysis tools behind this project.</p>
+    <a href="about_uggo.html" class="profile-link">Full profile &rarr;</a>
   </div>
-
-  <div class="team-grid">
-
-    <!-- Uggo -->
-    <div class="researcher-card">
-      <div>
-        <div class="card-name">Uggo Ferreira de Pinho</div>
-        <div class="card-title">Data Engineer &middot; Scientific Visualization Developer<br>Earth Science Research Alliance (ESRA)</div>
-      </div>
-      <hr class="card-divider">
-      <p class="card-bio">Developer of the El Niño Familiar Attractor project. Built the Python pipeline for ENSO phase-space analysis — from Fourier low-pass filtering and derivative computation to interactive web visualizations. His work bridges physical oceanography research and modern data engineering, producing open, reproducible tooling for ENSO dynamics.</p>
-      <div>
-        <div class="card-section-label">Expertise</div>
-        <div class="tag-row">
-          <span class="tag">Python</span>
-          <span class="tag">Data Engineering</span>
-          <span class="tag">ENSO Visualization</span>
-          <span class="tag">Fourier Analysis</span>
-          <span class="tag">Phase-Space Methods</span>
-          <span class="tag">Canvas Animation</span>
-        </div>
-      </div>
-      <div>
-        <div class="card-section-label">Project</div>
-        <ul class="pub-list">
-          <li><em>El Niño Familiar Attractor</em> — Interactive phase-space analysis of ENSO dynamics. Open-source Python package + live web visualizations. 2024–present.</li>
-        </ul>
-      </div>
-      <hr class="card-divider">
-      <div class="card-contact">
-        <span>&#9993; <a href="mailto:uggopinho@proton.me">uggopinho@proton.me</a></span>
-        <span>&#128279; <a href="https://github.com/uferreira/el_nino" target="_blank" rel="noopener">github.com/uferreira/el_nino</a></span>
-      </div>
-    </div>
-
-    <!-- Fabio -->
-    <div class="researcher-card">
-      <div>
-        <div class="card-name">Fabio Vieira Machado</div>
-        <div class="card-title">Physical Oceanographer &middot; Climate Variability Researcher<br>Research Collaborator, ESRA &mdash; Northland, New Zealand</div>
-      </div>
-      <hr class="card-divider">
-      <p class="card-bio">Physical Oceanographer and Climate Variability Researcher with more than 25 years of experience spanning environmental science, oceanography, atmospheric sciences, offshore operations, and marine geophysics. Co-author of original research on the Pacific Warm Pool as an ENSO indicator and on wavelet analysis of warm pool zonal displacement. His analytical work combines Python and MATLAB with observational datasets from satellite, tide gauge, Argo, and AUV platforms.</p>
-      <div>
-        <div class="card-section-label">Expertise</div>
-        <div class="tag-row">
-          <span class="tag">Physical Oceanography</span>
-          <span class="tag">ENSO Dynamics</span>
-          <span class="tag">Wavelet Analysis</span>
-          <span class="tag">Climate Variability</span>
-          <span class="tag">Marine Geophysics</span>
-          <span class="tag">Python &amp; MATLAB</span>
-        </div>
-      </div>
-      <div>
-        <div class="card-section-label">Selected Publications</div>
-        <ul class="pub-list">
-          <li>Machado, F.V., d'&Aacute;vila, V.A. — <em>The Centroid of the Pacific Warm Pool as an Indicator of El Ni&ntilde;o and La Ni&ntilde;a Phenomena.</em> Revista Brasileira de Meteorologia, 29(3), 443–456, 2014.</li>
-          <li>Machado, F.V., d'&Aacute;vila, V.A. — <em>Wavelet Analysis of the Zonal Displacement of the Pacific Warm Pool.</em> Revista Brasileira de Meteorologia, 2018.</li>
-        </ul>
-      </div>
-      <hr class="card-divider">
-      <div class="card-contact">
-        <span>&#9993; <a href="mailto:fvmachado@gmail.com">fvmachado@gmail.com</a></span>
-        <span>&#128279; <a href="https://www.linkedin.com/in/fabio-machado-torque-international/" target="_blank" rel="noopener">LinkedIn</a></span>
-      </div>
-    </div>
-
-    <!-- Victor -->
-    <div class="researcher-card">
-      <div>
-        <div class="card-name">Victor de Amorim d'&Aacute;vila</div>
-        <div class="card-title">Professor &middot; Physical Oceanographer &middot; Astrophysicist<br>Faculty of Oceanography, UERJ &mdash; Observat&oacute;rio Nacional, Brazil</div>
-      </div>
-      <hr class="card-divider">
-      <p class="card-bio">Associate Professor at the Faculty of Oceanography of UERJ and Senior Researcher at the Observat&oacute;rio Nacional, where he has worked since 1976. His career spans astrophysics, astrometry, physical oceanography, and nonlinear fluid dynamics. A pioneer of phase-space methods for ENSO analysis in Brazil, he supervised the original Pacific Warm Pool research underpinning this project and co-authored foundational work on mathematical models for El Ni&ntilde;o dynamics.</p>
-      <div>
-        <div class="card-section-label">Expertise</div>
-        <div class="tag-row">
-          <span class="tag">Physical Oceanography</span>
-          <span class="tag">Nonlinear Fluid Dynamics</span>
-          <span class="tag">Astrophysics</span>
-          <span class="tag">Phase-Space Methods</span>
-          <span class="tag">ENSO Dynamics</span>
-          <span class="tag">Astrometry</span>
-        </div>
-      </div>
-      <div>
-        <div class="card-section-label">Selected Publications</div>
-        <ul class="pub-list">
-          <li>d'&Aacute;vila, V.A., Machado, F.V. — <em>A Phase Diagram for the Description of El Ni&ntilde;o.</em> 1st Brazilian Oceanography Symposium, 2002.</li>
-          <li>Machado, F.V., d'&Aacute;vila, V.A. — <em>The Centroid of the Pacific Warm Pool as an Indicator of El Ni&ntilde;o and La Ni&ntilde;a Phenomena.</em> Revista Brasileira de Meteorologia, 29(3), 443–456, 2014.</li>
-          <li>d'&Aacute;vila, V.A. — <em>Fluidodin&acirc;mica N&atilde;o Linear.</em> Amazon, 2018.</li>
-        </ul>
-      </div>
-      <hr class="card-divider">
-      <div class="card-contact">
-        <span>Faculty of Oceanography, UERJ, Rio de Janeiro, Brazil</span>
-      </div>
-    </div>
-
+  <div class="team-row">
+    <div class="team-name"><a href="about_fabio.html">Fabio Vieira Machado</a></div>
+    <div class="team-affil">Physical Oceanographer and Climate Variability Researcher, ESRA, New Zealand</div>
+    <p class="team-bio">Co-developer of the ENSO phase-space methodology and Pacific Warm Pool analysis.</p>
+    <a href="about_fabio.html" class="profile-link">Full profile &rarr;</a>
+  </div>
+  <div class="team-row">
+    <div class="team-name"><a href="about_victor.html">Victor de Amorim d'&Aacute;vila</a></div>
+    <div class="team-affil">Retired Professor and Researcher, Faculty of Oceanography, UERJ, and the Observat&oacute;rio Nacional, Rio de Janeiro</div>
+    <p class="team-bio">Pioneered the mathematical framework for El Ni&ntilde;o phase-space modelling that underpins this work.</p>
+    <a href="about_victor.html" class="profile-link">Full profile &rarr;</a>
   </div>
 </div>
 

@@ -43,6 +43,9 @@ canvas.phasecanvas { display:block; width:100%; height:auto; border-radius:6px; 
 footer { text-align:center; padding:2rem 1rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); }
 footer a { color:var(--accent); text-decoration:none; }
 footer a:hover { text-decoration:underline; }
+.esra-header { text-align:center; padding:.6rem 1rem .3rem; border-bottom:1px solid var(--border); background:var(--surface); }
+.esra-full { display:block; font-size:clamp(.9rem,2vw,1.1rem); font-weight:600; color:var(--text); letter-spacing:.04em; }
+.esra-abbr { font-size:.75rem; letter-spacing:.25em; color:var(--accent); text-transform:uppercase; }
 
 /* ── Site navigation ─────────────────────── */
 .site-nav{display:flex;gap:1.2rem;justify-content:center;padding:.5rem 0 .2rem;}
@@ -76,13 +79,17 @@ input:checked + .toggle-slider:before { transform:translateX(16px); background:#
 </head>
 <body>
 
+<div class="esra-header">
+  <span class="esra-full">Earth Science Research Alliance</span>
+  <span class="esra-abbr">ESRA</span>
+</div>
 <header>
   <div class="container">
-    <div style="text-align:center;padding:.4rem 0 .2rem;font-size:.78rem;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;">Earth Science Research Alliance (ESRA)</div>
     <h1>El Niño Familiar Attractor</h1>
     <p class="subtitle">Compare ENSO Phase Diagrams — Overlay Multiple Datasets</p>
     <nav class="site-nav">
-  <a href="index.html" class="nav-link">Phase Diagrams</a>
+  <a href="index.html" class="nav-link">Home</a>
+  <a href="phase_diagrams.html" class="nav-link">Phase Diagrams</a>
   <a href="animations.html" class="nav-link">Animations</a>
   <a href="familiar_attractor.html" class="nav-link">Familiar Attractor</a>
   <a href="ensemble.html" class="nav-link">Year Ensemble</a>
