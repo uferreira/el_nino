@@ -3,60 +3,80 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Uggo Ferreira de Pinho &mdash; Project Documentation</title>
+<title>Uggo Ferreira de Pinho &mdash; ESRA</title>
 <style>
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+/* Dark nav variables */
 :root {
   --bg:#0a0a0e; --surface:#12121a; --card:#1a1a28; --border:#2a2a40;
   --text:#e8e8f0; --muted:#888899; --accent:#4488ff; --hot:#ff5533; --cold:#3388ff;
   --fg:#e8e8f0;
 }
-body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+/* Body: light gray page background */
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; font-size:16px; line-height:1.6; color:#24292e; background:#f6f8fa; }
 .container { max-width:1280px; margin:0 auto; padding:0 1.2rem; }
-header { text-align:center; padding:3rem 1rem 2rem; background:linear-gradient(180deg,#0d0d18 0%,var(--bg) 100%); border-bottom:1px solid var(--border); }
-header h1 { font-size:clamp(1.8rem,5vw,3rem); font-weight:700; background:linear-gradient(135deg,var(--cold),var(--hot)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:.5rem; }
-header p.subtitle { color:var(--muted); font-size:1.05rem; }
-footer { text-align:center; padding:2rem 1rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); margin-top:3rem; }
-footer a { color:var(--accent); text-decoration:none; }
-footer a:hover { text-decoration:underline; }
+
+/* ESRA topbar */
 .esra-header { text-align:center; padding:.6rem 1rem .3rem; border-bottom:1px solid var(--border); background:var(--surface); }
 .esra-full { display:block; font-size:clamp(.9rem,2vw,1.1rem); font-weight:600; color:var(--text); letter-spacing:.04em; }
 .esra-abbr { font-size:.75rem; letter-spacing:.25em; color:var(--accent); text-transform:uppercase; }
+
+/* Dark nav */
+header { background:linear-gradient(180deg,#0d0d18 0%,var(--bg) 100%); border-bottom:1px solid var(--border); padding:.3rem 0 .6rem; }
 .site-nav { display:flex; gap:1.2rem; justify-content:center; padding:.5rem 0 .2rem; }
 .site-nav .nav-link { color:var(--fg); text-decoration:none; font-size:.92rem; padding:.35rem .85rem; border-radius:5px; transition:background .15s; }
 .site-nav .nav-link:hover { background:rgba(255,255,255,.1); }
 .site-nav .nav-link.active { background:var(--accent); color:#fff; }
-.profile-body { max-width:860px; margin:2rem auto; padding:0 1.5rem 3rem; }
-.back-link { display:inline-block; margin-bottom:2rem; color:var(--accent); text-decoration:none; font-size:.9rem; }
+
+/* Light profile card */
+.profile-wrap { max-width:780px; margin:2rem auto; padding:2rem 2.5rem 3rem; background:#ffffff; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+.profile-subtitle { font-size:.85rem; color:#586069; letter-spacing:.06em; text-transform:uppercase; margin-bottom:.4rem; }
+h1 { font-size:2rem; font-weight:700; color:#24292e; margin-bottom:.3rem; }
+.profile-affil { color:#586069; font-size:.95rem; margin-bottom:1.2rem; }
+.profile-links { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:2rem; }
+.profile-links a { display:inline-block; padding:.3rem .75rem; border:1px solid #d0d7de; border-radius:6px; font-size:.82rem; color:#0969da; text-decoration:none; background:#f6f8fa; }
+.profile-links a:hover { background:#e7f3ff; }
+h2 { font-size:1.2rem; font-weight:600; border-bottom:1px solid #d0d7de; padding-bottom:.4rem; margin:2rem 0 1rem; color:#24292e; }
+.about-text { color:#444d56; }
+.timeline { list-style:none; }
+.timeline li { display:grid; grid-template-columns:120px 1fr; gap:.5rem 1.2rem; margin-bottom:1.2rem; align-items:start; }
+.tl-period { font-size:.82rem; color:#586069; padding-top:.15rem; white-space:nowrap; }
+.tl-role { font-weight:600; color:#24292e; }
+.tl-org { color:#586069; font-size:.92rem; }
+.edu-entry { margin-bottom:.9rem; }
+.edu-degree { font-weight:600; }
+.edu-inst { color:#586069; font-size:.93rem; }
+.tools-grid { display:grid; grid-template-columns:140px 1fr; gap:.35rem .8rem; margin-bottom:.5rem; }
+.tools-cat { font-weight:600; font-size:.9rem; }
+.tools-list { font-size:.9rem; color:#444d56; }
+.pub-list { list-style:none; }
+.pub-list li { display:grid; grid-template-columns:48px 1fr; gap:.3rem .8rem; margin-bottom:.9rem; }
+.pub-year { font-weight:600; color:#0969da; font-size:.88rem; padding-top:.1rem; }
+.pub-text { font-size:.93rem; color:#444d56; }
+.pub-text em { color:#24292e; }
+.lang-list { display:flex; flex-wrap:wrap; gap:.5rem; }
+.lang-item { padding:.25rem .6rem; border-radius:20px; background:#f6f8fa; border:1px solid #d0d7de; font-size:.83rem; color:#444d56; }
+.lang-level { color:#586069; font-size:.78rem; }
+.back-link { display:inline-block; margin-bottom:1.5rem; color:#0969da; font-size:.88rem; text-decoration:none; }
 .back-link:hover { text-decoration:underline; }
-.profile-body h1 { font-size:clamp(1.5rem,3vw,2rem); font-weight:700; color:var(--text); margin-bottom:.3rem; line-height:1.2; }
-.profile-role { font-size:.95rem; color:var(--muted); font-style:italic; margin-bottom:1.5rem; line-height:1.5; }
-.profile-body h2 { font-size:1.15rem; font-weight:600; color:var(--accent); margin:2rem 0 .75rem; padding-bottom:.4rem; border-bottom:1px solid var(--border); }
-.profile-body h3 { font-size:.98rem; font-weight:600; color:var(--text); margin:1.4rem 0 .5rem; }
-.profile-body p { color:var(--muted); margin-bottom:.9rem; font-size:.93rem; line-height:1.65; }
-.profile-body p strong, .profile-body li strong { color:var(--text); }
-.profile-body ul { list-style:none; padding:0; margin-bottom:.9rem; }
-.profile-body ul li { color:var(--muted); font-size:.93rem; line-height:1.6; margin-bottom:.4rem; padding-left:1.1rem; position:relative; }
-.profile-body ul li::before { content:"&#8212;"; position:absolute; left:0; color:var(--accent); }
-.profile-table { width:100%; border-collapse:collapse; margin:.75rem 0 1.5rem; font-size:.87rem; overflow-x:auto; display:block; }
-.profile-table th { background:var(--surface); color:var(--muted); text-align:left; padding:.5rem .8rem; font-weight:600; font-size:.77rem; text-transform:uppercase; letter-spacing:.06em; border-bottom:2px solid var(--border); white-space:nowrap; }
-.profile-table td { padding:.5rem .8rem; border-bottom:1px solid var(--border); color:var(--text); vertical-align:top; line-height:1.4; }
-.profile-table tr:last-child td { border-bottom:none; }
-.profile-table td:first-child { color:var(--muted); font-family:'Consolas','Courier New',monospace; font-size:.83rem; }
-pre.code-block { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:1rem 1.2rem; font-size:.82rem; color:#aaccff; overflow-x:auto; margin-bottom:1.2rem; line-height:1.6; font-family:'Consolas','Courier New',monospace; white-space:pre; }
-.profile-body a { color:var(--accent); text-decoration:none; }
-.profile-body a:hover { text-decoration:underline; }
+.profile-footer { margin-top:3rem; padding-top:1rem; border-top:1px solid #d0d7de; font-size:.82rem; color:#586069; }
+.profile-footer a { color:#0969da; text-decoration:none; }
+.profile-footer a:hover { text-decoration:underline; }
+.pub-links { font-size:.88rem; color:#444d56; margin-top:.5rem; }
+.pub-links a { color:#0969da; text-decoration:none; }
+.pub-links a:hover { text-decoration:underline; }
 </style>
 </head>
 <body>
+
 <div class="esra-header">
   <span class="esra-full">Earth Science Research Alliance</span>
   <span class="esra-abbr">ESRA</span>
 </div>
 <header>
   <div class="container">
-    <h1>El Ni&ntilde;o Familiar Attractor</h1>
-    <p class="subtitle">Researcher Profile &amp; Project Documentation</p>
     <nav class="site-nav">
   <a href="index.html" class="nav-link">Home</a>
   <a href="phase_diagrams.html" class="nav-link">Phase Diagrams</a>
@@ -69,204 +89,130 @@ pre.code-block { background:var(--surface); border:1px solid var(--border); bord
   </div>
 </header>
 
-<div class="profile-body">
+<div class="profile-wrap">
   <a href="about.html" class="back-link">&larr; Back to About Us</a>
 
+  <p class="profile-subtitle">Physical Oceanographer &middot; Senior Ocean Engineer</p>
   <h1>Uggo Ferreira de Pinho</h1>
-  <p class="profile-role">
-    Senior Ocean Engineer &middot; Physical Oceanographer<br>
-    Institute of Marine Research (IMR), Bergen, Norway
+  <p class="profile-affil">Institute of Marine Research (IMR), Bergen, Norway</p>
+
+  <div class="profile-links">
+    <a href="https://www.linkedin.com/in/uggo-pinho-138a1a332" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://scholar.google.com/citations?user=hisClKQAAAAJ&amp;hl=en" target="_blank" rel="noopener">Google Scholar</a>
+    <a href="https://orcid.org/0000-0002-5806-6868" target="_blank" rel="noopener">ORCID</a>
+    <a href="https://github.com/uferreira" target="_blank" rel="noopener">GitHub</a>
+    <a href="mailto:uggopinho@protonmail.com">Email</a>
+  </div>
+
+  <h2>About</h2>
+  <p class="about-text">I work at the intersection of oceanographic science and software engineering, building data pipelines, processing observational datasets, and developing tools for operational oceanography. My background spans over 20 years across research institutions, the offshore oil and gas industry, and national data centres, with applied experience in scientific programming, data management, and oceanographic instrumentation.</p>
+
+  <h2>Experience</h2>
+  <ul class="timeline">
+    <li>
+      <span class="tl-period">2025 &ndash; present</span>
+      <div>
+        <div class="tl-role">Senior Engineer, Data and Information Management</div>
+        <div class="tl-org">Institute of Marine Research (IMR / NMD) &mdash; Bergen, Norway</div>
+      </div>
+    </li>
+    <li>
+      <span class="tl-period">2024 &ndash; 2025</span>
+      <div>
+        <div class="tl-role">Ocean Physical Data Specialist</div>
+        <div class="tl-org">University of Hawai&#699;i at M&#257;noa &mdash; USA</div>
+      </div>
+    </li>
+    <li>
+      <span class="tl-period">2020 &ndash; 2024</span>
+      <div>
+        <div class="tl-role">Principal Metocean Engineer</div>
+        <div class="tl-org">Equinor ASA &mdash; Norway</div>
+      </div>
+    </li>
+    <li>
+      <span class="tl-period">2017 &ndash; 2020</span>
+      <div>
+        <div class="tl-role">Physical Oceanographer &amp; Programmer</div>
+        <div class="tl-org">University of Hawai&#699;i at M&#257;noa &mdash; USA</div>
+      </div>
+    </li>
+    <li>
+      <span class="tl-period">2004 &ndash; 2017</span>
+      <div>
+        <div class="tl-role">Physical Oceanographer</div>
+        <div class="tl-org">Petrobras &mdash; Brazil</div>
+      </div>
+    </li>
+    <li>
+      <span class="tl-period">2003 &ndash; 2004</span>
+      <div>
+        <div class="tl-role">Scientific Programmer</div>
+        <div class="tl-org">LabOceano / UFRJ &mdash; Brazil</div>
+      </div>
+    </li>
+  </ul>
+
+  <h2>Education</h2>
+  <div class="edu-entry">
+    <div class="edu-degree">Doctor of Science, Ocean Engineering</div>
+    <div class="edu-inst">COPPE / UFRJ &mdash; 2015&ndash;2018</div>
+  </div>
+  <div class="edu-entry">
+    <div class="edu-degree">Master of Science, Ocean Engineering</div>
+    <div class="edu-inst">COPPE / UFRJ &mdash; 1999&ndash;2003</div>
+  </div>
+  <div class="edu-entry">
+    <div class="edu-degree">Bachelor of Science, Physical Oceanography</div>
+    <div class="edu-inst">UERJ &mdash; 1993&ndash;1997</div>
+  </div>
+
+  <h2>Tools &amp; Technologies</h2>
+  <div class="tools-grid">
+    <span class="tools-cat">Languages</span><span class="tools-list">Python, MATLAB</span>
+    <span class="tools-cat">Data formats</span><span class="tools-list">NetCDF (CF), HDF5, Parquet</span>
+    <span class="tools-cat">Data services</span><span class="tools-list">THREDDS, ERDDAP, OPeNDAP</span>
+    <span class="tools-cat">Infrastructure</span><span class="tools-list">Git, Linux, Azure</span>
+    <span class="tools-cat">Other</span><span class="tools-list">GIS, FAIR data principles, CF Conventions, IOOS/EuroGOOS QC guidelines</span>
+  </div>
+
+  <h2>Selected Publications</h2>
+  <ul class="pub-list">
+    <li>
+      <span class="pub-year">2025</span>
+      <span class="pub-text">Osborne, A.R., <strong>Pinho, U.F.</strong> &mdash; <em>The Hamiltonian Form of the KdV Equation.</em> Symmetry, 2025.</span>
+    </li>
+    <li>
+      <span class="pub-year">2021</span>
+      <span class="pub-text">Violante-Carvalho et al., <strong>Pinho, U.F.</strong> &mdash; <em>The turbulent dispersion of surface drifters by water waves.</em> Ocean Dynamics, 2021.</span>
+    </li>
+    <li>
+      <span class="pub-year">2015</span>
+      <span class="pub-text"><strong>Pinho, U.F.</strong>, Babanin, A.V. &mdash; <em>Emergence of Short-Crestedness in Originally Unidirectional Nonlinear Waves.</em> Geophysical Research Letters, 2015.</span>
+    </li>
+    <li>
+      <span class="pub-year">2004</span>
+      <span class="pub-text"><strong>Pinho, U.F.</strong>, Liu, P.C., Ribeiro, C.E.P. &mdash; <em>Freak Waves at Campos Basin, Brazil.</em> Geofizika, 2004.</span>
+    </li>
+  </ul>
+  <p class="pub-links">
+    <a href="https://scholar.google.com/citations?user=hisClKQAAAAJ&amp;hl=en" target="_blank" rel="noopener">Google Scholar</a>
+    &nbsp;&middot;&nbsp;
+    ORCID: <a href="https://orcid.org/0000-0002-5806-6868" target="_blank" rel="noopener">0000-0002-5806-6868</a>
   </p>
 
-  <h1 style="font-size:1.5rem;margin-top:2rem;">El Ni&ntilde;o Phase Diagram Analysis</h1>
+  <h2>Languages</h2>
+  <div class="lang-list">
+    <span class="lang-item">Portuguese <span class="lang-level">native</span></span>
+    <span class="lang-item">English <span class="lang-level">fluent</span></span>
+    <span class="lang-item">Norwegian <span class="lang-level">basic</span></span>
+    <span class="lang-item">Spanish <span class="lang-level">working knowledge</span></span>
+  </div>
 
-  <p>This package reconstructs the low-dimensional attractor of the El Ni&ntilde;o&ndash;Southern Oscillation (ENSO) from two complementary ocean observables: sea surface temperature (SST) in the NINO1+2 region and tide-gauge sea level at three Pacific stations. A Fourier low-pass filter isolates variability on interannual timescales (periods longer than ~9 months), and the filtered signal is interpolated onto a fine grid so that the derivative dT/dt can be computed analytically. The resulting phase-space trajectory (T vs dT/dt) traces the ENSO attractor &mdash; the recurring loop that the coupled ocean&ndash;atmosphere system follows as it oscillates between El Ni&ntilde;o warm events and La Ni&ntilde;a cold events. The same trajectory can be animated as a rotating familiar attractor to reveal the quasi-periodic, low-dimensional structure of ENSO dynamics.</p>
-
-  <h2>Scientific Background</h2>
-
-  <h3>What is ENSO?</h3>
-  <p>The El Ni&ntilde;o&ndash;Southern Oscillation is the dominant mode of interannual climate variability on Earth. Every two to seven years, the equatorial Pacific alternates between warm (El Ni&ntilde;o) and cool (La Ni&ntilde;a) phases, driven by feedbacks between sea surface temperature, trade winds, and thermocline depth. ENSO affects rainfall, drought, hurricane activity, and fisheries across the globe and is the primary source of seasonal climate predictability.</p>
-
-  <h3>Why NINO1+2 SST?</h3>
-  <p>The NINO1+2 region (0&ndash;10&deg;S, 90&ndash;80&deg;W) sits in the far eastern equatorial Pacific, directly off the coasts of Peru and Ecuador. It is the region where El Ni&ntilde;o warming first appears and where the signal is strongest &mdash; temperature anomalies of 3&ndash;5&deg;C during major events like 1982&ndash;83 and 1997&ndash;98. The NOAA CPC NINO1+2 index is a monthly area-average SST derived from the Optimum Interpolation SST (OISST) analysis, providing a continuous record from 1950 to the present.</p>
-
-  <h3>Why these three sea level stations?</h3>
-  <p>Sea level integrates both the thermal expansion of seawater (steric effect) and wind-driven ocean circulation &mdash; making it a sensitive, physics-rich ENSO proxy.</p>
-  <ul>
-    <li><strong>Callao, Peru (UHSLC 093):</strong> Eastern Pacific coastal station. During El Ni&ntilde;o, downwelling Kelvin waves propagate eastward along the thermocline and suppress coastal upwelling, causing sea level to rise 10&ndash;30 cm. Callao is the canonical eastern boundary ENSO gauge.</li>
-    <li><strong>Honolulu, Hawaii (UHSLC 057):</strong> Mid-Pacific station with a moderate, broad ENSO response. Provides a reference for the central Pacific signal, roughly out of phase with Callao by ~90&deg;.</li>
-    <li><strong>Palau, western Pacific (UHSLC 007):</strong> In the western Pacific warm pool, sea level responds in the opposite sense to the eastern Pacific &mdash; it falls during El Ni&ntilde;o as surface warm water sloshes eastward and rises during La Ni&ntilde;a.</li>
-  </ul>
-
-  <h3>The Fourier low-pass filter</h3>
-  <p>The filter (<code>passa_baixa</code>) removes all variability with periods shorter than approximately 9 months. Intra-seasonal noise (weather, tides, the Madden&ndash;Julian Oscillation) is discarded; the ENSO signal (2&ndash;7 year periods) passes through unchanged. The transition band between 9 and 10 months uses a sigmoid window to avoid Gibbs ringing. The filtered series is then interpolated to 5 sub-points per month (<code>deri_fourier</code>) so the phase-space trajectory is smooth enough to reveal the attractor structure.</p>
-
-  <h3>The phase diagram T vs dT/dt</h3>
-  <p>Plotting the filtered temperature against its rate of change creates a 2-dimensional phase portrait. In a perfectly periodic system this would be a closed ellipse. In the real climate system it forms a quasi-periodic strange attractor: the trajectory revisits nearly the same region of phase space on ENSO timescales but never closes exactly, revealing the chaotic dimension of ENSO dynamics. El Ni&ntilde;o events appear as large excursions into the upper-right quadrant (T high and rising); La Ni&ntilde;a events appear in the lower-left.</p>
-
-  <h3>Seasonal cycle removal</h3>
-  <p>The annual cycle (12-month period) lies inside the filter passband (12 &gt; HN1 = 10 months). To prevent the dominant seasonal harmonic from contaminating the ENSO modes, the climatological monthly mean is subtracted before filtering and re-added afterwards. This ensures the filter operates cleanly on anomalies while the output retains absolute physical units.</p>
-
-  <h2>Data Sources</h2>
-  <table class="profile-table">
-    <thead><tr><th>Dataset</th><th>Source</th><th>Station / Region</th><th>Period</th><th>Resolution</th></tr></thead>
-    <tbody>
-      <tr><td>NINO1+2 SST</td><td><a href="https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices" target="_blank" rel="noopener">NOAA CPC</a></td><td>0&ndash;10&deg;S, 90&ndash;80&deg;W</td><td>1950&ndash;present</td><td>Monthly</td></tr>
-      <tr><td>Callao sea level</td><td><a href="https://uhslc.soest.hawaii.edu" target="_blank" rel="noopener">UHSLC 093</a></td><td>Callao, Peru</td><td>1905&ndash;present</td><td>Hourly &rarr; monthly</td></tr>
-      <tr><td>Honolulu sea level</td><td><a href="https://uhslc.soest.hawaii.edu" target="_blank" rel="noopener">UHSLC 057</a></td><td>Honolulu, Hawaii</td><td>1905&ndash;present</td><td>Hourly &rarr; monthly</td></tr>
-      <tr><td>Palau sea level</td><td><a href="https://uhslc.soest.hawaii.edu" target="_blank" rel="noopener">UHSLC 007</a></td><td>Malakal, Palau</td><td>1969&ndash;present</td><td>Hourly &rarr; monthly</td></tr>
-    </tbody>
-  </table>
-  <p>The NOAA SST record before 1982 is supplemented by a local historical file (<code>data/input/sst1950_1981.txt</code>) in the same 10-column format. The two segments are joined at January 1982 with no overlap.</p>
-
-  <h2>The Filter</h2>
-
-  <h3><code>passa_baixa</code> &mdash; Fourier low-pass filter</h3>
-  <p>Computes sine Fourier coefficients for modes IW = 1 to NM1/2 (where NM1 = NT&minus;1), then applies a sigmoid gain function:</p>
-  <pre class="code-block">FACTOR(IW) = 1 / (1 + exp((IW &minus; W&#8320;) / DW&#8322;))</pre>
-  <p>with W&#8321; = NM1/HN1, W&#8322; = NM1/HN2, W&#8320; = (W&#8321;+W&#8322;)/2, DW&#8322; = |W&#8322;&minus;W&#8321;|/2. Modes well below W&#8321; (long periods, ENSO band) receive gain &approx; 1. Modes well above W&#8322; (short periods, weather noise) receive gain &approx; 0. The transition is smooth, suppressing Gibbs ringing.</p>
-  <p>Parameters in <code>config.yaml</code>:</p>
-  <pre class="code-block">filter:
-  HN1: 10.0   # pass edge (months) &mdash; periods longer than this pass through
-  HN2: 9.0    # stop edge (months) &mdash; periods shorter than this are suppressed
-  NDOTS: 5    # sub-points per monthly interval for interpolation</pre>
-  <p><strong>Why Fourier instead of Butterworth?</strong> The Fourier approach is a faithful translation of the reference Fortran 77 code and produces exactly the same output &mdash; verified to within 0.005&deg;C. It also introduces zero phase distortion: each spectral mode is independently scaled, so the reconstructed trajectory preserves the timing of ENSO events exactly.</p>
-
-  <h3><code>deri_fourier</code> &mdash; interpolation and derivative</h3>
-  <p>Reconstructs the filtered series on NTD = (NT&minus;1)&times;NDOTS + 1 fine-grid points and simultaneously computes dT/dt analytically from the Fourier coefficients. For NDOTS = 5 and a 600-month record, NTD = 2996 points (spacing &approx; 6 days).</p>
-
-  <h2>Validation</h2>
-  <p>The Python implementation is a direct translation of the Fortran 77 reference program <code>filterfouriergr197501_202502.f</code>. Numerical equivalence is verified by <code>tests/test_filter_vs_fortran.py</code>, which compiles the Fortran with gfortran, runs both programs on identical 5-year synthetic input, and compares output column by column. Maximum difference in the T column: <strong>0.005&deg;C</strong>; maximum difference in the dT/dt column: <strong>0.005&deg;C/month</strong> &mdash; both within the rounding precision of the Fortran F7.2 output format. The 17-month passband mode survives with amplitude ratio 0.9998; the 3-month stopband mode is suppressed to amplitude ratio &lt; 10<sup>&minus;6</sup>.</p>
-
-  <h2>Installation</h2>
-  <p><strong>Requirements:</strong> Python &ge; 3.9, gfortran (optional, for Fortran validation test)</p>
-  <pre class="code-block"># 1. Clone the repository
-git clone &lt;repo-url&gt;
-cd el_nino
-
-# 2. Create and activate a virtual environment
-python3 -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
-
-# 3. Install the package in editable mode
-pip install -e .
-
-# 4. Place the historical SST file in the expected location
-mkdir -p data/input
-cp /path/to/sst1950_1981.txt data/input/</pre>
-  <p>The historical SST file covers January 1950 &ndash; December 1981 in the same 10-column format as the NOAA CPC online file. All post-1981 data are downloaded automatically from NOAA CPC at runtime.</p>
-
-  <h2>Live Website</h2>
-  <p>The interactive phase diagram and Duffing equation simulator are live at:</p>
-  <p><strong><a href="https://uferreira.github.io/el_nino/" target="_blank" rel="noopener">https://uferreira.github.io/el_nino/</a></strong></p>
-  <p>The website shows:</p>
-  <ul>
-    <li>Observed ENSO attractor (SST NINO1+2, 1975&ndash;2026)</li>
-    <li>Observed sea level attractor (Callao, Peru, 1970&ndash;2026)</li>
-    <li>Interactive Duffing equation simulator</li>
-    <li>Synchronized comparison animation with timeline scrubber</li>
-    <li>Poincar&eacute; section (3 datasets)</li>
-    <li>3D familiar attractor (12 monthly samples per year)</li>
-  </ul>
-
-  <h2>Quick Start</h2>
-
-  <h3>1. Run the SST pipeline and plot the phase diagram</h3>
-  <pre class="code-block">from el_nino.pipeline import run_sst, load_output
-from el_nino.plots import plot_phase_diagram, animate_phase_diagram
-
-result = run_sst(
-    local_file="data/input/sst1950_1981.txt",
-    ano_inicio=1975,
-    HN1=10.0, HN2=9.0, NDOTS=5,
-    output_file="data/output/sst_filtered.dat",
-)
-print(f"SIGMA30 = {result['sigma30']:.4f} &deg;C")
-
-data = load_output("data/output/sst_filtered.dat")
-fig = plot_phase_diagram(
-    data, title="NINO1+2 SST Attractor",
-    xlabel="Temperature (&deg;C)", xlim=[17.5, 32.5], ylim=[-2.5, 2.5],
-    save_path="data/output/sst_phase_diagram.png",
-)</pre>
-
-  <h3>2. Run the sea level pipeline for Callao</h3>
-  <pre class="code-block">from el_nino.pipeline import run_sea_level, load_output
-from el_nino.plots import animate_phase_diagram
-
-result = run_sea_level(
-    station_id="093", station_name="Callao",
-    start_date="1905-01-01",
-    HN1=10.0, HN2=9.0, NDOTS=5,
-    output_file="data/output/callao_filtered.dat",
-)
-data = load_output("data/output/callao_filtered.dat")
-ani = animate_phase_diagram(
-    data, title="Callao Sea Level Attractor",
-    xlabel="Sea level anomaly (mm)", xlim=[-300, 300], ylim=[-60, 60],
-    remove_mean=True, save_path="data/output/callao_animation.mp4",
-)</pre>
-
-  <h3>3. Run all four datasets at once from config.yaml</h3>
-  <pre class="code-block">from el_nino.pipeline import run_all
-from el_nino.plots import animate_all_from_config
-
-results = run_all("config.yaml")          # downloads data, filters, writes .dat files
-animate_all_from_config("config.yaml")   # reads .dat files, saves four .mp4 animations</pre>
-
-  <h2>Module Reference</h2>
-  <table class="profile-table">
-    <thead><tr><th>Module</th><th>Function</th><th>Description</th></tr></thead>
-    <tbody>
-      <tr><td>el_nino.filter</td><td>passa_baixa(HN1, HN2, ST0)</td><td>Fourier low-pass filter; returns filtered series (NT,)</td></tr>
-      <tr><td>el_nino.filter</td><td>deri_fourier(NDOTS, ST0)</td><td>Fourier interpolation + derivative; returns SST, VST, AST on fine grid</td></tr>
-      <tr><td>el_nino.filter</td><td>compute_sigma(ST0, ST_filtered, ST_interp, NDOTS)</td><td>RMS filter residual (SIGMA30) and interpolation residual (SIGMA04)</td></tr>
-      <tr><td>el_nino.download</td><td>load_sst(local_file, ano_inicio)</td><td>Load NINO1+2 SST from local file + NOAA CPC download</td></tr>
-      <tr><td>el_nino.download</td><td>load_sea_level(station_id, station_name, start_date)</td><td>Download hourly UHSLC sea level, aggregate to monthly</td></tr>
-      <tr><td>el_nino.download</td><td>load_from_config(config_path)</td><td>Load all four datasets from config.yaml</td></tr>
-      <tr><td>el_nino.pipeline</td><td>run_sst(...)</td><td>Full SST pipeline: download &rarr; filter &rarr; write .dat</td></tr>
-      <tr><td>el_nino.pipeline</td><td>run_sea_level(...)</td><td>Full sea level pipeline for one station</td></tr>
-      <tr><td>el_nino.pipeline</td><td>run_all(config_path)</td><td>Run all four pipelines from config.yaml</td></tr>
-      <tr><td>el_nino.pipeline</td><td>load_output(output_file)</td><td>Parse a .dat output file into NumPy arrays</td></tr>
-      <tr><td>el_nino.plots</td><td>plot_phase_diagram(data, ...)</td><td>Static T vs dT/dt figure with blue&rarr;red time gradient</td></tr>
-      <tr><td>el_nino.plots</td><td>animate_phase_diagram(data, ...)</td><td>Animated attractor: gray trail, red tail, blue dot</td></tr>
-      <tr><td>el_nino.plots</td><td>plot_timeseries(data, ...)</td><td>T and dT/dt vs time on twin y-axes</td></tr>
-      <tr><td>el_nino.plots</td><td>animate_all_from_config(config_path)</td><td>Create and save all four animations from config.yaml</td></tr>
-    </tbody>
-  </table>
-
-  <h2>Repository Structure</h2>
-  <pre class="code-block">el_nino/
-&#9500;&#9472;&#9472; config.yaml                  # Filter parameters and station metadata
-&#9500;&#9472;&#9472; pyproject.toml               # Package metadata and dependencies
-&#9500;&#9472;&#9472; README.md                    # Project documentation
-&#9474;
-&#9500;&#9472;&#9472; data/
-&#9474;   &#9500;&#9472;&#9472; input/
-&#9474;   &#9474;   &#9492;&#9472;&#9472; sst1950_1981.txt     # Historical NINO1+2 SST (1950&ndash;1981)
-&#9474;   &#9492;&#9472;&#9472; output/                  # Generated .dat, .png, .mp4 files
-&#9474;
-&#9500;&#9472;&#9472; docs/
-&#9474;   &#9500;&#9472;&#9472; USAGE.md                 # Practical usage guide
-&#9474;   &#9492;&#9472;&#9472; SCIENCE.md               # Scientific reference
-&#9474;
-&#9500;&#9472;&#9472; scripts/
-&#9474;   &#9500;&#9472;&#9472; run_all.py               # Run all four pipelines
-&#9474;   &#9492;&#9472;&#9472; run_sst_test.py          # End-to-end SST smoke test
-&#9474;
-&#9500;&#9472;&#9472; src/el_nino/
-&#9474;   &#9500;&#9472;&#9472; filter.py                # passa_baixa, deri_fourier, compute_sigma
-&#9474;   &#9500;&#9472;&#9472; download.py              # load_sst, load_sea_level, load_from_config
-&#9474;   &#9500;&#9472;&#9472; pipeline.py              # run_sst, run_sea_level, run_all, load_output
-&#9474;   &#9492;&#9472;&#9472; plots.py                 # plot_phase_diagram, animate_phase_diagram
-&#9474;
-&#9492;&#9472;&#9472; tests/
-    &#9492;&#9472;&#9472; test_filter_vs_fortran.py  # Numerical validation against reference Fortran</pre>
+  <div class="profile-footer">
+    Uggo Ferreira de Pinho &middot; Bergen, Norway &middot; <a href="mailto:uggopinho@protonmail.com">uggopinho@protonmail.com</a>
+  </div>
 </div>
-
-<footer>
-  <p>Source code and data pipeline on <a href="https://github.com/uferreira/el_nino" target="_blank" rel="noopener">GitHub</a></p>
-</footer>
 
 </body>
 </html>

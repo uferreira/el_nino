@@ -3,60 +3,72 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fabio Vieira Machado &mdash; Profile</title>
+<title>Fabio Vieira Machado &mdash; ESRA</title>
 <style>
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
 :root {
   --bg:#0a0a0e; --surface:#12121a; --card:#1a1a28; --border:#2a2a40;
   --text:#e8e8f0; --muted:#888899; --accent:#4488ff; --hot:#ff5533; --cold:#3388ff;
   --fg:#e8e8f0;
 }
-body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; font-size:16px; line-height:1.6; color:#24292e; background:#f6f8fa; }
 .container { max-width:1280px; margin:0 auto; padding:0 1.2rem; }
-header { text-align:center; padding:3rem 1rem 2rem; background:linear-gradient(180deg,#0d0d18 0%,var(--bg) 100%); border-bottom:1px solid var(--border); }
-header h1 { font-size:clamp(1.8rem,5vw,3rem); font-weight:700; background:linear-gradient(135deg,var(--cold),var(--hot)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:.5rem; }
-header p.subtitle { color:var(--muted); font-size:1.05rem; }
-footer { text-align:center; padding:2rem 1rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); margin-top:3rem; }
-footer a { color:var(--accent); text-decoration:none; }
-footer a:hover { text-decoration:underline; }
+
 .esra-header { text-align:center; padding:.6rem 1rem .3rem; border-bottom:1px solid var(--border); background:var(--surface); }
 .esra-full { display:block; font-size:clamp(.9rem,2vw,1.1rem); font-weight:600; color:var(--text); letter-spacing:.04em; }
 .esra-abbr { font-size:.75rem; letter-spacing:.25em; color:var(--accent); text-transform:uppercase; }
+
+header { background:linear-gradient(180deg,#0d0d18 0%,var(--bg) 100%); border-bottom:1px solid var(--border); padding:.3rem 0 .6rem; }
 .site-nav { display:flex; gap:1.2rem; justify-content:center; padding:.5rem 0 .2rem; }
 .site-nav .nav-link { color:var(--fg); text-decoration:none; font-size:.92rem; padding:.35rem .85rem; border-radius:5px; transition:background .15s; }
 .site-nav .nav-link:hover { background:rgba(255,255,255,.1); }
 .site-nav .nav-link.active { background:var(--accent); color:#fff; }
-.profile-body { max-width:860px; margin:2rem auto; padding:0 1.5rem 3rem; }
-.back-link { display:inline-block; margin-bottom:2rem; color:var(--accent); text-decoration:none; font-size:.9rem; }
+
+.profile-wrap { max-width:780px; margin:2rem auto; padding:2rem 2.5rem 3rem; background:#ffffff; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+.profile-subtitle { font-size:.85rem; color:#586069; letter-spacing:.06em; text-transform:uppercase; margin-bottom:.4rem; }
+h1 { font-size:2rem; font-weight:700; color:#24292e; margin-bottom:.3rem; }
+.profile-affil { color:#586069; font-size:.95rem; margin-bottom:1.2rem; }
+.profile-links { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:2rem; }
+.profile-links a { display:inline-block; padding:.3rem .75rem; border:1px solid #d0d7de; border-radius:6px; font-size:.82rem; color:#0969da; text-decoration:none; background:#f6f8fa; }
+.profile-links a:hover { background:#e7f3ff; }
+h2 { font-size:1.2rem; font-weight:600; border-bottom:1px solid #d0d7de; padding-bottom:.4rem; margin:2rem 0 1rem; color:#24292e; }
+.about-text { color:#444d56; }
+.timeline { list-style:none; }
+.timeline li { display:grid; grid-template-columns:120px 1fr; gap:.5rem 1.2rem; margin-bottom:1.2rem; align-items:start; }
+.tl-period { font-size:.82rem; color:#586069; padding-top:.15rem; white-space:nowrap; }
+.tl-role { font-weight:600; color:#24292e; }
+.tl-org { color:#586069; font-size:.92rem; }
+.edu-entry { margin-bottom:.9rem; }
+.edu-degree { font-weight:600; }
+.edu-inst { color:#586069; font-size:.93rem; }
+.tools-grid { display:grid; grid-template-columns:140px 1fr; gap:.35rem .8rem; margin-bottom:.5rem; }
+.tools-cat { font-weight:600; font-size:.9rem; }
+.tools-list { font-size:.9rem; color:#444d56; }
+.pub-list { list-style:none; }
+.pub-list li { display:grid; grid-template-columns:48px 1fr; gap:.3rem .8rem; margin-bottom:.9rem; }
+.pub-year { font-weight:600; color:#0969da; font-size:.88rem; padding-top:.1rem; }
+.pub-text { font-size:.93rem; color:#444d56; }
+.pub-text em { color:#24292e; }
+.lang-list { display:flex; flex-wrap:wrap; gap:.5rem; }
+.lang-item { padding:.25rem .6rem; border-radius:20px; background:#f6f8fa; border:1px solid #d0d7de; font-size:.83rem; color:#444d56; }
+.lang-level { color:#586069; font-size:.78rem; }
+.back-link { display:inline-block; margin-bottom:1.5rem; color:#0969da; font-size:.88rem; text-decoration:none; }
 .back-link:hover { text-decoration:underline; }
-.profile-body h1 { font-size:clamp(1.5rem,3vw,2rem); font-weight:700; color:var(--text); margin-bottom:.3rem; line-height:1.2; }
-.profile-role { font-size:.95rem; color:var(--muted); font-style:italic; margin-bottom:1.5rem; line-height:1.5; }
-.profile-body h2 { font-size:1.15rem; font-weight:600; color:var(--accent); margin:2rem 0 .75rem; padding-bottom:.4rem; border-bottom:1px solid var(--border); }
-.profile-body p { color:var(--muted); margin-bottom:.9rem; font-size:.93rem; line-height:1.65; }
-.profile-body ul { list-style:none; padding:0; margin-bottom:.9rem; }
-.profile-body ul li { color:var(--muted); font-size:.93rem; line-height:1.6; margin-bottom:.35rem; padding-left:1.1rem; position:relative; }
-.profile-body ul li::before { content:"—"; position:absolute; left:0; color:var(--accent); }
-.profile-table { width:100%; border-collapse:collapse; margin:.75rem 0 1.5rem; font-size:.88rem; }
-.profile-table th { background:var(--surface); color:var(--muted); text-align:left; padding:.5rem .8rem; font-weight:600; font-size:.78rem; text-transform:uppercase; letter-spacing:.06em; border-bottom:2px solid var(--border); }
-.profile-table td { padding:.55rem .8rem; border-bottom:1px solid var(--border); color:var(--text); vertical-align:top; line-height:1.45; }
-.profile-table tr:last-child td { border-bottom:none; }
-.profile-table td:first-child { color:var(--muted); white-space:nowrap; font-family:'Consolas','Courier New',monospace; font-size:.83rem; }
-.lang-list { display:flex; gap:.5rem; flex-wrap:wrap; }
-.contact-list { list-style:none; padding:0; margin:0; }
-.contact-list li { color:var(--muted); font-size:.93rem; margin-bottom:.3rem; }
-.contact-list a { color:var(--accent); text-decoration:none; }
-.contact-list a:hover { text-decoration:underline; }
+.profile-footer { margin-top:3rem; padding-top:1rem; border-top:1px solid #d0d7de; font-size:.82rem; color:#586069; }
+.profile-footer a { color:#0969da; text-decoration:none; }
+.profile-footer a:hover { text-decoration:underline; }
 </style>
 </head>
 <body>
+
 <div class="esra-header">
   <span class="esra-full">Earth Science Research Alliance</span>
   <span class="esra-abbr">ESRA</span>
 </div>
 <header>
   <div class="container">
-    <h1>El Ni&ntilde;o Familiar Attractor</h1>
-    <p class="subtitle">Researcher Profile</p>
     <nav class="site-nav">
   <a href="index.html" class="nav-link">Home</a>
   <a href="phase_diagrams.html" class="nav-link">Phase Diagrams</a>
@@ -69,70 +81,124 @@ footer a:hover { text-decoration:underline; }
   </div>
 </header>
 
-<div class="profile-body">
+<div class="profile-wrap">
   <a href="about.html" class="back-link">&larr; Back to About Us</a>
 
+  <p class="profile-subtitle">Physical Oceanographer &middot; Climate Variability Researcher</p>
   <h1>Fabio Vieira Machado</h1>
-  <p class="profile-role">
-    Physical Oceanographer &middot; Climate Variability Researcher &middot; Environmental Data Scientist<br>
-    Research Collaborator, Earth Science Research Alliance (ESRA), New Zealand
-  </p>
+  <p class="profile-affil">Earth Science Research Alliance (ESRA), New Zealand</p>
 
-  <p>Fabio Vieira Machado is a Physical Oceanographer and Climate Variability Researcher with more than 25 years of experience across environmental science, oceanography, atmospheric sciences, offshore operations, marine geophysics, and applied research. His work focuses on understanding ocean&ndash;atmosphere interactions, ENSO dynamics, and Pacific climate variability, combining analytical tools in Python and MATLAB with observational datasets from satellite, tide gauge, Argo, and AUV platforms. He is a co-author of original research on the Pacific Warm Pool as an ENSO indicator and on wavelet analysis of warm pool zonal displacement.</p>
+  <div class="profile-links">
+    <a href="https://www.linkedin.com/in/fabio-machado-torque-international/" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="mailto:fvmachado@gmail.com">Email</a>
+  </div>
+
+  <h2>About</h2>
+  <p class="about-text">Physical Oceanographer and Climate Variability Researcher with more than 25 years of experience across environmental science, oceanography, atmospheric sciences, offshore operations, marine geophysics, and applied research. His work focuses on understanding ocean&ndash;atmosphere interactions, ENSO dynamics, and Pacific climate variability, combining analytical tools in Python and MATLAB with observational datasets from satellite, tide gauge, Argo, and AUV platforms. He is a co-author of original research on the Pacific Warm Pool as an ENSO indicator and on wavelet analysis of warm pool zonal displacement.</p>
 
   <h2>Experience</h2>
-  <table class="profile-table">
-    <thead><tr><th>Period</th><th>Role</th><th>Organisation</th></tr></thead>
-    <tbody>
-      <tr><td>2024 &ndash; present</td><td>Research Collaborator &ndash; Climate Variability &amp; Natural Hazards</td><td>Earth Science Research Alliance (ESRA), New Zealand</td></tr>
-      <tr><td>2022 &ndash; 2026</td><td>Science &amp; Mathematics Teacher</td><td>Northland, New Zealand</td></tr>
-      <tr><td>2018 &ndash; 2021</td><td>Oceanographic Data Analyst</td><td>Southern Ocean Research Programme</td></tr>
-      <tr><td>2012 &ndash; 2014</td><td>Project Coordinator</td><td>Petrobras, Brazil</td></tr>
-      <tr><td>2005 &ndash; 2016</td><td>Senior Oceanographer &middot; Marine Geophysicist &middot; Environmental Risk Specialist</td><td>C&amp;C Technologies / Fugro / Subsea Consult</td></tr>
-      <tr><td>1998 &ndash; 2005</td><td>Research Scientist</td><td>National Observatory / CPTEC-INPE / Brazilian Navy</td></tr>
-    </tbody>
-  </table>
+  <ul class="timeline">
+    <li>
+      <span class="tl-period">2024 &ndash; present</span>
+      <div>
+        <div class="tl-role">Research Collaborator &ndash; Climate Variability &amp; Natural Hazards</div>
+        <div class="tl-org">Earth Science Research Alliance (ESRA) &mdash; New Zealand</div>
+      </div>
+    </li>
+    <li>
+      <span class="tl-period">2022 &ndash; 2026</span>
+      <div>
+        <div class="tl-role">Science &amp; Mathematics Teacher</div>
+        <div class="tl-org">Northland, New Zealand</div>
+      </div>
+    </li>
+    <li>
+      <span class="tl-period">2018 &ndash; 2021</span>
+      <div>
+        <div class="tl-role">Oceanographic Data Analyst</div>
+        <div class="tl-org">Southern Ocean Research Programme</div>
+      </div>
+    </li>
+    <li>
+      <span class="tl-period">2012 &ndash; 2014</span>
+      <div>
+        <div class="tl-role">Project Coordinator</div>
+        <div class="tl-org">Petrobras &mdash; Brazil</div>
+      </div>
+    </li>
+    <li>
+      <span class="tl-period">2005 &ndash; 2016</span>
+      <div>
+        <div class="tl-role">Senior Oceanographer &middot; Marine Geophysicist &middot; Environmental Risk Specialist</div>
+        <div class="tl-org">C&amp;C Technologies / Fugro / Subsea Consult</div>
+      </div>
+    </li>
+    <li>
+      <span class="tl-period">1998 &ndash; 2005</span>
+      <div>
+        <div class="tl-role">Research Scientist</div>
+        <div class="tl-org">National Observatory / CPTEC-INPE / Brazilian Navy</div>
+      </div>
+    </li>
+  </ul>
 
   <h2>Education</h2>
-  <table class="profile-table">
-    <thead><tr><th>Degree</th><th>Institution</th><th>Year</th></tr></thead>
-    <tbody>
-      <tr><td>Postgraduate Diploma in Secondary Teaching (Mathematics)</td><td>Massey University</td><td>2026</td></tr>
-      <tr><td>PhD Studies in Environmental Science (Partially Completed)</td><td>University of Auckland</td><td>2018&ndash;2021</td></tr>
-      <tr><td>PhD Studies in Ocean Engineering (Partially Completed)</td><td>Federal University of Rio de Janeiro</td><td>2015&ndash;2018</td></tr>
-      <tr><td>Postgraduate Diploma in Ocean and Earth Dynamics</td><td>Fluminense Federal University</td><td>2015</td></tr>
-      <tr><td>Master of Science, Atmospheric Sciences</td><td>University of S&atilde;o Paulo</td><td>2003&ndash;2005</td></tr>
-      <tr><td>Bachelor of Science, Physical Oceanography</td><td>State University of Rio de Janeiro (UERJ)</td><td>1997&ndash;2002</td></tr>
-    </tbody>
-  </table>
+  <div class="edu-entry">
+    <div class="edu-degree">Postgraduate Diploma in Secondary Teaching (Mathematics)</div>
+    <div class="edu-inst">Massey University &mdash; 2026</div>
+  </div>
+  <div class="edu-entry">
+    <div class="edu-degree">PhD Studies in Environmental Science (Partially Completed)</div>
+    <div class="edu-inst">University of Auckland &mdash; 2018&ndash;2021</div>
+  </div>
+  <div class="edu-entry">
+    <div class="edu-degree">PhD Studies in Ocean Engineering (Partially Completed)</div>
+    <div class="edu-inst">Federal University of Rio de Janeiro &mdash; 2015&ndash;2018</div>
+  </div>
+  <div class="edu-entry">
+    <div class="edu-degree">Postgraduate Diploma in Ocean and Earth Dynamics</div>
+    <div class="edu-inst">Fluminense Federal University &mdash; 2015</div>
+  </div>
+  <div class="edu-entry">
+    <div class="edu-degree">Master of Science, Atmospheric Sciences</div>
+    <div class="edu-inst">University of S&atilde;o Paulo &mdash; 2003&ndash;2005</div>
+  </div>
+  <div class="edu-entry">
+    <div class="edu-degree">Bachelor of Science, Physical Oceanography</div>
+    <div class="edu-inst">State University of Rio de Janeiro (UERJ) &mdash; 1997&ndash;2002</div>
+  </div>
 
   <h2>Tools &amp; Technologies</h2>
-  <p><strong>Languages:</strong> Python &middot; MATLAB &middot; Fortran</p>
-  <p><strong>Oceanographic &amp; Survey:</strong> Hydromap &middot; SFIS &middot; Bathymetric Mapping &middot; Hydrographic Surveying &middot; Side Scan Sonar</p>
-  <p><strong>Positioning:</strong> DGPS &middot; C-Nav &middot; HiPAP</p>
-  <p><strong>Scientific Methods:</strong> Time-Series Analysis &middot; Fourier Analysis &middot; Wavelet Analysis &middot; Statistical Analysis</p>
-  <p><strong>Domains:</strong> Physical Oceanography &middot; Atmospheric Sciences &middot; Climate Variability &middot; ENSO Dynamics &middot; Coastal Processes &middot; Natural Hazards &middot; AUV Operations &middot; Marine Geophysics</p>
+  <div class="tools-grid">
+    <span class="tools-cat">Languages</span><span class="tools-list">Python &middot; MATLAB &middot; Fortran</span>
+    <span class="tools-cat">Survey</span><span class="tools-list">Hydromap &middot; SFIS &middot; Bathymetric Mapping &middot; Side Scan Sonar</span>
+    <span class="tools-cat">Positioning</span><span class="tools-list">DGPS &middot; C-Nav &middot; HiPAP</span>
+    <span class="tools-cat">Methods</span><span class="tools-list">Fourier Analysis &middot; Wavelet Analysis &middot; Time-Series Analysis</span>
+    <span class="tools-cat">Domains</span><span class="tools-list">Physical Oceanography &middot; ENSO Dynamics &middot; Climate Variability &middot; Marine Geophysics &middot; Natural Hazards</span>
+  </div>
 
   <h2>Selected Publications</h2>
-  <ul>
-    <li>Machado, F.V., d'&Aacute;vila, V.A. &mdash; <em>The Centroid of the Pacific Warm Pool as an Indicator of El Ni&ntilde;o and La Ni&ntilde;a Phenomena.</em> Revista Brasileira de Meteorologia, 29(3), 443&ndash;456, 2014. DOI: 10.1590/0102-778620130595</li>
-    <li>Machado, F.V., d'&Aacute;vila, V.A. &mdash; <em>Wavelet Analysis of the Zonal Displacement of the Pacific Warm Pool.</em> Revista Brasileira de Meteorologia, 2018.</li>
+  <ul class="pub-list">
+    <li>
+      <span class="pub-year">2018</span>
+      <span class="pub-text">Machado, F.V., d'&Aacute;vila, V.A. &mdash; <em>Wavelet Analysis of the Zonal Displacement of the Pacific Warm Pool.</em> Revista Brasileira de Meteorologia, 2018.</span>
+    </li>
+    <li>
+      <span class="pub-year">2014</span>
+      <span class="pub-text">Machado, F.V., d'&Aacute;vila, V.A. &mdash; <em>The Centroid of the Pacific Warm Pool as an Indicator of El Ni&ntilde;o and La Ni&ntilde;a Phenomena.</em> Revista Brasileira de Meteorologia, 29(3), 443&ndash;456, 2014. DOI: 10.1590/0102-778620130595</span>
+    </li>
   </ul>
 
   <h2>Languages</h2>
-  <p>Portuguese (native) &middot; English (fluent)</p>
+  <div class="lang-list">
+    <span class="lang-item">Portuguese <span class="lang-level">native</span></span>
+    <span class="lang-item">English <span class="lang-level">fluent</span></span>
+  </div>
 
-  <h2>Contact</h2>
-  <ul class="contact-list">
-    <li>Email: <a href="mailto:fvmachado@gmail.com">fvmachado@gmail.com</a></li>
-    <li><a href="https://www.linkedin.com/in/fabio-machado-torque-international/" target="_blank" rel="noopener">LinkedIn profile</a></li>
-    <li>Location: Northland, New Zealand</li>
-  </ul>
+  <div class="profile-footer">
+    Fabio Vieira Machado &middot; Northland, New Zealand &middot; <a href="mailto:fvmachado@gmail.com">fvmachado@gmail.com</a>
+  </div>
 </div>
-
-<footer>
-  <p>Source code and data pipeline on <a href="https://github.com/uferreira/el_nino" target="_blank" rel="noopener">GitHub</a></p>
-</footer>
 
 </body>
 </html>

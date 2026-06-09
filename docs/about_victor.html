@@ -3,56 +3,69 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Victor de Amorim d'&Aacute;vila &mdash; Profile</title>
+<title>Victor de Amorim d'&Aacute;vila &mdash; ESRA</title>
 <style>
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
 :root {
   --bg:#0a0a0e; --surface:#12121a; --card:#1a1a28; --border:#2a2a40;
   --text:#e8e8f0; --muted:#888899; --accent:#4488ff; --hot:#ff5533; --cold:#3388ff;
   --fg:#e8e8f0;
 }
-body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; font-size:16px; line-height:1.6; color:#24292e; background:#f6f8fa; }
 .container { max-width:1280px; margin:0 auto; padding:0 1.2rem; }
-header { text-align:center; padding:3rem 1rem 2rem; background:linear-gradient(180deg,#0d0d18 0%,var(--bg) 100%); border-bottom:1px solid var(--border); }
-header h1 { font-size:clamp(1.8rem,5vw,3rem); font-weight:700; background:linear-gradient(135deg,var(--cold),var(--hot)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:.5rem; }
-header p.subtitle { color:var(--muted); font-size:1.05rem; }
-footer { text-align:center; padding:2rem 1rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); margin-top:3rem; }
-footer a { color:var(--accent); text-decoration:none; }
-footer a:hover { text-decoration:underline; }
+
 .esra-header { text-align:center; padding:.6rem 1rem .3rem; border-bottom:1px solid var(--border); background:var(--surface); }
 .esra-full { display:block; font-size:clamp(.9rem,2vw,1.1rem); font-weight:600; color:var(--text); letter-spacing:.04em; }
 .esra-abbr { font-size:.75rem; letter-spacing:.25em; color:var(--accent); text-transform:uppercase; }
+
+header { background:linear-gradient(180deg,#0d0d18 0%,var(--bg) 100%); border-bottom:1px solid var(--border); padding:.3rem 0 .6rem; }
 .site-nav { display:flex; gap:1.2rem; justify-content:center; padding:.5rem 0 .2rem; }
 .site-nav .nav-link { color:var(--fg); text-decoration:none; font-size:.92rem; padding:.35rem .85rem; border-radius:5px; transition:background .15s; }
 .site-nav .nav-link:hover { background:rgba(255,255,255,.1); }
 .site-nav .nav-link.active { background:var(--accent); color:#fff; }
-.profile-body { max-width:860px; margin:2rem auto; padding:0 1.5rem 3rem; }
-.back-link { display:inline-block; margin-bottom:2rem; color:var(--accent); text-decoration:none; font-size:.9rem; }
+
+.profile-wrap { max-width:780px; margin:2rem auto; padding:2rem 2.5rem 3rem; background:#ffffff; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+.profile-subtitle { font-size:.85rem; color:#586069; letter-spacing:.06em; text-transform:uppercase; margin-bottom:.4rem; }
+h1 { font-size:2rem; font-weight:700; color:#24292e; margin-bottom:.3rem; display:flex; align-items:center; flex-wrap:wrap; gap:.6rem; }
+.retired-badge { display:inline-block; padding:.2rem .65rem; background:#fff3cd; border:1px solid #ffc107; border-radius:20px; font-size:.72rem; color:#856404; font-weight:600; letter-spacing:.03em; }
+.profile-affil { color:#586069; font-size:.95rem; margin-bottom:1.2rem; }
+h2 { font-size:1.2rem; font-weight:600; border-bottom:1px solid #d0d7de; padding-bottom:.4rem; margin:2rem 0 1rem; color:#24292e; }
+.about-text { color:#444d56; }
+.timeline { list-style:none; }
+.timeline li { display:grid; grid-template-columns:120px 1fr; gap:.5rem 1.2rem; margin-bottom:1.2rem; align-items:start; }
+.tl-period { font-size:.82rem; color:#586069; padding-top:.15rem; white-space:nowrap; }
+.tl-role { font-weight:600; color:#24292e; }
+.tl-org { color:#586069; font-size:.92rem; }
+.edu-entry { margin-bottom:.9rem; }
+.edu-degree { font-weight:600; }
+.edu-inst { color:#586069; font-size:.93rem; }
+.edu-thesis { color:#586069; font-size:.88rem; font-style:italic; margin-top:.15rem; }
+.tools-grid { display:grid; grid-template-columns:140px 1fr; gap:.35rem .8rem; margin-bottom:.5rem; }
+.tools-cat { font-weight:600; font-size:.9rem; }
+.tools-list { font-size:.9rem; color:#444d56; }
+.pub-list { list-style:none; }
+.pub-list li { display:grid; grid-template-columns:48px 1fr; gap:.3rem .8rem; margin-bottom:.9rem; }
+.pub-year { font-weight:600; color:#0969da; font-size:.88rem; padding-top:.1rem; }
+.pub-text { font-size:.93rem; color:#444d56; }
+.pub-text em { color:#24292e; }
+.lang-list { display:flex; flex-wrap:wrap; gap:.5rem; }
+.lang-item { padding:.25rem .6rem; border-radius:20px; background:#f6f8fa; border:1px solid #d0d7de; font-size:.83rem; color:#444d56; }
+.lang-level { color:#586069; font-size:.78rem; }
+.back-link { display:inline-block; margin-bottom:1.5rem; color:#0969da; font-size:.88rem; text-decoration:none; }
 .back-link:hover { text-decoration:underline; }
-.profile-body h1 { font-size:clamp(1.5rem,3vw,2rem); font-weight:700; color:var(--text); margin-bottom:.3rem; line-height:1.2; }
-.profile-role { font-size:.95rem; color:var(--muted); font-style:italic; margin-bottom:.3rem; line-height:1.5; }
-.profile-retired { font-size:.88rem; color:var(--hot); font-weight:600; margin-bottom:1.5rem; letter-spacing:.03em; }
-.profile-body h2 { font-size:1.15rem; font-weight:600; color:var(--accent); margin:2rem 0 .75rem; padding-bottom:.4rem; border-bottom:1px solid var(--border); }
-.profile-body p { color:var(--muted); margin-bottom:.9rem; font-size:.93rem; line-height:1.65; }
-.profile-body ul { list-style:none; padding:0; margin-bottom:.9rem; }
-.profile-body ul li { color:var(--muted); font-size:.93rem; line-height:1.6; margin-bottom:.35rem; padding-left:1.1rem; position:relative; }
-.profile-body ul li::before { content:"—"; position:absolute; left:0; color:var(--accent); }
-.profile-table { width:100%; border-collapse:collapse; margin:.75rem 0 1.5rem; font-size:.88rem; }
-.profile-table th { background:var(--surface); color:var(--muted); text-align:left; padding:.5rem .8rem; font-weight:600; font-size:.78rem; text-transform:uppercase; letter-spacing:.06em; border-bottom:2px solid var(--border); }
-.profile-table td { padding:.55rem .8rem; border-bottom:1px solid var(--border); color:var(--text); vertical-align:top; line-height:1.45; }
-.profile-table tr:last-child td { border-bottom:none; }
-.profile-table td:first-child { color:var(--muted); white-space:nowrap; font-family:'Consolas','Courier New',monospace; font-size:.83rem; }
+.profile-footer { margin-top:3rem; padding-top:1rem; border-top:1px solid #d0d7de; font-size:.82rem; color:#586069; }
 </style>
 </head>
 <body>
+
 <div class="esra-header">
   <span class="esra-full">Earth Science Research Alliance</span>
   <span class="esra-abbr">ESRA</span>
 </div>
 <header>
   <div class="container">
-    <h1>El Ni&ntilde;o Familiar Attractor</h1>
-    <p class="subtitle">Researcher Profile</p>
     <nav class="site-nav">
   <a href="index.html" class="nav-link">Home</a>
   <a href="phase_diagrams.html" class="nav-link">Phase Diagrams</a>
@@ -65,59 +78,103 @@ footer a:hover { text-decoration:underline; }
   </div>
 </header>
 
-<div class="profile-body">
+<div class="profile-wrap">
   <a href="about.html" class="back-link">&larr; Back to About Us</a>
 
-  <h1>Victor de Amorim d'&Aacute;vila</h1>
-  <p class="profile-role">Professor Emeritus (retired) &middot; Physical Oceanographer &middot; Astrophysicist</p>
-  <p class="profile-retired">Retired &middot; Rio de Janeiro State University (UERJ) and Observat&oacute;rio Nacional, Brazil</p>
+  <p class="profile-subtitle">Professor Emeritus (retired) &middot; Physical Oceanographer &middot; Astrophysicist</p>
+  <h1>Victor de Amorim d'&Aacute;vila <span class="retired-badge">Retired</span></h1>
+  <p class="profile-affil">Formerly: UERJ Faculty of Oceanography &amp; Observat&oacute;rio Nacional, Rio de Janeiro, Brazil</p>
 
-  <p>Victor de Amorim d'&Aacute;vila served as Professor at the Faculty of Oceanography of the Rio de Janeiro State University (UERJ) and Senior Researcher at the Observat&oacute;rio Nacional, where he worked from 1976 until his retirement. His career spanned astrophysics, astrometry, physical oceanography, and nonlinear fluid dynamics. He was one of the pioneers of phase-space methods for ENSO analysis in Brazil, having supervised the original Pacific Warm Pool research that underpins this project, and co-authored foundational work on mathematical models for El Ni&ntilde;o dynamics.</p>
+  <h2>About</h2>
+  <p class="about-text">Victor de Amorim d'&Aacute;vila served as Professor at the Faculty of Oceanography of the Rio de Janeiro State University (UERJ) and Senior Researcher at the Observat&oacute;rio Nacional, where he worked from 1976 until his retirement. His career spanned astrophysics, astrometry, physical oceanography, and nonlinear fluid dynamics. He was one of the pioneers of phase-space methods for ENSO analysis in Brazil, having supervised the original Pacific Warm Pool research that underpins this project, and co-authored foundational work on mathematical models for El Ni&ntilde;o dynamics.</p>
 
   <h2>Experience</h2>
-  <table class="profile-table">
-    <thead><tr><th>Period</th><th>Role</th><th>Organisation</th></tr></thead>
-    <tbody>
-      <tr><td>1981 &ndash; 2026</td><td>Professor Emeritus (retired), Faculty of Oceanography</td><td>UERJ, Rio de Janeiro, Brazil</td></tr>
-      <tr><td>1976 &ndash; 2026</td><td>Senior Researcher, Astrometry &amp; Astrophysics (retired)</td><td>Observat&oacute;rio Nacional, Brazil</td></tr>
-      <tr><td>2000 &ndash; 2001</td><td>Principal Investigator, &ldquo;A Mathematical Model for El Ni&ntilde;o&rdquo;</td><td>UERJ / FAPERJ</td></tr>
-    </tbody>
-  </table>
+  <ul class="timeline">
+    <li>
+      <span class="tl-period">1981 &ndash; 2026</span>
+      <div>
+        <div class="tl-role">Professor Emeritus (retired), Faculty of Oceanography</div>
+        <div class="tl-org">UERJ, Rio de Janeiro, Brazil</div>
+      </div>
+    </li>
+    <li>
+      <span class="tl-period">1976 &ndash; 2026</span>
+      <div>
+        <div class="tl-role">Senior Researcher, Astrometry &amp; Astrophysics (retired)</div>
+        <div class="tl-org">Observat&oacute;rio Nacional, Brazil</div>
+      </div>
+    </li>
+    <li>
+      <span class="tl-period">2000 &ndash; 2001</span>
+      <div>
+        <div class="tl-role">Principal Investigator, &ldquo;A Mathematical Model for El Ni&ntilde;o&rdquo;</div>
+        <div class="tl-org">UERJ / FAPERJ</div>
+      </div>
+    </li>
+  </ul>
 
   <h2>Education</h2>
-  <table class="profile-table">
-    <thead><tr><th>Degree</th><th>Institution</th><th>Year</th></tr></thead>
-    <tbody>
-      <tr><td>Doctor of Science, Physics &mdash; Thesis: <em>Hydrodynamics of Shock Waves in Supernovae</em></td><td>Centro Brasileiro de Pesquisas F&iacute;sicas (CBPF)</td><td>1992&ndash;1995</td></tr>
-      <tr><td>Master of Science, Astronomy &mdash; Thesis: <em>Lunar Observations with the Danjon Astrolabe</em></td><td>University of S&atilde;o Paulo (USP)</td><td>1973&ndash;1975</td></tr>
-      <tr><td>Bachelor of Science, Physics</td><td>University of S&atilde;o Paulo (USP)</td><td>1969&ndash;1972</td></tr>
-    </tbody>
-  </table>
+  <div class="edu-entry">
+    <div class="edu-degree">Doctor of Science, Physics</div>
+    <div class="edu-inst">Centro Brasileiro de Pesquisas F&iacute;sicas (CBPF) &mdash; 1992&ndash;1995</div>
+    <div class="edu-thesis">Thesis: Hydrodynamics of Shock Waves in Supernovae</div>
+  </div>
+  <div class="edu-entry">
+    <div class="edu-degree">Master of Science, Astronomy</div>
+    <div class="edu-inst">University of S&atilde;o Paulo (USP) &mdash; 1973&ndash;1975</div>
+    <div class="edu-thesis">Thesis: Lunar Observations with the Danjon Astrolabe</div>
+  </div>
+  <div class="edu-entry">
+    <div class="edu-degree">Bachelor of Science, Physics</div>
+    <div class="edu-inst">University of S&atilde;o Paulo (USP) &mdash; 1969&ndash;1972</div>
+  </div>
 
   <h2>Tools &amp; Technologies</h2>
-  <p><strong>Languages:</strong> Fortran &middot; MATLAB &middot; Python</p>
-  <p><strong>Domains:</strong> Physical Oceanography &middot; Astrophysics &middot; Astrometry &middot; Nonlinear Fluid Dynamics &middot; ENSO Dynamics &middot; Ocean&ndash;Atmosphere Interaction</p>
+  <div class="tools-grid">
+    <span class="tools-cat">Languages</span><span class="tools-list">Fortran &middot; MATLAB &middot; Python</span>
+    <span class="tools-cat">Domains</span><span class="tools-list">Physical Oceanography &middot; Astrophysics &middot; Astrometry &middot; Nonlinear Fluid Dynamics &middot; ENSO Dynamics &middot; Ocean&ndash;Atmosphere Interaction</span>
+  </div>
 
   <h2>Selected Publications</h2>
-  <ul>
-    <li>d'&Aacute;vila, V.A., Machado, F.V. &mdash; <em>A Phase Diagram for the Description of El Ni&ntilde;o.</em> 1st Brazilian Oceanography Symposium, 2002.</li>
-    <li>Machado, F.V., d'&Aacute;vila, V.A. &mdash; <em>The Centroid of the Pacific Warm Pool as an Indicator of El Ni&ntilde;o and La Ni&ntilde;a Phenomena.</em> Revista Brasileira de Meteorologia, 29(3), 443&ndash;456, 2014.</li>
-    <li>Machado, F.V., d'&Aacute;vila, V.A. &mdash; <em>Wavelet Analysis of the Zonal Displacement of the Pacific Warm Pool.</em> Revista Brasileira de Meteorologia, 2018.</li>
-    <li>d'&Aacute;vila, V.A. &mdash; <em>Fluidodin&acirc;mica N&atilde;o Linear.</em> Amazon, 2018.</li>
-    <li>d'&Aacute;vila, V.A. &mdash; <em>Hydrodynamics of Shock Waves in Supernovae.</em> LAP LAMBERT Academic Publishing, 2012.</li>
-    <li>Rapizo, H., d'&Aacute;vila, V.A., Violante-Carvalho, N., Pinho, U.F. et al. &mdash; <em>Simple Techniques for Retrieval of Wind Wave Periods and Directions from Optical Image Sequences.</em> Journal of Coastal Research, 32, 1227, 2016.</li>
+  <ul class="pub-list">
+    <li>
+      <span class="pub-year">2018</span>
+      <span class="pub-text">d'&Aacute;vila, V.A. &mdash; <em>Fluidodin&acirc;mica N&atilde;o Linear.</em> Amazon, 2018.</span>
+    </li>
+    <li>
+      <span class="pub-year">2018</span>
+      <span class="pub-text">Machado, F.V., d'&Aacute;vila, V.A. &mdash; <em>Wavelet Analysis of the Zonal Displacement of the Pacific Warm Pool.</em> Revista Brasileira de Meteorologia, 2018.</span>
+    </li>
+    <li>
+      <span class="pub-year">2016</span>
+      <span class="pub-text">Rapizo, H., d'&Aacute;vila, V.A., Violante-Carvalho, N., Pinho, U.F. et al. &mdash; <em>Simple Techniques for Retrieval of Wind Wave Periods and Directions from Optical Image Sequences.</em> Journal of Coastal Research, 32, 1227, 2016.</span>
+    </li>
+    <li>
+      <span class="pub-year">2014</span>
+      <span class="pub-text">Machado, F.V., d'&Aacute;vila, V.A. &mdash; <em>The Centroid of the Pacific Warm Pool as an Indicator of El Ni&ntilde;o and La Ni&ntilde;a Phenomena.</em> Revista Brasileira de Meteorologia, 29(3), 443&ndash;456, 2014.</span>
+    </li>
+    <li>
+      <span class="pub-year">2012</span>
+      <span class="pub-text">d'&Aacute;vila, V.A. &mdash; <em>Hydrodynamics of Shock Waves in Supernovae.</em> LAP LAMBERT Academic Publishing, 2012.</span>
+    </li>
+    <li>
+      <span class="pub-year">2002</span>
+      <span class="pub-text">d'&Aacute;vila, V.A., Machado, F.V. &mdash; <em>A Phase Diagram for the Description of El Ni&ntilde;o.</em> 1st Brazilian Oceanography Symposium, 2002.</span>
+    </li>
   </ul>
 
   <h2>Languages</h2>
-  <p>Portuguese (native) &middot; English (fluent) &middot; Spanish (fluent) &middot; French (fluent)</p>
+  <div class="lang-list">
+    <span class="lang-item">Portuguese <span class="lang-level">native</span></span>
+    <span class="lang-item">English <span class="lang-level">fluent</span></span>
+    <span class="lang-item">Spanish <span class="lang-level">fluent</span></span>
+    <span class="lang-item">French <span class="lang-level">fluent</span></span>
+  </div>
 
-  <h2>Contact</h2>
-  <p>Faculty of Oceanography, UERJ, Rio de Janeiro, Brazil</p>
+  <div class="profile-footer">
+    Victor de Amorim d'&Aacute;vila &middot; Rio de Janeiro, Brazil (retired)
+  </div>
 </div>
-
-<footer>
-  <p>Source code and data pipeline on <a href="https://github.com/uferreira/el_nino" target="_blank" rel="noopener">GitHub</a></p>
-</footer>
 
 </body>
 </html>
