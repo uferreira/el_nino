@@ -66,6 +66,10 @@ footer a:hover { text-decoration:underline; }
 .esra-header { text-align:center; padding:.6rem 1rem .3rem; border-bottom:1px solid var(--border); background:var(--surface); }
 .esra-full { display:block; font-size:clamp(.9rem,2vw,1.1rem); font-weight:600; color:var(--text); letter-spacing:.04em; }
 .esra-abbr { font-size:.75rem; letter-spacing:.25em; color:var(--accent); text-transform:uppercase; }
+.date-range-row { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; margin-bottom:.8rem; font-size:.85rem; color:var(--muted); }
+.date-range-row select { background:var(--surface); border:1px solid var(--border); border-radius:4px; color:var(--text); font-size:.82rem; padding:.2rem .4rem; cursor:pointer; }
+.date-range-row button.apply-btn { padding:.25rem .7rem; font-size:.82rem; background:var(--accent); border:none; border-radius:4px; color:#fff; cursor:pointer; }
+.date-range-row button.apply-btn:hover { opacity:.85; }
 
 /* ── Help panel & floating button ─────────────────────────────────────────── */
 #help-btn {
@@ -269,6 +273,11 @@ footer a:hover { text-decoration:underline; }
   </p>
 
   <h3 style="margin:1.2rem 0 .4rem;font-size:1rem;color:var(--muted)">Animated — year by year (SST + Callao)</h3>
+  <div class="date-range-row">
+    <label>From year: <select id="fa3d-yr-start"></select></label>
+    <label style="margin-left:1rem">To year: <select id="fa3d-yr-end"></select></label>
+    <button class="apply-btn" style="margin-left:.8rem" onclick="fa3dApplyRange()">Apply</button>
+  </div>
   <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.8rem;">
     <label style="display:flex;align-items:center;gap:.4rem;font-size:.85rem;">
       Delay (ms):
@@ -612,7 +621,7 @@ const palMean  = PAL_N   > 0 ? palauData.x.reduce((a,b)=>a+b,0)/PAL_N    : 0;
 
 const FA3D = {
   running:false, paused:false, yearIdx:0, rafId:null,
-  delay:30,
+  delay:30, startYearIdx:0, endYearIdx:-1,
   obsYearLoops:null,    calYearLoops:null,
   obsAnimLayout:null,   calAnimLayout:null,
   // phase3d-static animated plots (accel and phase)
@@ -1062,6 +1071,37 @@ function init3D() {
     name:String(yr), showlegend:false
   }));
 
+  FA3D.endYearIdx = FA3D.obsYearLoops.length;
+  // Populate year dropdowns
+  (function() {
+    const startEl = document.getElementById('fa3d-yr-start');
+    const endEl   = document.getElementById('fa3d-yr-end');
+    if (startEl && endEl) {
+      obsYears.forEach(yr => {
+        const o1=document.createElement('option'); o1.value=yr; o1.textContent=yr; startEl.appendChild(o1);
+        const o2=document.createElement('option'); o2.value=yr; o2.textContent=yr; endEl.appendChild(o2);
+      });
+      endEl.value = obsYears[obsYears.length-1];
+    }
+  })();
+  window.fa3dApplyRange = function() {
+    const sYr = parseInt(document.getElementById('fa3d-yr-start').value);
+    const eYr = parseInt(document.getElementById('fa3d-yr-end').value);
+    if (sYr > eYr) { alert('End year must be >= start year'); return; }
+    FA3D.startYearIdx = FA3D.obsYearLoops.findIndex(t => parseInt(t.name) >= sYr);
+    if (FA3D.startYearIdx < 0) FA3D.startYearIdx = 0;
+    const lastIdx = FA3D.obsYearLoops.reduceRight((acc, t, i) => acc===-1 && parseInt(t.name)<=eYr ? i : acc, -1);
+    FA3D.endYearIdx = lastIdx >= 0 ? lastIdx+1 : FA3D.obsYearLoops.length;
+    FA3D.running = false; FA3D.paused = false; FA3D.yearIdx = FA3D.startYearIdx;
+    if (FA3D.rafId) { clearTimeout(FA3D.rafId); FA3D.rafId = null; }
+    Plotly.react('plot-3d-obs-anim', [], FA3D.obsAnimLayout);
+    Plotly.react('plot-3d-cal-anim', [], FA3D.calAnimLayout);
+    const lbl = document.getElementById('fa3d-year-label');
+    if (lbl) lbl.textContent = '—';
+    document.getElementById('fa3d-run').disabled = false;
+    document.getElementById('fa3d-pause').disabled = true;
+  };
+
   FA3D.obsAnimLayout = makeLayout(
     'SST NINO1+2 — animated by year', 'T (°C)', 'dT/dt (°C/mo)');
   FA3D.calAnimLayout = makeLayout(
@@ -1076,7 +1116,7 @@ function init3D() {
   function fa3dFrame() {
     if (!FA3D.running || FA3D.paused) return;
     const i = FA3D.yearIdx;
-    if (i >= FA3D.obsYearLoops.length) {
+    if (i >= FA3D.endYearIdx) {
       FA3D.running = false;
       document.getElementById('fa3d-run').disabled = false;
       document.getElementById('fa3d-pause').disabled = true;
@@ -1086,7 +1126,10 @@ function init3D() {
     const ci = Math.min(i, FA3D.calYearLoops.length - 1);
     Plotly.addTraces('plot-3d-cal-anim', FA3D.calYearLoops[ci]);
     const lbl = document.getElementById('fa3d-year-label');
-    if (lbl) lbl.textContent = 'Year: ' + FA3D.obsYearLoops[i].name;
+    if (lbl) {
+      const yr = FA3D.obsYearLoops[i].name;
+      lbl.textContent = MO_NAMES[0] + ' ' + yr + ' – ' + MO_NAMES[11] + ' ' + yr;
+    }
     FA3D.yearIdx++;
     FA3D.rafId = setTimeout(fa3dFrame, FA3D.delay);
   }
@@ -1095,7 +1138,7 @@ function init3D() {
     if (FA3D.paused) {
       FA3D.paused = false;
     } else {
-      FA3D.yearIdx = 0; FA3D.running = true;
+      FA3D.yearIdx = FA3D.startYearIdx; FA3D.running = true;
       Plotly.react('plot-3d-obs-anim', [], FA3D.obsAnimLayout);
       Plotly.react('plot-3d-cal-anim', [], FA3D.calAnimLayout);
     }
@@ -1110,12 +1153,12 @@ function init3D() {
     document.getElementById('fa3d-pause').disabled = true;
   }
   function fa3dReset() {
-    FA3D.running = false; FA3D.paused = false; FA3D.yearIdx = 0;
+    FA3D.running = false; FA3D.paused = false; FA3D.yearIdx = FA3D.startYearIdx;
     if (FA3D.rafId) { clearTimeout(FA3D.rafId); FA3D.rafId = null; }
     Plotly.react('plot-3d-obs-anim', [], FA3D.obsAnimLayout);
     Plotly.react('plot-3d-cal-anim', [], FA3D.calAnimLayout);
     const lbl = document.getElementById('fa3d-year-label');
-    if (lbl) lbl.textContent = 'Year: —';
+    if (lbl) lbl.textContent = '—';
     document.getElementById('fa3d-run').disabled = false;
     document.getElementById('fa3d-pause').disabled = true;
   }

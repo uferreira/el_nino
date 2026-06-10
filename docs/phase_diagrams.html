@@ -65,6 +65,10 @@ footer a:hover { text-decoration:underline; }
 .esra-header { text-align:center; padding:.6rem 1rem .3rem; border-bottom:1px solid var(--border); background:var(--surface); }
 .esra-full { display:block; font-size:clamp(.9rem,2vw,1.1rem); font-weight:600; color:var(--text); letter-spacing:.04em; }
 .esra-abbr { font-size:.75rem; letter-spacing:.25em; color:var(--accent); text-transform:uppercase; }
+.date-range-row { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; margin-bottom:.8rem; font-size:.85rem; color:var(--muted); }
+.date-range-row select { background:var(--surface); border:1px solid var(--border); border-radius:4px; color:var(--text); font-size:.82rem; padding:.2rem .4rem; cursor:pointer; }
+.date-range-row button.apply-btn { padding:.25rem .7rem; font-size:.82rem; background:var(--accent); border:none; border-radius:4px; color:#fff; cursor:pointer; }
+.date-range-row button.apply-btn:hover { opacity:.85; }
 
 /* ── Help panel & floating button ─────────────────────────────────────────── */
 #help-btn {
@@ -191,6 +195,27 @@ footer a:hover { text-decoration:underline; }
         </div>
       </div>
     </div>
+    <div class="date-range-row">
+      <label>From:
+        <select id="obs1-yr-start"></select>
+        <select id="obs1-mo-start">
+          <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+          <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+          <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+          <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+        </select>
+      </label>
+      <label style="margin-left:1rem">To:
+        <select id="obs1-yr-end"></select>
+        <select id="obs1-mo-end">
+          <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+          <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+          <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+          <option value="10">Oct</option><option value="11">Nov</option><option value="12" selected>Dec</option>
+        </select>
+      </label>
+      <button class="apply-btn" id="obs1-apply-range" style="margin-left:.8rem" onclick="obs1ApplyRange()">Apply</button>
+    </div>
     <div class="btn-row">
       <button id="obs1-run" onclick="obs1Start()">&#9654; Run</button>
       <button id="obs1-pause" class="secondary" onclick="obs1Pause()" disabled>&#9646;&#9646; Pause</button>
@@ -293,6 +318,27 @@ footer a:hover { text-decoration:underline; }
           <input type="range" id="cls-sl-delay" min="0" max="200" step="5" value="30">
         </div>
       </div>
+    </div>
+    <div class="date-range-row">
+      <label>From:
+        <select id="cls-yr-start"></select>
+        <select id="cls-mo-start">
+          <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+          <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+          <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+          <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+        </select>
+      </label>
+      <label style="margin-left:1rem">To:
+        <select id="cls-yr-end"></select>
+        <select id="cls-mo-end">
+          <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+          <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+          <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+          <option value="10">Oct</option><option value="11">Nov</option><option value="12" selected>Dec</option>
+        </select>
+      </label>
+      <button class="apply-btn" id="cls-apply-range" style="margin-left:.8rem" onclick="clsApplyRange()">Apply</button>
     </div>
     <div class="btn-row">
       <button id="cls-run" onclick="clsStart()">&#9654; Run</button>
@@ -746,6 +792,7 @@ const OBS1 = {
   running:false, paused:false,
   obsIdx:0, calIdx:0,
   obsStartIdx:0, calStartIdx:0,
+  obsEndIdx:-1, calEndIdx:-1,   // -1 = full data; set in obs1Init
   totalFrames:0,
   wasRunningBeforeScrub:false,
   spf:1, delay:30,
@@ -805,11 +852,13 @@ function obs1Init() {
   const cs = _cmpCommonStart();
   OBS1.obsStartIdx = cs.obsStartIdx;
   OBS1.calStartIdx = cs.calStartIdx;
+  OBS1.obsEndIdx = OBS_N;
+  OBS1.calEndIdx = CAL_N;
   OBS1.totalFrames = _obs1TotalFrames(cs);
   OBS1.obsIdx = cs.obsStartIdx;
   OBS1.calIdx = cs.calStartIdx;
   obs1InitExtras(_obs1ExtraStarts(cs));
-
+  _populateYearDropdowns('obs1', observedData);
   obs1DrawBgs();
 
   const slSpf   = document.getElementById('obs1-sl-spf');
@@ -856,11 +905,61 @@ function obs1Init() {
   }
 }
 
+function _populateYearDropdowns(prefix, data) {
+  const years = [...new Set(data.year)].sort((a,b)=>a-b);
+  ['start','end'].forEach(which => {
+    const sel = document.getElementById(prefix+'-yr-'+which);
+    if (!sel) return;
+    sel.innerHTML = '';
+    years.forEach(yr => { const o = new Option(yr, yr); sel.add(o); });
+    if (which === 'end') sel.value = years[years.length - 1];
+  });
+}
+
+function _findStartIdx(data, N, yr, mo) {
+  for (let i = 0; i < N; i++) {
+    if (data.year[i] * 12 + data.month[i] >= yr * 12 + mo) return i;
+  }
+  return N;
+}
+function _findEndIdx(data, N, yr, mo) {
+  for (let i = N - 1; i >= 0; i--) {
+    if (data.year[i] * 12 + data.month[i] <= yr * 12 + mo) return i + 1;
+  }
+  return 0;
+}
+
+function obs1ApplyRange() {
+  const sYr = parseInt(document.getElementById('obs1-yr-start').value);
+  const sMo = parseInt(document.getElementById('obs1-mo-start').value);
+  const eYr = parseInt(document.getElementById('obs1-yr-end').value);
+  const eMo = parseInt(document.getElementById('obs1-mo-end').value);
+  const startIdx = _findStartIdx(observedData, OBS_N, sYr, sMo);
+  const endIdx   = _findEndIdx(observedData, OBS_N, eYr, eMo);
+  if (startIdx >= endIdx) { alert('End date must be after start date'); return; }
+  OBS1.obsEndIdx = endIdx;
+  OBS1.calEndIdx = _findEndIdx(callaoData, CAL_N, eYr, eMo);
+  obs1Reset();
+}
+
+function clsApplyRange() {
+  const sYr = parseInt(document.getElementById('cls-yr-start').value);
+  const sMo = parseInt(document.getElementById('cls-mo-start').value);
+  const eYr = parseInt(document.getElementById('cls-yr-end').value);
+  const eMo = parseInt(document.getElementById('cls-mo-end').value);
+  const startIdx = _findStartIdx(observedData, OBS_N, sYr, sMo);
+  const endIdx   = _findEndIdx(observedData, OBS_N, eYr, eMo);
+  if (startIdx >= endIdx) { alert('End date must be after start date'); return; }
+  CLS.obsEndIdx = endIdx;
+  CLS.calEndIdx = _findEndIdx(callaoData, CAL_N, eYr, eMo);
+  clsReset();
+}
+
 function obs1Loop() {
   if (!OBS1.running || OBS1.paused) return;
   const spf = OBS1.spf;
   for (let i=0; i<spf; i++) {
-    if (OBS1.obsIdx >= OBS_N) { obs1Finish(); return; }
+    if (OBS1.obsIdx >= OBS1.obsEndIdx) { obs1Finish(); return; }
     const ox = observedData.x[OBS1.obsIdx] - obsMean;
     const oy = observedData.y[OBS1.obsIdx];
     pushTail(OBS1.obsTail, ox, oy, observedData.month[OBS1.obsIdx], OBS1_TAIL, OBS1.sstOffCtx, OBS1_PLT, OBS1_DOM_SST);
@@ -877,7 +976,7 @@ function obs1Loop() {
   const dispStr = MO_NAMES[observedData.month[tIdx]-1] + ' ' + observedData.year[tIdx];
   obs1DrawBgs();
   compositeFrame(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1.sstOff, OBS1.obsTail, dispStr);
-  compositeFrame(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1.calOff, OBS1.calTail, null);
+  compositeFrame(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1.calOff, OBS1.calTail, dispStr);
   obs1DrawExtras();
   document.getElementById('obs1-time-display').textContent =
     observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
@@ -904,7 +1003,7 @@ function obs1Start() {
   const cs = _cmpCommonStart();
   OBS1.obsStartIdx = cs.obsStartIdx; OBS1.calStartIdx = cs.calStartIdx;
   OBS1.obsIdx = cs.obsStartIdx;      OBS1.calIdx = cs.calStartIdx;
-  OBS1.totalFrames = _obs1TotalFrames(cs);
+  OBS1.totalFrames = Math.min(_obs1TotalFrames(cs), OBS1.obsEndIdx - cs.obsStartIdx);
   OBS1.obsTail=[]; OBS1.calTail=[];
   OBS1.running=true; OBS1.paused=false;
   OBS1.sstOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
@@ -994,7 +1093,7 @@ function obs1RedrawToFrame(targetFrame) {
   const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
   obs1DrawBgs();
   compositeFrame(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1.sstOff, OBS1.obsTail, dispStr);
-  compositeFrame(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1.calOff, OBS1.calTail, null);
+  compositeFrame(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1.calOff, OBS1.calTail, dispStr);
   obs1DrawExtras();
   document.getElementById('obs1-time-display').textContent =
     observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
@@ -1116,12 +1215,18 @@ function compositeFrame(ctx, CW, CH, PLT, DOM, offCanvas, tail, timeStr) {
     ctx.strokeStyle='#88ccff'; ctx.lineWidth=1.2; ctx.stroke();
   }
 
-  // Time label top-left
+  // Time label top-left — semi-transparent pill
   if (timeStr) {
-    ctx.fillStyle='rgba(10,10,14,0.70)';
-    ctx.fillRect(PLT.l+4, PLT.t+4, 82, 22);
-    ctx.fillStyle='#e8e8f0'; ctx.font='bold 12px monospace'; ctx.textAlign='left';
-    ctx.fillText(timeStr, PLT.l+8, PLT.t+20);
+    ctx.font = 'bold 13px monospace';
+    const tw = ctx.measureText(timeStr).width;
+    ctx.fillStyle = 'rgba(10,10,20,0.72)';
+    ctx.beginPath();
+    ctx.roundRect(PLT.l+6, PLT.t+6, tw+16, 22, 4);
+    ctx.fill();
+    ctx.fillStyle = '#e8e8f0';
+    ctx.textAlign = 'left';
+    ctx.fillText(timeStr, PLT.l+14, PLT.t+22);
+    ctx.textAlign = 'left';
   }
 }
 
@@ -1244,6 +1349,7 @@ const CLS = {
   running:false, paused:false,
   obsIdx:0, calIdx:0,
   obsStartIdx:0, calStartIdx:0,
+  obsEndIdx:-1, calEndIdx:-1,
   totalFrames:0,
   wasRunningBeforeScrub:false,
   spf:1, delay:30,
@@ -1327,11 +1433,18 @@ function compositeFrameWhite(ctx, CW, CH, PLT, DOM, offCanvas, tail, timeStr) {
     ctx.fillStyle='#3388ff'; ctx.fill();
     ctx.strokeStyle='#1155cc'; ctx.lineWidth=1.2; ctx.stroke();
   }
-  if(timeStr){
-    ctx.fillStyle='rgba(255,255,255,0.88)';
-    ctx.fillRect(PLT.l+4,PLT.t+4,92,22);
-    ctx.fillStyle='#222222'; ctx.font='bold 12px monospace'; ctx.textAlign='left';
-    ctx.fillText(timeStr,PLT.l+8,PLT.t+20);
+  // Time label top-left — light pill for white-theme canvas
+  if (timeStr) {
+    ctx.font = 'bold 13px monospace';
+    const tw = ctx.measureText(timeStr).width;
+    ctx.fillStyle = 'rgba(240,240,240,0.85)';
+    ctx.beginPath();
+    ctx.roundRect(PLT.l+6, PLT.t+6, tw+16, 22, 4);
+    ctx.fill();
+    ctx.fillStyle = '#111111';
+    ctx.textAlign = 'left';
+    ctx.fillText(timeStr, PLT.l+14, PLT.t+22);
+    ctx.textAlign = 'left';
   }
 }
 
@@ -1365,8 +1478,10 @@ function clsInit(){
   const cs=_cmpCommonStart();
   CLS.obsStartIdx=cs.obsStartIdx; CLS.calStartIdx=cs.calStartIdx;
   CLS.obsIdx=cs.obsStartIdx; CLS.calIdx=cs.calStartIdx;
+  CLS.obsEndIdx=OBS_N; CLS.calEndIdx=CAL_N;
   CLS.totalFrames=_obs1TotalFrames(cs);
   clsInitExtras(_obs1ExtraStarts(cs));
+  _populateYearDropdowns('cls', observedData);
   CLS.sstCtx.drawImage(CLS.sstOff,0,0);
   CLS.calCtx.drawImage(CLS.calOff,0,0);
   const slSpf=document.getElementById('cls-sl-spf');
@@ -1402,7 +1517,7 @@ function clsLoop(){
   if(!CLS.running||CLS.paused) return;
   const spf=CLS.spf;
   for(let i=0;i<spf;i++){
-    if(CLS.obsIdx>=OBS_N){clsFinish(); return;}
+    if(CLS.obsIdx>=CLS.obsEndIdx){clsFinish(); return;}
     const ox=observedData.x[CLS.obsIdx]; // absolute temperature — no mean subtraction
     const oy=observedData.y[CLS.obsIdx];
     CLS.obsTail.push({x:ox,y:oy});
@@ -1426,7 +1541,7 @@ function clsLoop(){
   const tIdx=Math.min(CLS.obsIdx,OBS_N-1);
   const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
   compositeFrameWhite(CLS.sstCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_SST,CLS.sstOff,CLS.obsTail,dispStr);
-  compositeFrameWhite(CLS.calCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS.calOff,CLS.calTail,null);
+  compositeFrameWhite(CLS.calCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS.calOff,CLS.calTail,dispStr);
   clsDrawExtras();
   document.getElementById('cls-time-display').textContent=observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
   const scrub=document.getElementById('cls-scrubber');
@@ -1450,7 +1565,9 @@ function clsStart(){
   const cs=_cmpCommonStart();
   CLS.obsStartIdx=cs.obsStartIdx; CLS.calStartIdx=cs.calStartIdx;
   CLS.obsIdx=cs.obsStartIdx; CLS.calIdx=cs.calStartIdx;
-  CLS.totalFrames=_obs1TotalFrames(cs);
+  if(CLS.obsEndIdx<0) CLS.obsEndIdx=OBS_N;
+  if(CLS.calEndIdx<0) CLS.calEndIdx=CAL_N;
+  CLS.totalFrames=Math.min(_obs1TotalFrames(cs), CLS.obsEndIdx-cs.obsStartIdx);
   CLS.obsTail=[]; CLS.calTail=[];
   CLS.running=true; CLS.paused=false;
   CLS.sstOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
@@ -1545,7 +1662,7 @@ function clsRedrawToFrame(targetFrame){
   const tIdx=Math.min(CLS.obsIdx,OBS_N-1);
   const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
   compositeFrameWhite(CLS.sstCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_SST,CLS.sstOff,CLS.obsTail,dispStr);
-  compositeFrameWhite(CLS.calCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS.calOff,CLS.calTail,null);
+  compositeFrameWhite(CLS.calCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS.calOff,CLS.calTail,dispStr);
   clsDrawExtras();
   document.getElementById('cls-time-display').textContent=observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
   const scrub=document.getElementById('cls-scrubber');
