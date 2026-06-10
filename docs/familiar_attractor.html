@@ -602,6 +602,17 @@ function gradientAccel(yArr) {
   a[N-1] = (yArr[N-1] - yArr[N-2]) / dt;
   for (let i = 1; i < N-1; i++)
     a[i] = (yArr[i+1] - yArr[i-1]) / (2 * dt);
+
+  // Clip to ±3 standard deviations to remove boundary
+  // spikes caused by Fourier filter edge effects
+  let sum = 0, sum2 = 0;
+  for (let i = 0; i < N; i++) { sum += a[i]; sum2 += a[i]*a[i]; }
+  const mean = sum / N;
+  const std  = Math.sqrt(sum2/N - mean*mean);
+  const lo = mean - 3*std, hi = mean + 3*std;
+  for (let i = 0; i < N; i++)
+    a[i] = Math.max(lo, Math.min(hi, a[i]));
+
   return a;
 }
 const obsMean  = observedData.x.reduce((a,b) => a+b, 0) / OBS_N;
@@ -696,9 +707,21 @@ function init3D() {
 
   const TWO_PI = 2 * Math.PI;
 
-  // Z-axis configs
-  const zCfgAccelSST = {title:'d²T/dt²'};
-  const zCfgAccelCal = {title:'d²SL/dt²'};
+  // Helper: padded [min, max] range from a (already-clipped) accel array
+  function accelRange(arr) {
+    if (!arr || arr.length === 0) return [-1, 1];
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i] < lo) lo = arr[i];
+      if (arr[i] > hi) hi = arr[i];
+    }
+    const pad = (hi - lo) * 0.1 || 0.1;
+    return [lo - pad, hi + pad];
+  }
+
+  // Z-axis configs — explicit range prevents Plotly auto-rescaling during animation
+  const zCfgAccelSST = { title:'d²T/dt²',  range: accelRange(obsAccel) };
+  const zCfgAccelCal = { title:'d²SL/dt²', range: accelRange(calAccel) };
   const zCfgPhase = {
     title:'Annual phase θ (rad)',
     range:[0, TWO_PI],
@@ -770,8 +793,9 @@ function init3D() {
     pal:    ['Palau SSH — animated · d²SL/dt²',         'Palau SSH — animated · annual phase',         'SSH anomaly (mm)',     'dSL/dt (mm/mo)', zCfgAccelCal],
   };
   for (const e of FA3D.psExtras) {
-    const [at, pt, xl, yl, zca] = _EXTRA_LABELS[e.id];
-    e.accelLayout = makeLayoutZ(at, xl, yl, zca);
+    const [at, pt, xl, yl] = _EXTRA_LABELS[e.id];
+    const zTitle = e.id.startsWith('nino') ? 'd²T/dt²' : 'd²SL/dt²';
+    e.accelLayout = makeLayoutZ(at, xl, yl, { title: zTitle, range: accelRange(e.accel) });
     e.phaseLayout = makeLayoutZ(pt, xl, yl, zCfgPhase);
   }
 
