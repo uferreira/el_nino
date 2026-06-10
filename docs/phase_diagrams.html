@@ -173,7 +173,7 @@ footer a:hover { text-decoration:underline; }
   <div class="science-box">
     <strong>What is a phase diagram?</strong>
     Both panels plot a climate variable T against its rate of change dT/dt.
-    Left: NINO1+2 sea surface temperature anomaly (°C, mean removed) — El Niño events appear
+    Left: NINO1+2 sea surface temperature (°C) — El Niño events appear
     as large excursions to the right. Right: Callao tide-gauge sea level anomaly (mm) — sea
     level rises sharply during El Niño as Kelvin waves suppress coastal upwelling.
     Both variables trace the same ENSO familiar attractor on the same calendar.
@@ -228,7 +228,7 @@ footer a:hover { text-decoration:underline; }
   <div class="two-col" style="margin-bottom:.6rem;">
     <div>
       <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:.4rem">
-        SST NINO1+2 anomaly (°C)
+        SST NINO1+2 (°C)
       </div>
       <canvas id="obs1-sst-canvas" class="phasecanvas" width="700" height="480"></canvas>
     </div>
@@ -692,12 +692,12 @@ const obsMean = observedData.x.reduce((a,b)=>a+b,0)/OBS_N;
 
 const OBS1_CW=700, OBS1_CH=480;
 const OBS1_PLT={l:56,r:680,t:34,b:446};
-const OBS1_DOM_SST={xmin:-7.5,xmax:7.5,ymin:-2.5,ymax:2.5};
+const OBS1_DOM_SST={xmin:17.5,xmax:32.5,ymin:-2.5,ymax:2.5};
 const OBS1_DOM_CAL={xmin:-300, xmax:300, ymin:-60,  ymax:60};
-const OBS1_LABELS_SST={x:'SST anomaly (°C)', y:'dT/dt'};
+const OBS1_LABELS_SST={x:'SST NINO1+2 (°C)', y:'dT/dt'};
 const OBS1_LABELS_CAL={x:'SSH anom (mm)',    y:'dSL/dt'};
 const CAL_SSH_TICKS={x:[-300,-200,-100,0,100,200,300],y:[-60,-40,-20,0,20,40,60]};
-const SST_ANOM_TICKS={x:[-6,-4,-2,0,2,4,6],y:[-2,-1,0,1,2]};
+const SST_ANOM_TICKS={x:[18,20,22,24,26,28,30,32],y:[-2,-1,0,1,2]};
 const OBS1_TAIL=60;
 
 const OBS1_EXTRA_CFGS = [
@@ -960,7 +960,7 @@ function obs1Loop() {
   const spf = OBS1.spf;
   for (let i=0; i<spf; i++) {
     if (OBS1.obsIdx >= OBS1.obsEndIdx) { obs1Finish(); return; }
-    const ox = observedData.x[OBS1.obsIdx] - obsMean;
+    const ox = observedData.x[OBS1.obsIdx];
     const oy = observedData.y[OBS1.obsIdx];
     pushTail(OBS1.obsTail, ox, oy, observedData.month[OBS1.obsIdx], OBS1_TAIL, OBS1.sstOffCtx, OBS1_PLT, OBS1_DOM_SST);
     OBS1.obsIdx++;
@@ -1070,7 +1070,7 @@ function obs1RedrawToFrame(targetFrame) {
   for (let f=0; f<frame; f++) {
     const oi=obsStart+f, ci=calStart+f;
     if (oi<OBS_N) {
-      const ox=observedData.x[oi]-obsMean, oy=observedData.y[oi];
+      const ox=observedData.x[oi], oy=observedData.y[oi];
       pushTail(obsTail, ox, oy, observedData.month[oi], OBS1_TAIL, OBS1.sstOffCtx, OBS1_PLT, OBS1_DOM_SST);
     }
     if (ci<CAL_N) {

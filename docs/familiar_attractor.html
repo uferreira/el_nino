@@ -751,11 +751,11 @@ function init3D() {
   ];
 
   FA3D.obsAccelLayout = makeLayoutZ('SST NINO1+2 — animated · d²T/dt²',
-    'SST anomaly (°C)', 'dT/dt (°C/mo)', zCfgAccelSST);
+    'Temperature (°C)', 'dT/dt (°C/mo)', zCfgAccelSST);
   FA3D.calAccelLayout = makeLayoutZ('Callao SSH — animated · d²SL/dt²',
     'SSH anomaly (mm)', 'dSL/dt (mm/mo)', zCfgAccelCal);
   FA3D.obsPhaseLayout = makeLayoutZ('SST NINO1+2 — animated · annual phase',
-    'SST anomaly (°C)', 'dT/dt (°C/mo)', zCfgPhase);
+    'Temperature (°C)', 'dT/dt (°C/mo)', zCfgPhase);
   FA3D.calPhaseLayout = makeLayoutZ('Callao SSH — animated · annual phase',
     'SSH anomaly (mm)', 'dSL/dt (mm/mo)', zCfgPhase);
 
@@ -831,7 +831,7 @@ function init3D() {
     const oExt = {x:[[]], y:[[]], z_a:[[]], z_p:[[]]};
     for (let s = 0; s < spf && FA3D.obsIdx < OBS_N; s++, FA3D.obsIdx++) {
       const i = FA3D.obsIdx;
-      oExt.x[0].push(obsXanom[i]);
+      oExt.x[0].push(observedData.x[i]);
       oExt.y[0].push(observedData.y[i]);
       oExt.z_a[0].push(obsAccel[i]);
       oExt.z_p[0].push(obsPhaseZ[i]);
@@ -860,7 +860,7 @@ function init3D() {
     const oi = FA3D.obsIdx - 1;
     if (oi >= 0 && oi < OBS_N) {
       const ts = Math.max(0, oi - TAIL_N + 1);
-      const ox  = sl(obsXanom,       ts, oi+1);
+      const ox  = sl(observedData.x,  ts, oi+1);
       const oy  = sl(observedData.y, ts, oi+1);
       const oac = sl(obsAccel,       ts, oi+1);
       const oph = sl(obsPhaseZ,      ts, oi+1);

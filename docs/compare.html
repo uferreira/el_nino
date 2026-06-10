@@ -367,7 +367,8 @@ function cmpPrepareDataset(entry) {
 }
 
 function cmpNormX(v, prep, norm) {
-  return norm ? (v - prep.mean_x) / prep.std_x : v - prep.mean_x;
+  if (norm) return (v - prep.mean_x) / prep.std_x;
+  return prep.id === 'nino12' ? v : v - prep.mean_x;
 }
 function cmpNormY(v, prep, norm) {
   return norm ? v / prep.std_x : v;
@@ -388,7 +389,7 @@ function cmpComputeDomains(norm) {
     return {sst:nd, ssh:nd};
   }
   return {
-    sst:{xmin:-7.5, xmax:7.5, ymin:-2.5, ymax:2.5},
+    sst:{xmin:17.5, xmax:32.5, ymin:-2.5, ymax:2.5},
     ssh:{xmin:-300,  xmax:300, ymin:-60,  ymax:60 }
   };
 }
@@ -453,7 +454,7 @@ function cmpDrawBackground(ctx, domSST, domSSH, norm) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, CMP_CW, CMP_CH);
 
-  const sstXL = norm ? 'Anomaly (σ)'      : 'SST anomaly (°C)';
+  const sstXL = norm ? 'Anomaly (σ)'      : 'Temperature (°C)';
   const sstYL = norm ? 'dT/dt (σ/mo)'    : 'dT/dt (°C/mo)';
   const sshXL = norm ? 'Anomaly (σ)'      : 'SSH anomaly (mm)';
   const sshYL = norm ? 'dSL/dt (σ/mo)'   : 'dSL/dt (mm/mo)';

@@ -257,7 +257,7 @@ const calEns = Array.from({length:ENS_FRAMES}, ()=>({x:[],y:[],years:[]}));
 
 for (let i=0; i<OBS_N; i++) {
   const k = (observedData.month[i]-1)*5 + observedData.irest[i];
-  obsEns[k].x.push(observedData.x[i] - obsMean);
+  obsEns[k].x.push(observedData.x[i]);
   obsEns[k].y.push(observedData.y[i]);
   obsEns[k].years.push(observedData.year[i]);
 }
@@ -328,7 +328,7 @@ const _darkBase = {
 };
 const ensLayoutSST = Object.assign({}, _darkBase, {
   title:{text:'SST NINO1+2 — all years at same instant', font:{color:'#e8e8f0',size:13}},
-  xaxis:{title:{text:'SST anomaly (°C)'}, range:[-7.5,7.5],
+  xaxis:{title:{text:'Temperature (°C)'}, range:[17.5,32.5],
          color:'#888899', gridcolor:'#2a2a40',
          zeroline:true, zerolinecolor:'#666', zerolinewidth:1.5},
   yaxis:{title:{text:'dT/dt (°C/month)'}, range:[-2.5,2.5],
