@@ -596,22 +596,43 @@ function rk4Step(t, X, Y, p, h) {
 
 // ─── Numerical acceleration (second derivative of y) ─────────────────────
 function gradientAccel(yArr) {
-  const N = yArr.length, dt = 1.0 / 5;
-  const a = new Float64Array(N);
-  a[0]   = (yArr[1]   - yArr[0])   / dt;
-  a[N-1] = (yArr[N-1] - yArr[N-2]) / dt;
-  for (let i = 1; i < N-1; i++)
-    a[i] = (yArr[i+1] - yArr[i-1]) / (2 * dt);
+  const N = yArr.length;
+  if (N < 7) return new Float64Array(N);
+  const dt = 1.0 / 5;
 
-  // Clip to ±3 standard deviations to remove boundary
-  // spikes caused by Fourier filter edge effects
-  let sum = 0, sum2 = 0;
-  for (let i = 0; i < N; i++) { sum += a[i]; sum2 += a[i]*a[i]; }
-  const mean = sum / N;
-  const std  = Math.sqrt(sum2/N - mean*mean);
-  const lo = mean - 3*std, hi = mean + 3*std;
-  for (let i = 0; i < N; i++)
-    a[i] = Math.max(lo, Math.min(hi, a[i]));
+  // 1. Smooth y with a centered 11-point moving average (~2 months) to
+  //    suppress sub-monthly noise in NINO3/4/34 where run_sst_index skips
+  //    seasonal cycle removal, leaving Fourier filter edge effects in dT/dt.
+  const W = 5;
+  const ys = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    let s = 0, c = 0;
+    const lo = Math.max(0, i - W), hi = Math.min(N - 1, i + W);
+    for (let k = lo; k <= hi; k++) { s += yArr[k]; c++; }
+    ys[i] = s / c;
+  }
+
+  // 2. Central-difference gradient of the smoothed series
+  const a = new Float64Array(N);
+  a[0]   = (ys[1]   - ys[0])   / dt;
+  a[N-1] = (ys[N-1] - ys[N-2]) / dt;
+  for (let i = 1; i < N - 1; i++)
+    a[i] = (ys[i+1] - ys[i-1]) / (2 * dt);
+
+  // 3. Zero boundary regions unreliable due to filter edge effects
+  const EDGE = 12;
+  for (let i = 0; i < EDGE && i < N; i++) a[i] = 0;
+  for (let i = Math.max(0, N - EDGE); i < N; i++) a[i] = 0;
+
+  // 4. Clip interior to ±3σ (boundary zeros excluded from stats)
+  let sum = 0, sum2 = 0, cnt = 0;
+  for (let i = EDGE; i < N - EDGE; i++) { sum += a[i]; sum2 += a[i]*a[i]; cnt++; }
+  if (cnt > 0) {
+    const mean = sum / cnt;
+    const std  = Math.sqrt(Math.max(0, sum2/cnt - mean*mean));
+    const lo = mean - 3*std, hi = mean + 3*std;
+    for (let i = 0; i < N; i++) a[i] = Math.max(lo, Math.min(hi, a[i]));
+  }
 
   return a;
 }
@@ -685,7 +706,7 @@ function init3D() {
         bgcolor:'#0a0a0e',
         xaxis:{color:'#888899', gridcolor:'#2a2a40', title:xTitle, zeroline:true, zerolinecolor:'#666', zerolinewidth:1.5},
         yaxis:{color:'#888899', gridcolor:'#2a2a40', title:yTitle, zeroline:true, zerolinecolor:'#666', zerolinewidth:1.5},
-        zaxis:Object.assign({color:'#888899', gridcolor:'#2a2a40'}, zCfg),
+        zaxis:Object.assign({color:'#888899', gridcolor:'#2a2a40', autorange: !zCfg.range}, zCfg),
         camera:{eye:{x:1.8,y:0.8,z:0.5}}
       },
       font:{color:'#e8e8f0'},
