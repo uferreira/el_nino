@@ -1242,11 +1242,15 @@ function cmpApplyRange() {
   const sMo = parseInt(document.getElementById('cmp-mo-start').value);
   const eYr = parseInt(document.getElementById('cmp-yr-end').value);
   const eMo = parseInt(document.getElementById('cmp-mo-end').value);
-  const startIdx = _findStartIdx(observedData, OBS_N, sYr, sMo);
-  const endIdx   = _findEndIdx(observedData, OBS_N, eYr, eMo);
-  if (startIdx >= endIdx) { alert('End date must be after start date'); return; }
-  CMP.obsEndIdx = endIdx;
-  CMP.calEndIdx = _findEndIdx(callaoData, CAL_N, eYr, eMo);
+  const obsStart = _findStartIdx(observedData, OBS_N, sYr, sMo);
+  const obsEnd   = _findEndIdx(observedData, OBS_N, eYr, eMo);
+  const calStart = _findStartIdx(callaoData, CAL_N, sYr, sMo);
+  const calEnd   = _findEndIdx(callaoData, CAL_N, eYr, eMo);
+  if (obsStart >= obsEnd) { alert('End date must be after start date'); return; }
+  CMP.obsStartIdx = obsStart;
+  CMP.calStartIdx = calStart;
+  CMP.obsEndIdx   = obsEnd;
+  CMP.calEndIdx   = calEnd;
   cmpReset();
 }
 
@@ -1518,14 +1522,12 @@ function cmpStart() {
 
   // Align both datasets to their common start date
   const cs = _cmpCommonStart();
-  CMP.obsStartIdx = cs.obsStartIdx;
-  CMP.calStartIdx = cs.calStartIdx;
-  CMP.startYear   = cs.startYear;
-  CMP.obsIdx=cs.obsStartIdx; CMP.calIdx=cs.calStartIdx;
+  CMP.startYear   = observedData.year[CMP.obsStartIdx] || cs.startYear;
+  CMP.obsIdx=CMP.obsStartIdx; CMP.calIdx=CMP.calStartIdx;
   CMP.modStep=0; CMP.modX=0; CMP.modY=0;
   if(CMP.obsEndIdx<0) CMP.obsEndIdx=OBS_N;
   if(CMP.calEndIdx<0) CMP.calEndIdx=CAL_N;
-  CMP.totalFrames = Math.min(_cmpTotalFrames(cs), CMP.obsEndIdx-cs.obsStartIdx);
+  CMP.totalFrames = Math.min(_cmpTotalFrames(cs), CMP.obsEndIdx-CMP.obsStartIdx);
 
   CMP.obsTail=[]; CMP.calTail=[]; CMP.modTail=[];
   CMP.poiObs=[]; CMP.poiCal=[]; CMP.poiMod=[];
@@ -1569,7 +1571,7 @@ function cmpFinish() {
 }
 function cmpReset() {
   cmpFinish();
-  CMP.obsIdx=0; CMP.calIdx=0; CMP.modStep=0; CMP.modX=0; CMP.modY=0;
+  CMP.obsIdx=CMP.obsStartIdx; CMP.calIdx=CMP.calStartIdx; CMP.modStep=0; CMP.modX=0; CMP.modY=0;
   CMP.obsTail=[]; CMP.calTail=[]; CMP.modTail=[];
   CMP.poiObs=[]; CMP.poiCal=[]; CMP.poiMod=[];
   CMP.obsOffCtx.clearRect(0,0,CMP_CW,CMP_CH);

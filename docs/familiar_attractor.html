@@ -595,14 +595,33 @@ function rk4Step(t, X, Y, p, h) {
 // ═══════════════════════════════════════════════════════
 
 // ─── Numerical acceleration (second derivative of y) ─────────────────────
+// Clean central-difference gradient with ±3σ clipping.
+// Used for band-limited series (NINO1+2 SST, all SSH stations).
 function gradientAccel(yArr) {
   const N = yArr.length;
-  if (N < 7) return new Float64Array(N);
+  if (N < 3) return new Float64Array(N);
   const dt = 1.0 / 5;
+  const a = new Float64Array(N);
+  a[0]   = (yArr[1]   - yArr[0])   / dt;
+  a[N-1] = (yArr[N-1] - yArr[N-2]) / dt;
+  for (let i = 1; i < N - 1; i++)
+    a[i] = (yArr[i+1] - yArr[i-1]) / (2 * dt);
+  let sum = 0, sum2 = 0;
+  for (let i = 0; i < N; i++) { sum += a[i]; sum2 += a[i]*a[i]; }
+  const mean = sum / N;
+  const std  = Math.sqrt(Math.max(0, sum2/N - mean*mean));
+  const lo = mean - 3 * std, hi = mean + 3 * std;
+  for (let i = 0; i < N; i++)
+    a[i] = Math.max(lo, Math.min(hi, a[i]));
+  return a;
+}
 
-  // 1. Smooth y with a centered 11-point moving average (~2 months) to
-  //    suppress sub-monthly noise in NINO3/4/34 where run_sst_index skips
-  //    seasonal cycle removal, leaving Fourier filter edge effects in dT/dt.
+// Smooth y with 11-point moving average BEFORE taking gradient.
+// Used ONLY for NINO3/3.4/4 which skip seasonal-cycle removal in the pipeline.
+function gradientAccelSmoothed(yArr) {
+  const N = yArr.length;
+  if (N < 11) return new Float64Array(N);
+  const dt = 1.0 / 5;
   const W = 5;
   const ys = new Float64Array(N);
   for (let i = 0; i < N; i++) {
@@ -611,37 +630,42 @@ function gradientAccel(yArr) {
     for (let k = lo; k <= hi; k++) { s += yArr[k]; c++; }
     ys[i] = s / c;
   }
-
-  // 2. Central-difference gradient of the smoothed series
   const a = new Float64Array(N);
   a[0]   = (ys[1]   - ys[0])   / dt;
   a[N-1] = (ys[N-1] - ys[N-2]) / dt;
   for (let i = 1; i < N - 1; i++)
     a[i] = (ys[i+1] - ys[i-1]) / (2 * dt);
-
-  // 3. Zero boundary regions unreliable due to filter edge effects
-  const EDGE = 12;
-  for (let i = 0; i < EDGE && i < N; i++) a[i] = 0;
-  for (let i = Math.max(0, N - EDGE); i < N; i++) a[i] = 0;
-
-  // 4. Clip interior to ±3σ (boundary zeros excluded from stats)
-  let sum = 0, sum2 = 0, cnt = 0;
-  for (let i = EDGE; i < N - EDGE; i++) { sum += a[i]; sum2 += a[i]*a[i]; cnt++; }
-  if (cnt > 0) {
-    const mean = sum / cnt;
-    const std  = Math.sqrt(Math.max(0, sum2/cnt - mean*mean));
-    const lo = mean - 3*std, hi = mean + 3*std;
-    for (let i = 0; i < N; i++) a[i] = Math.max(lo, Math.min(hi, a[i]));
-  }
-
+  let sum = 0, sum2 = 0;
+  for (let i = 0; i < N; i++) { sum += a[i]; sum2 += a[i]*a[i]; }
+  const mean = sum / N;
+  const std  = Math.sqrt(Math.max(0, sum2/N - mean*mean));
+  const lo = mean - 3 * std, hi = mean + 3 * std;
+  for (let i = 0; i < N; i++)
+    a[i] = Math.max(lo, Math.min(hi, a[i]));
   return a;
 }
+
+// 11-point centred moving average for smoothing noisy y series.
+function smoothY(yArr) {
+  const N = yArr.length;
+  if (N < 11) return yArr;
+  const W = 5;
+  const ys = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    let s = 0, c = 0;
+    const lo = Math.max(0, i - W), hi = Math.min(N - 1, i + W);
+    for (let k = lo; k <= hi; k++) { s += yArr[k]; c++; }
+    ys[i] = s / c;
+  }
+  return ys;
+}
+
 const obsMean  = observedData.x.reduce((a,b) => a+b, 0) / OBS_N;
 const obsAccel    = gradientAccel(observedData.y);
 const calAccel    = gradientAccel(callaoData.y);
-const nino3Accel  = NINO3_N  > 0 ? gradientAccel(nino3Data.y)    : [];
-const nino34Accel = NINO34_N > 0 ? gradientAccel(nino34Data.y)   : [];
-const nino4Accel  = NINO4_N  > 0 ? gradientAccel(nino4Data.y)    : [];
+const nino3Accel  = NINO3_N  > 0 ? gradientAccelSmoothed(nino3Data.y)  : [];
+const nino34Accel = NINO34_N > 0 ? gradientAccelSmoothed(nino34Data.y) : [];
+const nino4Accel  = NINO4_N  > 0 ? gradientAccelSmoothed(nino4Data.y)  : [];
 const talAccel    = TAL_N    > 0 ? gradientAccel(talaraData.y)   : [];
 const llAccel     = LALIB_N  > 0 ? gradientAccel(laLibData.y)    : [];
 const honAccel    = HON_N    > 0 ? gradientAccel(honoluluData.y) : [];
@@ -779,11 +803,11 @@ function init3D() {
 
   const _safeN = (data, N) => (N > 0 && data.year[0] <= 2010) ? N : 0;
   FA3D.psExtras = [
-    { id:'nino3',  xanom:nino3Xanom,  yArr:nino3Data.y,    accel:nino3Accel,  phaseZ:nino3PhaseZ,  N:_safeN(nino3Data,NINO3_N),
+    { id:'nino3',  xanom:nino3Xanom,  yArr:smoothY(nino3Data.y),    accel:nino3Accel,  phaseZ:nino3PhaseZ,  N:_safeN(nino3Data,NINO3_N),
       xLabel:'NINO3 anomaly (°C)', yLabel:'dT/dt (°C/mo)', accelLayout:null, phaseLayout:null, idx:0, prevPhaseZ:undefined },
-    { id:'nino34', xanom:nino34Xanom, yArr:nino34Data.y,   accel:nino34Accel, phaseZ:nino34PhaseZ, N:_safeN(nino34Data,NINO34_N),
+    { id:'nino34', xanom:nino34Xanom, yArr:smoothY(nino34Data.y),   accel:nino34Accel, phaseZ:nino34PhaseZ, N:_safeN(nino34Data,NINO34_N),
       xLabel:'NINO3.4 anomaly (°C)', yLabel:'dT/dt (°C/mo)', accelLayout:null, phaseLayout:null, idx:0, prevPhaseZ:undefined },
-    { id:'nino4',  xanom:nino4Xanom,  yArr:nino4Data.y,    accel:nino4Accel,  phaseZ:nino4PhaseZ,  N:_safeN(nino4Data,NINO4_N),
+    { id:'nino4',  xanom:nino4Xanom,  yArr:smoothY(nino4Data.y),    accel:nino4Accel,  phaseZ:nino4PhaseZ,  N:_safeN(nino4Data,NINO4_N),
       xLabel:'NINO4 anomaly (°C)', yLabel:'dT/dt (°C/mo)', accelLayout:null, phaseLayout:null, idx:0, prevPhaseZ:undefined },
     { id:'tal',    xanom:talXanom,    yArr:talaraData.y,   accel:talAccel,    phaseZ:talPhaseZ,    N:_safeN(talaraData,TAL_N),
       xLabel:'SSH anomaly (mm)', yLabel:'dSL/dt (mm/mo)', accelLayout:null, phaseLayout:null, idx:0, prevPhaseZ:undefined },

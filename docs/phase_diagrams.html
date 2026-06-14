@@ -934,11 +934,15 @@ function obs1ApplyRange() {
   const sMo = parseInt(document.getElementById('obs1-mo-start').value);
   const eYr = parseInt(document.getElementById('obs1-yr-end').value);
   const eMo = parseInt(document.getElementById('obs1-mo-end').value);
-  const startIdx = _findStartIdx(observedData, OBS_N, sYr, sMo);
-  const endIdx   = _findEndIdx(observedData, OBS_N, eYr, eMo);
-  if (startIdx >= endIdx) { alert('End date must be after start date'); return; }
-  OBS1.obsEndIdx = endIdx;
-  OBS1.calEndIdx = _findEndIdx(callaoData, CAL_N, eYr, eMo);
+  const obsStart = _findStartIdx(observedData, OBS_N, sYr, sMo);
+  const obsEnd   = _findEndIdx(observedData, OBS_N, eYr, eMo);
+  const calStart = _findStartIdx(callaoData, CAL_N, sYr, sMo);
+  const calEnd   = _findEndIdx(callaoData, CAL_N, eYr, eMo);
+  if (obsStart >= obsEnd) { alert('End date must be after start date'); return; }
+  OBS1.obsStartIdx = obsStart;
+  OBS1.calStartIdx = calStart;
+  OBS1.obsEndIdx   = obsEnd;
+  OBS1.calEndIdx   = calEnd;
   obs1Reset();
 }
 
@@ -947,11 +951,15 @@ function clsApplyRange() {
   const sMo = parseInt(document.getElementById('cls-mo-start').value);
   const eYr = parseInt(document.getElementById('cls-yr-end').value);
   const eMo = parseInt(document.getElementById('cls-mo-end').value);
-  const startIdx = _findStartIdx(observedData, OBS_N, sYr, sMo);
-  const endIdx   = _findEndIdx(observedData, OBS_N, eYr, eMo);
-  if (startIdx >= endIdx) { alert('End date must be after start date'); return; }
-  CLS.obsEndIdx = endIdx;
-  CLS.calEndIdx = _findEndIdx(callaoData, CAL_N, eYr, eMo);
+  const obsStart = _findStartIdx(observedData, OBS_N, sYr, sMo);
+  const obsEnd   = _findEndIdx(observedData, OBS_N, eYr, eMo);
+  const calStart = _findStartIdx(callaoData, CAL_N, sYr, sMo);
+  const calEnd   = _findEndIdx(callaoData, CAL_N, eYr, eMo);
+  if (obsStart >= obsEnd) { alert('End date must be after start date'); return; }
+  CLS.obsStartIdx = obsStart;
+  CLS.calStartIdx = calStart;
+  CLS.obsEndIdx   = obsEnd;
+  CLS.calEndIdx   = calEnd;
   clsReset();
 }
 
@@ -1001,9 +1009,8 @@ function obs1Start() {
   OBS1.spf   = parseInt(document.getElementById('obs1-sl-spf')?.value)||1;
   OBS1.delay = parseInt(document.getElementById('obs1-sl-delay')?.value)||30;
   const cs = _cmpCommonStart();
-  OBS1.obsStartIdx = cs.obsStartIdx; OBS1.calStartIdx = cs.calStartIdx;
-  OBS1.obsIdx = cs.obsStartIdx;      OBS1.calIdx = cs.calStartIdx;
-  OBS1.totalFrames = Math.min(_obs1TotalFrames(cs), OBS1.obsEndIdx - cs.obsStartIdx);
+  OBS1.obsIdx = OBS1.obsStartIdx;    OBS1.calIdx = OBS1.calStartIdx;
+  OBS1.totalFrames = Math.min(_obs1TotalFrames(cs), OBS1.obsEndIdx - OBS1.obsStartIdx);
   OBS1.obsTail=[]; OBS1.calTail=[];
   OBS1.running=true; OBS1.paused=false;
   OBS1.sstOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
@@ -1042,11 +1049,11 @@ function obs1Finish() {
 
 function obs1Reset() {
   obs1Finish();
-  const cs = _cmpCommonStart();
-  OBS1.obsIdx = cs.obsStartIdx; OBS1.calIdx = cs.calStartIdx;
+  OBS1.obsIdx = OBS1.obsStartIdx; OBS1.calIdx = OBS1.calStartIdx;
   OBS1.obsTail=[]; OBS1.calTail=[];
   OBS1.sstOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
   OBS1.calOffCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
+  const cs = _cmpCommonStart();
   obs1ResetExtras(_obs1ExtraStarts(cs));
   obs1DrawBgs();
   const scrub = document.getElementById('obs1-scrubber');
@@ -1563,11 +1570,10 @@ function clsStart(){
   CLS.spf=parseInt(document.getElementById('cls-sl-spf')?.value)||1;
   CLS.delay=parseInt(document.getElementById('cls-sl-delay')?.value)||30;
   const cs=_cmpCommonStart();
-  CLS.obsStartIdx=cs.obsStartIdx; CLS.calStartIdx=cs.calStartIdx;
-  CLS.obsIdx=cs.obsStartIdx; CLS.calIdx=cs.calStartIdx;
+  CLS.obsIdx=CLS.obsStartIdx; CLS.calIdx=CLS.calStartIdx;
   if(CLS.obsEndIdx<0) CLS.obsEndIdx=OBS_N;
   if(CLS.calEndIdx<0) CLS.calEndIdx=CAL_N;
-  CLS.totalFrames=Math.min(_obs1TotalFrames(cs), CLS.obsEndIdx-cs.obsStartIdx);
+  CLS.totalFrames=Math.min(_obs1TotalFrames(cs), CLS.obsEndIdx-CLS.obsStartIdx);
   CLS.obsTail=[]; CLS.calTail=[];
   CLS.running=true; CLS.paused=false;
   CLS.sstOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
@@ -1593,11 +1599,11 @@ function clsPause(){
 
 function clsReset(){
   clsFinish();
-  const cs=_cmpCommonStart();
-  CLS.obsIdx=cs.obsStartIdx; CLS.calIdx=cs.calStartIdx;
+  CLS.obsIdx=CLS.obsStartIdx; CLS.calIdx=CLS.calStartIdx;
   CLS.obsTail=[]; CLS.calTail=[];
   CLS.sstOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
   CLS.calOffCtx.clearRect(0,0,CLS_CW,CLS_CH);
+  const cs=_cmpCommonStart();
   clsResetExtras(_obs1ExtraStarts(cs));
   clsDrawBgs();
   CLS.sstCtx.drawImage(CLS.sstOff,0,0);
