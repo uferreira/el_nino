@@ -684,9 +684,74 @@ const FA3D = {
   obsAccelLayout:null,  calAccelLayout:null,
   obsPhaseLayout:null,  calPhaseLayout:null,
   psRunning:false, psPaused:false, psRafId:null,
-  obsIdx:0, calIdx:0, spf:5,
-  prevObsPhaseZ:undefined, prevCalPhaseZ:undefined,
+  spf:5,
   psExtras:[],
+  dsets:[],
+};
+
+// ═══════════════════════════════════════════════════════
+// WebGL context budget manager
+// Browsers cap the number of simultaneous WebGL contexts (~16). This page
+// defines ~20 scatter3d plots; without management the browser silently
+// kills the oldest contexts, which showed up as the headline SST / Callao
+// panels rendering as blank white boxes. We mount a plot's WebGL context
+// only while it is near the viewport and purge it once it scrolls far
+// away, keeping the live count safely below the cap. Each panel exposes a
+// mount() (build the plot) and render() (redraw current animation frame),
+// so a purged-then-remounted panel always recovers the correct state.
+// ═══════════════════════════════════════════════════════
+const GLBudget = {
+  MAX_LIVE: 14,
+  panels: new Map(),   // id -> {mount, render, live, intersecting, seq}
+  seq: 0,
+  register(id, mount, render) {
+    this.panels.set(id, {mount, render, live:false, intersecting:false, seq:0});
+  },
+  isLive(id) { const p = this.panels.get(id); return !!(p && p.live); },
+  _liveCount() {
+    let n = 0;
+    for (const p of this.panels.values()) if (p.live) n++;
+    return n;
+  },
+  _evict(exceptId) {
+    // Purge oldest live panels that are NOT currently on-screen.
+    const victims = [...this.panels.entries()]
+      .filter(([id, p]) => p.live && !p.intersecting && id !== exceptId)
+      .sort((a, b) => a[1].seq - b[1].seq);
+    while (this._liveCount() >= this.MAX_LIVE && victims.length) {
+      const [id, p] = victims.shift();
+      try { Plotly.purge(id); } catch (e) {}
+      p.live = false;
+    }
+  },
+  show(id) {
+    const p = this.panels.get(id);
+    if (!p) return;
+    if (!p.live) {
+      this._evict(id);
+      try { p.mount(); p.live = true; } catch (e) { console.warn('GLBudget mount failed', id, e); }
+    }
+    p.seq = ++this.seq;
+    if (p.live && p.render) { try { p.render(); } catch (e) {} }
+  },
+  hide(id) {
+    const p = this.panels.get(id);
+    if (p && p.live) { try { Plotly.purge(id); } catch (e) {} p.live = false; }
+  },
+  observe() {
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        const p = this.panels.get(e.target.id);
+        if (p) p.intersecting = e.isIntersecting;
+        if (e.isIntersecting) this.show(e.target.id);
+        else this.hide(e.target.id);
+      }
+    }, { rootMargin: '250px 0px' });
+    for (const id of this.panels.keys()) {
+      const el = document.getElementById(id);
+      if (el) io.observe(el);
+    }
+  },
 };
 
 function init3D() {
@@ -860,20 +925,40 @@ function init3D() {
       e('#3388ff',             'markers',         1, 8),
     ];
   }
-  Plotly.newPlot('plot-static-sst-accel-anim', mkInitTraces(), FA3D.obsAccelLayout,
-    {responsive:true, displaylogo:false});
-  Plotly.newPlot('plot-static-cal-accel-anim', mkInitTraces(), FA3D.calAccelLayout,
-    {responsive:true, displaylogo:false});
-  Plotly.newPlot('plot-static-sst-phase-anim', mkInitTraces(), FA3D.obsPhaseLayout,
-    {responsive:true, displaylogo:false});
-  Plotly.newPlot('plot-static-cal-phase-anim', mkInitTraces(), FA3D.calPhaseLayout,
-    {responsive:true, displaylogo:false});
+  // ── Animated dataset descriptors (each drives an accel + a phase panel) ──
+  const DSETS = [
+    { key:'sst', x:observedData.x, y:observedData.y, accel:obsAccel, phase:obsPhaseZ,
+      N:OBS_N, month:observedData.month, year:observedData.year, label:true,
+      accelId:'plot-static-sst-accel-anim', phaseId:'plot-static-sst-phase-anim',
+      accelLayout:FA3D.obsAccelLayout, phaseLayout:FA3D.obsPhaseLayout, idx:0 },
+    { key:'cal', x:calXanom, y:callaoData.y, accel:calAccel, phase:calPhaseZ,
+      N:CAL_N, month:callaoData.month, year:callaoData.year,
+      accelId:'plot-static-cal-accel-anim', phaseId:'plot-static-cal-phase-anim',
+      accelLayout:FA3D.calAccelLayout, phaseLayout:FA3D.calPhaseLayout, idx:0 },
+  ];
   for (const e of FA3D.psExtras) {
-    if (e.N > 0) {
-      Plotly.newPlot('plot-static-' + e.id + '-accel-anim', mkInitTraces(), e.accelLayout, {responsive:true, displaylogo:false});
-      Plotly.newPlot('plot-static-' + e.id + '-phase-anim', mkInitTraces(), e.phaseLayout, {responsive:true, displaylogo:false});
+    if (e.N <= 0) continue;
+    DSETS.push({ key:e.id, x:e.xanom, y:e.yArr, accel:e.accel, phase:e.phaseZ, N:e.N,
+      accelId:'plot-static-' + e.id + '-accel-anim',
+      phaseId:'plot-static-' + e.id + '-phase-anim',
+      accelLayout:e.accelLayout, phaseLayout:e.phaseLayout, idx:0 });
+  }
+  FA3D.dsets = DSETS;
+
+  // Hide the empty plot cards of any extra dataset that is suppressed
+  // (e.g. Talara — too short a record for the multi-decade colour story),
+  // so no blank bordered box is left behind.
+  for (const e of FA3D.psExtras) {
+    if (e.N > 0) continue;
+    for (const t of ['accel', 'phase']) {
+      const el = document.getElementById('plot-static-' + e.id + '-' + t + '-anim');
+      const box = el && el.closest('.plot-box');
+      if (box) box.style.display = 'none';
     }
   }
+
+  const slc = (arr, a, b) => (arr instanceof Float64Array)
+    ? Array.from(arr.subarray(a, b)) : arr.slice(a, b);
 
   // ── Helper: build phase-z slice with null breaks at Dec→Jan wraps ───────
   function makePhaseSliceWithNulls(xArr, yArr, phaseArr, start, end) {
@@ -887,146 +972,73 @@ function init3D() {
     return {x, y, z};
   }
 
-  // ── Point-by-point smooth animation for phase3d-static ────────────────
-  function psClear() {
-    Plotly.react('plot-static-sst-accel-anim', mkInitTraces(), FA3D.obsAccelLayout);
-    Plotly.react('plot-static-cal-accel-anim', mkInitTraces(), FA3D.calAccelLayout);
-    Plotly.react('plot-static-sst-phase-anim', mkInitTraces(), FA3D.obsPhaseLayout);
-    Plotly.react('plot-static-cal-phase-anim', mkInitTraces(), FA3D.calPhaseLayout);
-    for (const e of FA3D.psExtras) {
-      if (e.N > 0) {
-        Plotly.react('plot-static-' + e.id + '-accel-anim', mkInitTraces(), e.accelLayout);
-        Plotly.react('plot-static-' + e.id + '-phase-anim', mkInitTraces(), e.phaseLayout);
-      }
+  // ── Full-state renderers ──────────────────────────────────────────────
+  // Redraw a panel's three traces (history / tail / dot) from the dataset
+  // arrays for the current ds.idx. Because every frame is rendered from
+  // scratch, a panel can be created, purged and re-created at any time and
+  // still show the correct state — which is what lets the WebGL budget
+  // manager mount panels lazily.
+  function renderAccel(ds) {
+    const end = Math.min(ds.idx, ds.N);
+    if (end <= 0) {
+      Plotly.restyle(ds.accelId, {x:[[],[],[]], y:[[],[],[]], z:[[],[],[]]}, [0,1,2]);
+      return;
+    }
+    const ts = Math.max(0, end - TAIL_N);
+    Plotly.restyle(ds.accelId, {
+      x:[slc(ds.x,0,end),     slc(ds.x,ts,end),     [ds.x[end-1]]],
+      y:[slc(ds.y,0,end),     slc(ds.y,ts,end),     [ds.y[end-1]]],
+      z:[slc(ds.accel,0,end), slc(ds.accel,ts,end), [ds.accel[end-1]]],
+    }, [0,1,2]);
+  }
+  function renderPhase(ds) {
+    const end = Math.min(ds.idx, ds.N);
+    if (end <= 0) {
+      Plotly.restyle(ds.phaseId, {x:[[],[],[]], y:[[],[],[]], z:[[],[],[]]}, [0,1,2]);
+      return;
+    }
+    const ts = Math.max(0, end - TAIL_N);
+    const hist = makePhaseSliceWithNulls(ds.x, ds.y, ds.phase, 0, end);
+    const tail = makePhaseSliceWithNulls(ds.x, ds.y, ds.phase, ts, end);
+    Plotly.restyle(ds.phaseId, {
+      x:[hist.x, tail.x, [ds.x[end-1]]],
+      y:[hist.y, tail.y, [ds.y[end-1]]],
+      z:[hist.z, tail.z, [ds.phase[end-1]]],
+    }, [0,1,2]);
+  }
+
+  // ── Register every animated panel with the WebGL budget manager ───────
+  for (const ds of DSETS) {
+    GLBudget.register(ds.accelId,
+      () => Plotly.newPlot(ds.accelId, mkInitTraces(), ds.accelLayout, {responsive:true, displaylogo:false}),
+      () => renderAccel(ds));
+    GLBudget.register(ds.phaseId,
+      () => Plotly.newPlot(ds.phaseId, mkInitTraces(), ds.phaseLayout, {responsive:true, displaylogo:false}),
+      () => renderPhase(ds));
+  }
+
+  function psRenderLive() {
+    for (const ds of DSETS) {
+      if (GLBudget.isLive(ds.accelId)) renderAccel(ds);
+      if (GLBudget.isLive(ds.phaseId)) renderPhase(ds);
     }
   }
   function psFrame() {
     if (!FA3D.psRunning || FA3D.psPaused) return;
     const spf = FA3D.spf;
-    const sl = (arr, a, b) => {
-      if (arr instanceof Float64Array) return Array.from(arr.subarray(a, b));
-      return arr.slice(a, b);
-    };
+    for (const ds of DSETS) if (ds.idx < ds.N) ds.idx = Math.min(ds.N, ds.idx + spf);
+    psRenderLive();
 
-    // ── Collect new obs points (with Dec→Jan null breaks in phase) ──
-    const oExt = {x:[[]], y:[[]], z_a:[[]], z_p:[[]]};
-    for (let s = 0; s < spf && FA3D.obsIdx < OBS_N; s++, FA3D.obsIdx++) {
-      const i = FA3D.obsIdx;
-      const newZ = obsPhaseZ[i];
-      if (FA3D.prevObsPhaseZ !== undefined && (FA3D.prevObsPhaseZ - newZ) > Math.PI) {
-        oExt.x[0].push(null); oExt.y[0].push(null);
-        oExt.z_a[0].push(null); oExt.z_p[0].push(null);
-      }
-      FA3D.prevObsPhaseZ = newZ;
-      oExt.x[0].push(observedData.x[i]);
-      oExt.y[0].push(observedData.y[i]);
-      oExt.z_a[0].push(obsAccel[i]);
-      oExt.z_p[0].push(newZ);
-    }
-    // ── Collect new cal points (with Dec→Jan null breaks in phase) ──
-    const cExt = {x:[[]], y:[[]], z_a:[[]], z_p:[[]]};
-    for (let s = 0; s < spf && FA3D.calIdx < CAL_N; s++, FA3D.calIdx++) {
-      const i = FA3D.calIdx;
-      const newZ = calPhaseZ[i];
-      if (FA3D.prevCalPhaseZ !== undefined && (FA3D.prevCalPhaseZ - newZ) > Math.PI) {
-        cExt.x[0].push(null); cExt.y[0].push(null);
-        cExt.z_a[0].push(null); cExt.z_p[0].push(null);
-      }
-      FA3D.prevCalPhaseZ = newZ;
-      cExt.x[0].push(calXanom[i]);
-      cExt.y[0].push(callaoData.y[i]);
-      cExt.z_a[0].push(calAccel[i]);
-      cExt.z_p[0].push(newZ);
-    }
-
-    // ── Extend history (trace 0) ──
-    if (oExt.x[0].length) {
-      Plotly.extendTraces('plot-static-sst-accel-anim', {x:oExt.x, y:oExt.y, z:oExt.z_a}, [0]);
-      Plotly.extendTraces('plot-static-sst-phase-anim', {x:oExt.x, y:oExt.y, z:oExt.z_p}, [0]);
-    }
-    if (cExt.x[0].length) {
-      Plotly.extendTraces('plot-static-cal-accel-anim', {x:cExt.x, y:cExt.y, z:cExt.z_a}, [0]);
-      Plotly.extendTraces('plot-static-cal-phase-anim', {x:cExt.x, y:cExt.y, z:cExt.z_p}, [0]);
-    }
-
-    // ── Update tail (trace 1) and dot (trace 2) ──
-    const oi = FA3D.obsIdx - 1;
-    if (oi >= 0 && oi < OBS_N) {
-      const ts = Math.max(0, oi - TAIL_N + 1);
-      const ox  = sl(observedData.x,  ts, oi+1);
-      const oy  = sl(observedData.y, ts, oi+1);
-      const oac = sl(obsAccel,       ts, oi+1);
-      const ophSlice = makePhaseSliceWithNulls(observedData.x, observedData.y, obsPhaseZ, ts, oi+1);
-      Plotly.restyle('plot-static-sst-accel-anim', {x:[ox], y:[oy], z:[oac]}, [1]);
-      Plotly.restyle('plot-static-sst-accel-anim',
-        {x:[[ox[ox.length-1]]], y:[[oy[oy.length-1]]], z:[[oac[oac.length-1]]]}, [2]);
-      Plotly.restyle('plot-static-sst-phase-anim', {x:[ophSlice.x], y:[ophSlice.y], z:[ophSlice.z]}, [1]);
-      Plotly.restyle('plot-static-sst-phase-anim',
-        {x:[[observedData.x[oi]]], y:[[observedData.y[oi]]], z:[[obsPhaseZ[oi]]]}, [2]);
-    }
-    const ci2 = FA3D.calIdx - 1;
-    if (ci2 >= 0 && ci2 < CAL_N) {
-      const ts = Math.max(0, ci2 - TAIL_N + 1);
-      const cx  = sl(calXanom,       ts, ci2+1);
-      const cy  = sl(callaoData.y,   ts, ci2+1);
-      const cac = sl(calAccel,       ts, ci2+1);
-      const cphSlice = makePhaseSliceWithNulls(calXanom, callaoData.y, calPhaseZ, ts, ci2+1);
-      Plotly.restyle('plot-static-cal-accel-anim', {x:[cx], y:[cy], z:[cac]}, [1]);
-      Plotly.restyle('plot-static-cal-accel-anim',
-        {x:[[cx[cx.length-1]]], y:[[cy[cy.length-1]]], z:[[cac[cac.length-1]]]}, [2]);
-      Plotly.restyle('plot-static-cal-phase-anim', {x:[cphSlice.x], y:[cphSlice.y], z:[cphSlice.z]}, [1]);
-      Plotly.restyle('plot-static-cal-phase-anim',
-        {x:[[calXanom[ci2]]], y:[[callaoData.y[ci2]]], z:[[calPhaseZ[ci2]]]}, [2]);
-    }
-
-    // ── Extra datasets (with Dec→Jan null breaks in phase) ──
-    for (const e of FA3D.psExtras) {
-      if (e.N === 0) continue;
-      const eExt = {x:[[]], y:[[]], z_a:[[]], z_p:[[]]};
-      for (let s = 0; s < spf && e.idx < e.N; s++, e.idx++) {
-        const i = e.idx;
-        const newZ = e.phaseZ[i];
-        if (e.prevPhaseZ !== undefined && (e.prevPhaseZ - newZ) > Math.PI) {
-          eExt.x[0].push(null); eExt.y[0].push(null);
-          eExt.z_a[0].push(null); eExt.z_p[0].push(null);
-        }
-        e.prevPhaseZ = newZ;
-        eExt.x[0].push(e.xanom[i]);
-        eExt.y[0].push(e.yArr[i]);
-        eExt.z_a[0].push(e.accel[i]);
-        eExt.z_p[0].push(newZ);
-      }
-      if (eExt.x[0].length) {
-        Plotly.extendTraces('plot-static-' + e.id + '-accel-anim', {x:eExt.x, y:eExt.y, z:eExt.z_a}, [0]);
-        Plotly.extendTraces('plot-static-' + e.id + '-phase-anim', {x:eExt.x, y:eExt.y, z:eExt.z_p}, [0]);
-      }
-      const ei = e.idx - 1;
-      if (ei >= 0 && ei < e.N) {
-        const ts = Math.max(0, ei - TAIL_N + 1);
-        const ex  = sl(e.xanom,  ts, ei+1);
-        const ey  = sl(e.yArr,   ts, ei+1);
-        const eac = sl(e.accel,  ts, ei+1);
-        const ephSlice = makePhaseSliceWithNulls(e.xanom, e.yArr, e.phaseZ, ts, ei+1);
-        const aid = 'plot-static-' + e.id + '-accel-anim';
-        const pid = 'plot-static-' + e.id + '-phase-anim';
-        Plotly.restyle(aid, {x:[ex], y:[ey], z:[eac]}, [1]);
-        Plotly.restyle(aid, {x:[[ex[ex.length-1]]], y:[[ey[ey.length-1]]], z:[[eac[eac.length-1]]]}, [2]);
-        Plotly.restyle(pid, {x:[ephSlice.x], y:[ephSlice.y], z:[ephSlice.z]}, [1]);
-        Plotly.restyle(pid, {x:[[e.xanom[ei]]], y:[[e.yArr[ei]]], z:[[e.phaseZ[ei]]]}, [2]);
-      }
-    }
-
-    // ── Label ──
-    if (oi >= 0 && oi < OBS_N) {
+    // ── Label (driven by the flagged dataset, i.e. SST) ──
+    const lds = DSETS.find(d => d.label) || DSETS[0];
+    if (lds && lds.idx > 0) {
+      const oi = lds.idx - 1;
       const lbl = document.getElementById('ps-year-label');
-      if (lbl) lbl.textContent =
-        MO_NAMES[observedData.month[oi]-1] + ' ' + observedData.year[oi];
+      if (lbl && lds.month) lbl.textContent = MO_NAMES[lds.month[oi]-1] + ' ' + lds.year[oi];
     }
 
     // ── Continue or stop ──
-    const _allDone = FA3D.obsIdx >= OBS_N && FA3D.calIdx >= CAL_N &&
-      FA3D.psExtras.every(e => e.N === 0 || e.idx >= e.N);
-    if (_allDone) {
+    if (DSETS.every(ds => ds.idx >= ds.N)) {
       FA3D.psRunning = false;
       document.getElementById('ps-run').disabled  = false;
       document.getElementById('ps-pause').disabled = true;
@@ -1039,10 +1051,9 @@ function init3D() {
     if (FA3D.psPaused) {
       FA3D.psPaused = false;
     } else {
-      FA3D.obsIdx = 0; FA3D.calIdx = 0; FA3D.psRunning = true;
-      FA3D.prevObsPhaseZ = undefined; FA3D.prevCalPhaseZ = undefined;
-      for (const e of FA3D.psExtras) { e.idx = 0; e.prevPhaseZ = undefined; }
-      psClear();
+      for (const ds of DSETS) ds.idx = 0;
+      FA3D.psRunning = true;
+      psRenderLive();
     }
     document.getElementById('ps-run').disabled  = true;
     document.getElementById('ps-pause').disabled = false;
@@ -1056,11 +1067,9 @@ function init3D() {
   }
   function psReset() {
     FA3D.psRunning = false; FA3D.psPaused = false;
-    FA3D.obsIdx = 0; FA3D.calIdx = 0;
-    FA3D.prevObsPhaseZ = undefined; FA3D.prevCalPhaseZ = undefined;
-    for (const e of FA3D.psExtras) { e.idx = 0; e.prevPhaseZ = undefined; }
+    for (const ds of DSETS) ds.idx = 0;
     if (FA3D.psRafId) { clearTimeout(FA3D.psRafId); FA3D.psRafId = null; }
-    psClear();
+    psRenderLive();
     const lbl = document.getElementById('ps-year-label');
     if (lbl) lbl.textContent = '—';
     document.getElementById('ps-run').disabled  = false;
@@ -1102,10 +1111,12 @@ function init3D() {
       marker:{size:5, color:ci, opacity:0.88, showscale:false},
       showlegend:false};
   });
-  Plotly.newPlot('plot-3d-obs', obsTraces,
-    makeLayout('SST NINO1+2 — Phase Space × Month of Year',
-               'T (°C)', 'dT/dt (°C/mo)'),
-    {responsive:true, displaylogo:false});
+  GLBudget.register('plot-3d-obs',
+    () => Plotly.newPlot('plot-3d-obs', obsTraces,
+      makeLayout('SST NINO1+2 — Phase Space × Month of Year',
+                 'T (°C)', 'dT/dt (°C/mo)'),
+      {responsive:true, displaylogo:false}),
+    null);
 
   // ── Duffing Equation: 12 monthly traces, colored by simulated year ────
   const p3d = {K0:0, K1:0.121847, K2:0, K3:-0.03046, K4:0, K5:0,
@@ -1132,10 +1143,12 @@ function init3D() {
     marker:{size:5, color:b.ci, opacity:0.88, showscale:false},
     showlegend:false
   }));
-  Plotly.newPlot('plot-3d-mod', modTraces,
-    makeLayout('Duffing Equation — Phase Space × Month of Year',
-               'X', 'dX/dt'),
-    {responsive:true, displaylogo:false});
+  GLBudget.register('plot-3d-mod',
+    () => Plotly.newPlot('plot-3d-mod', modTraces,
+      makeLayout('Duffing Equation — Phase Space × Month of Year',
+                 'X', 'dX/dt'),
+      {responsive:true, displaylogo:false}),
+    null);
 
   // ── Pre-compute year loops for attractor3d animated plots ────────────
   const obsYearMap = {}, calYearMap = {};
@@ -1196,8 +1209,7 @@ function init3D() {
     FA3D.endYearIdx = lastIdx >= 0 ? lastIdx+1 : FA3D.obsYearLoops.length;
     FA3D.running = false; FA3D.paused = false; FA3D.yearIdx = FA3D.startYearIdx;
     if (FA3D.rafId) { clearTimeout(FA3D.rafId); FA3D.rafId = null; }
-    Plotly.react('plot-3d-obs-anim', [], FA3D.obsAnimLayout);
-    Plotly.react('plot-3d-cal-anim', [], FA3D.calAnimLayout);
+    fa3dRenderLive();
     const lbl = document.getElementById('fa3d-year-label');
     if (lbl) lbl.textContent = '—';
     document.getElementById('fa3d-run').disabled = false;
@@ -1209,10 +1221,30 @@ function init3D() {
   FA3D.calAnimLayout = makeLayout(
     'Callao SSH — animated by year', 'SSH anomaly (mm)', 'dSSH/dt (mm/mo)');
 
-  Plotly.newPlot('plot-3d-obs-anim', [], FA3D.obsAnimLayout,
-    {responsive:true, displaylogo:false});
-  Plotly.newPlot('plot-3d-cal-anim', [], FA3D.calAnimLayout,
-    {responsive:true, displaylogo:false});
+  // ── attractor3d animated-by-year: full-state render of accumulated years ─
+  function renderObsAnim() {
+    const a = FA3D.startYearIdx, b = Math.min(FA3D.yearIdx, FA3D.obsYearLoops.length);
+    Plotly.react('plot-3d-obs-anim', FA3D.obsYearLoops.slice(a, Math.max(a, b)), FA3D.obsAnimLayout);
+  }
+  function renderCalAnim() {
+    const a = Math.min(FA3D.startYearIdx, FA3D.calYearLoops.length);
+    const b = Math.min(FA3D.yearIdx, FA3D.calYearLoops.length);
+    Plotly.react('plot-3d-cal-anim', FA3D.calYearLoops.slice(a, Math.max(a, b)), FA3D.calAnimLayout);
+  }
+  function fa3dRenderLive() {
+    if (GLBudget.isLive('plot-3d-obs-anim')) renderObsAnim();
+    if (GLBudget.isLive('plot-3d-cal-anim')) renderCalAnim();
+  }
+  GLBudget.register('plot-3d-obs-anim',
+    () => Plotly.newPlot('plot-3d-obs-anim',
+      FA3D.obsYearLoops.slice(FA3D.startYearIdx, Math.max(FA3D.startYearIdx, Math.min(FA3D.yearIdx, FA3D.obsYearLoops.length))),
+      FA3D.obsAnimLayout, {responsive:true, displaylogo:false}),
+    renderObsAnim);
+  GLBudget.register('plot-3d-cal-anim',
+    () => Plotly.newPlot('plot-3d-cal-anim',
+      FA3D.calYearLoops.slice(Math.min(FA3D.startYearIdx, FA3D.calYearLoops.length), Math.max(0, Math.min(FA3D.yearIdx, FA3D.calYearLoops.length))),
+      FA3D.calAnimLayout, {responsive:true, displaylogo:false}),
+    renderCalAnim);
 
   // ── attractor3d animation (month z-axis) ──────────────────────────────
   function fa3dFrame() {
@@ -1225,15 +1257,13 @@ function init3D() {
       document.getElementById('fa3d-pause').disabled = true;
       return;
     }
-    Plotly.addTraces('plot-3d-obs-anim', FA3D.obsYearLoops[i]);
-    const ci = Math.min(i, FA3D.calYearLoops.length - 1);
-    Plotly.addTraces('plot-3d-cal-anim', FA3D.calYearLoops[ci]);
+    FA3D.yearIdx++;
+    fa3dRenderLive();
     const lbl = document.getElementById('fa3d-year-label');
     if (lbl) {
       const yr = FA3D.obsYearLoops[i].name;
       lbl.textContent = MO_NAMES[0] + ' ' + yr + ' – ' + MO_NAMES[11] + ' ' + yr;
     }
-    FA3D.yearIdx++;
     FA3D.rafId = setTimeout(fa3dFrame, FA3D.delay);
   }
   function fa3dRun() {
@@ -1243,8 +1273,7 @@ function init3D() {
       FA3D.paused = false;
     } else {
       FA3D.yearIdx = FA3D.startYearIdx; FA3D.running = true;
-      Plotly.react('plot-3d-obs-anim', [], FA3D.obsAnimLayout);
-      Plotly.react('plot-3d-cal-anim', [], FA3D.calAnimLayout);
+      fa3dRenderLive();
     }
     document.getElementById('fa3d-run').disabled = true;
     document.getElementById('fa3d-pause').disabled = false;
@@ -1259,8 +1288,7 @@ function init3D() {
   function fa3dReset() {
     FA3D.running = false; FA3D.paused = false; FA3D.yearIdx = FA3D.startYearIdx;
     if (FA3D.rafId) { clearTimeout(FA3D.rafId); FA3D.rafId = null; }
-    Plotly.react('plot-3d-obs-anim', [], FA3D.obsAnimLayout);
-    Plotly.react('plot-3d-cal-anim', [], FA3D.calAnimLayout);
+    fa3dRenderLive();
     const lbl = document.getElementById('fa3d-year-label');
     if (lbl) lbl.textContent = '—';
     document.getElementById('fa3d-run').disabled = false;
@@ -1275,6 +1303,9 @@ function init3D() {
     FA3D.delay = +delaySl.value;
     delayLbl.textContent = delaySl.value + ' ms';
   });
+
+  // ── Activate lazy WebGL mounting for every registered 3D panel ─────────
+  GLBudget.observe();
 }
 
 let G_DOT = 3.0;

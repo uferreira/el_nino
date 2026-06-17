@@ -1422,12 +1422,12 @@ function redrawToFrame(targetFrame) {
     }
   }
 
-  CMP.obsIdx=obsStart+frame; CMP.calIdx=calStart+frame;
+  CMP.obsIdx=Math.min(obsStart+frame, OBS_N); CMP.calIdx=Math.min(calStart+frame, CAL_N);
   CMP.modStep=modStep; CMP.modX=modX; CMP.modY=modY;
   CMP.obsTail=obsTail; CMP.calTail=calTail; CMP.modTail=modTail;
 
-  const tIdx=Math.min(CMP.obsIdx,OBS_N-1);
-  const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
+  const _dd=_cmpDispDate();
+  const dispStr=_dd.str;
   cmpDrawBgs();
   compositeFrame(CMP.obsCtx,CMP_CW,CMP_CH,CMP_PLT,CMP_DOM_OBS,CMP.obsOff,CMP.obsTail,dispStr);
   compositeFrame(CMP.calCtx,CMP_CW,CMP_CH,CMP_PLT,CMP_DOM_CAL,CMP.calOff,CMP.calTail,dispStr);
@@ -1435,8 +1435,23 @@ function redrawToFrame(targetFrame) {
   cmpDrawExtras();
   document.getElementById('cmp-timelabel').textContent=dispStr;
   document.getElementById('cmp-time-display').textContent=
-    observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
+    _dd.y+' / '+String(_dd.m).padStart(2,'0');
   cmpStatus();
+}
+
+// Display date for the synced clock: the furthest calendar month reached
+// across the observed panels. SST holds at its last month (May) while sea
+// level may run one month further (June), so the clock follows whichever
+// series is furthest along.
+function _cmpDispDate() {
+  const oi = Math.min(CMP.obsIdx, OBS_N) - 1;
+  const ci = Math.min(CMP.calIdx, CAL_N) - 1;
+  let y = -1, m = 1;
+  if (oi >= 0) { y = observedData.year[oi]; m = observedData.month[oi]; }
+  if (ci >= 0 && callaoData.year[ci]*12 + callaoData.month[ci] > y*12 + m) {
+    y = callaoData.year[ci]; m = callaoData.month[ci];
+  }
+  return { y, m, str: (y < 0) ? '—' : (MO_NAMES[m-1] + ' ' + y) };
 }
 
 function cmpLoop() {
@@ -1444,22 +1459,27 @@ function cmpLoop() {
   const spf = parseInt(document.getElementById('nb-spf').value)||1;
   const p   = CMP.params;
   const DT_MOD = 0.2;
+  let done = false;
 
   for (let i=0; i<spf; i++) {
-    if (CMP.obsIdx >= CMP.obsEndIdx) { cmpFinish(); return; }
+    const obsActive = CMP.obsIdx < CMP.obsEndIdx;
+    const calActive = CMP.calIdx < CMP.calEndIdx;
+    if (!obsActive && !calActive) { done = true; break; }
 
-    // --- SST observed step ---
-    const ox = observedData.x[CMP.obsIdx];
-    const oy = observedData.y[CMP.obsIdx];
-    pushTail(CMP.obsTail, ox, oy, observedData.month[CMP.obsIdx], CMP_TAIL, CMP.obsOffCtx, CMP_PLT, CMP_DOM_OBS);
-    if (observedData.irest[CMP.obsIdx] === 0 && observedData.month[CMP.obsIdx] === CMP.selectedMonth) {
-      CMP.poiObs.push({x:ox, y:oy, year:observedData.year[CMP.obsIdx]});
-      poincareAddDot(ox, oy, observedData.year[CMP.obsIdx], CMP_DOM_OBS, 'obs');
+    // --- SST observed step (frozen at its last point once its record ends) ---
+    if (obsActive) {
+      const ox = observedData.x[CMP.obsIdx];
+      const oy = observedData.y[CMP.obsIdx];
+      pushTail(CMP.obsTail, ox, oy, observedData.month[CMP.obsIdx], CMP_TAIL, CMP.obsOffCtx, CMP_PLT, CMP_DOM_OBS);
+      if (observedData.irest[CMP.obsIdx] === 0 && observedData.month[CMP.obsIdx] === CMP.selectedMonth) {
+        CMP.poiObs.push({x:ox, y:oy, year:observedData.year[CMP.obsIdx]});
+        poincareAddDot(ox, oy, observedData.year[CMP.obsIdx], CMP_DOM_OBS, 'obs');
+      }
+      CMP.obsIdx++;
     }
-    CMP.obsIdx++;
 
     // --- Callao step (advances independently from its own t=0) ---
-    if (CMP.calIdx < CAL_N) {
+    if (CMP.calIdx < CMP.calEndIdx) {
       const cx = callaoData.x[CMP.calIdx] - callaoMean;
       const cy = callaoData.y[CMP.calIdx];
       pushTail(CMP.calTail, cx, cy, callaoData.month[CMP.calIdx], CMP_TAIL, CMP.calOffCtx, CMP_PLT, CMP_DOM_CAL);
@@ -1475,7 +1495,7 @@ function cmpLoop() {
     const prevModT = CMP.modStep * DT_MOD;
     const s = rk4Step(prevModT, CMP.modX, CMP.modY, p, DT_MOD);
     CMP.modX=s.X; CMP.modY=s.Y; CMP.modStep++;
-    if (!isFinite(CMP.modX)||Math.abs(CMP.modX)>200) { cmpFinish(); return; }
+    if (!isFinite(CMP.modX)||Math.abs(CMP.modX)>200) { done = true; break; }
     const modMonth = (Math.floor(prevModT) % 12) + 1;
     pushTail(CMP.modTail, CMP.modX, CMP.modY, modMonth, CMP_TAIL, CMP.modOffCtx, CMP_PLT, CMP_DOM_MOD);
     const currMonthFloor = Math.floor(CMP.modStep / 5);
@@ -1490,9 +1510,9 @@ function cmpLoop() {
     cmpAdvanceExtraStep();
   }
 
-  // Time label from SST data
-  const tIdx = Math.min(CMP.obsIdx, OBS_N-1);
-  const dispStr = MO_NAMES[observedData.month[tIdx]-1] + ' ' + observedData.year[tIdx];
+  // Time label — furthest calendar month reached across the observed panels
+  const _dd = _cmpDispDate();
+  const dispStr = _dd.str;
 
   drawBg(CMP.obsCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_OBS, CMP_LABELS_OBS);
   compositeFrame(CMP.obsCtx, CMP_CW, CMP_CH, CMP_PLT, CMP_DOM_OBS, CMP.obsOff, CMP.obsTail, dispStr);
@@ -1506,11 +1526,12 @@ function cmpLoop() {
 
   document.getElementById('cmp-timelabel').textContent = dispStr;
   document.getElementById('cmp-time-display').textContent =
-    observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
+    _dd.y+' / '+String(_dd.m).padStart(2,'0');
   const scrub = document.getElementById('cmp-scrubber');
-  if (scrub) scrub.value = CMP.obsIdx - CMP.obsStartIdx;
+  if (scrub) scrub.value = Math.max(CMP.obsIdx - CMP.obsStartIdx, CMP.calIdx - CMP.calStartIdx);
   cmpStatus();
 
+  if (done) { cmpFinish(); return; }
   const delay = parseInt(document.getElementById('nb-delay').value);
   if (CMP.running) CMP.rafId = setTimeout(()=>requestAnimationFrame(cmpLoop), delay);
 }
@@ -1527,7 +1548,9 @@ function cmpStart() {
   CMP.modStep=0; CMP.modX=0; CMP.modY=0;
   if(CMP.obsEndIdx<0) CMP.obsEndIdx=OBS_N;
   if(CMP.calEndIdx<0) CMP.calEndIdx=CAL_N;
-  CMP.totalFrames = Math.min(_cmpTotalFrames(cs), CMP.obsEndIdx-CMP.obsStartIdx);
+  // Run until the LONGEST observed panel ends, so each series plays out to
+  // its own latest month (e.g. sea level reaches June while SST holds at May).
+  CMP.totalFrames = Math.max(CMP.obsEndIdx - CMP.obsStartIdx, CMP.calEndIdx - CMP.calStartIdx);
 
   CMP.obsTail=[]; CMP.calTail=[]; CMP.modTail=[];
   CMP.poiObs=[]; CMP.poiCal=[]; CMP.poiMod=[];

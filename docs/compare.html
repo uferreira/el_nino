@@ -521,11 +521,19 @@ function cmpGetSelected() {
 
 function cmpGetTimeLabel(preps, startIndices, frame) {
   if (!preps.length) return '—';
-  const idx = startIndices[0] + frame;
-  const d = preps[0].data;
-  if (idx >= d.year.length) return '—';
   const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return mo[d.month[idx]-1] + ' ' + d.year[idx];
+  // Furthest calendar month across panels; exhausted series hold at their
+  // last point, so the clock follows whichever dataset is most up to date.
+  let bestYM = -1, bestStr = '—';
+  for (let k=0; k<preps.length; k++) {
+    const d = preps[k].data;
+    let idx = startIndices[k] + frame;
+    if (idx >= d.year.length) idx = d.year.length - 1;
+    if (idx < 0) continue;
+    const ym = d.year[idx]*12 + d.month[idx];
+    if (ym > bestYM) { bestYM = ym; bestStr = mo[d.month[idx]-1] + ' ' + d.year[idx]; }
+  }
+  return bestStr;
 }
 
 function cmpAlignedStartIndices(preps, align) {
@@ -545,12 +553,15 @@ function cmpAlignedStartIndices(preps, align) {
 
 function cmpTotalFrames(preps, startIndices) {
   if (!preps.length) return 0;
-  let min = Infinity;
+  // Run until the LONGEST selected series ends, so each panel plays out to
+  // its own latest month (shorter series hold at their last point — every
+  // draw path already guards idx against each dataset's length).
+  let max = 0;
   for (let k=0; k<preps.length; k++) {
     const avail = preps[k].data.x.length - startIndices[k];
-    if (avail < min) min = avail;
+    if (avail > max) max = avail;
   }
-  return Math.max(0, min);
+  return Math.max(0, max);
 }
 
 // Add point to tail, evict oldest to offscreen
@@ -690,10 +701,15 @@ function cmpPrepareState() {
   CMP.startIndices = starts;
   let cappedTotal = total;
   if (CMP.endYM > 0) {
-    const d = preps[0].data;
-    let endFrame = total;
-    for (let i=starts[0]; i<d.year.length; i++) {
-      if (d.year[i]*12+d.month[i] > CMP.endYM) { endFrame = i - starts[0]; break; }
+    // Frame at which the furthest-reaching dataset passes the chosen end month.
+    let endFrame = 0;
+    for (let k=0; k<preps.length; k++) {
+      const d = preps[k].data;
+      let ef = d.x.length - starts[k];
+      for (let i=starts[k]; i<d.year.length; i++) {
+        if (d.year[i]*12+d.month[i] > CMP.endYM) { ef = i - starts[k]; break; }
+      }
+      if (ef > endFrame) endFrame = ef;
     }
     cappedTotal = Math.min(total, Math.max(1, endFrame));
   }
