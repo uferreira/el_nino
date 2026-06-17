@@ -770,11 +770,16 @@ function obs1AdvanceExtraStep() {
   }
 }
 
-function obs1DrawExtras() {
+function obs1DrawExtras(dispStr) {
   for (const ex of OBS1_EXTRAS) {
     if (!ex || !ex.ctx) continue;
+    let exStr = dispStr;
+    const ei = ex.idx - 1;
+    if (ei >= 0 && ei < ex.cfg.N) {
+      exStr = MO_NAMES[ex.cfg.data.month[ei]-1] + ' ' + ex.cfg.data.year[ei];
+    }
     drawBg(ex.ctx, OBS1_CW, OBS1_CH, OBS1_PLT, ex.cfg.dom, ex.cfg.labels, ex.cfg.ticks);
-    compositeFrame(ex.ctx, OBS1_CW, OBS1_CH, OBS1_PLT, ex.cfg.dom, ex.off, ex.tail, null);
+    compositeFrame(ex.ctx, OBS1_CW, OBS1_CH, OBS1_PLT, ex.cfg.dom, ex.off, ex.tail, exStr);
   }
 }
 
@@ -985,7 +990,7 @@ function obs1Loop() {
   obs1DrawBgs();
   compositeFrame(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1.sstOff, OBS1.obsTail, dispStr);
   compositeFrame(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1.calOff, OBS1.calTail, dispStr);
-  obs1DrawExtras();
+  obs1DrawExtras(dispStr);
   document.getElementById('obs1-time-display').textContent =
     observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
   const scrub = document.getElementById('obs1-scrubber');
@@ -1101,7 +1106,7 @@ function obs1RedrawToFrame(targetFrame) {
   obs1DrawBgs();
   compositeFrame(OBS1.sstCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_SST, OBS1.sstOff, OBS1.obsTail, dispStr);
   compositeFrame(OBS1.calCtx, OBS1_CW, OBS1_CH, OBS1_PLT, OBS1_DOM_CAL, OBS1.calOff, OBS1.calTail, dispStr);
-  obs1DrawExtras();
+  obs1DrawExtras(dispStr);
   document.getElementById('obs1-time-display').textContent =
     observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
   const scrub = document.getElementById('obs1-scrubber');
@@ -1334,10 +1339,15 @@ function clsAdvanceExtraStep() {
   }
 }
 
-function clsDrawExtras() {
+function clsDrawExtras(dispStr) {
   for (const ex of CLS_EXTRAS) {
     if (!ex || !ex.ctx) continue;
-    compositeFrameWhite(ex.ctx, CLS_CW, CLS_CH, CLS_PLT, ex.cfg.dom, ex.off, ex.tail, null);
+    let exStr = dispStr;
+    const ei = ex.idx - 1;
+    if (ei >= 0 && ei < ex.cfg.N) {
+      exStr = MO_NAMES[ex.cfg.data.month[ei]-1] + ' ' + ex.cfg.data.year[ei];
+    }
+    compositeFrameWhite(ex.ctx, CLS_CW, CLS_CH, CLS_PLT, ex.cfg.dom, ex.off, ex.tail, exStr);
   }
 }
 
@@ -1549,7 +1559,7 @@ function clsLoop(){
   const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
   compositeFrameWhite(CLS.sstCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_SST,CLS.sstOff,CLS.obsTail,dispStr);
   compositeFrameWhite(CLS.calCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS.calOff,CLS.calTail,dispStr);
-  clsDrawExtras();
+  clsDrawExtras(dispStr);
   document.getElementById('cls-time-display').textContent=observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
   const scrub=document.getElementById('cls-scrubber');
   if(scrub) scrub.value=CLS.obsIdx-CLS.obsStartIdx;
@@ -1669,7 +1679,7 @@ function clsRedrawToFrame(targetFrame){
   const dispStr=MO_NAMES[observedData.month[tIdx]-1]+' '+observedData.year[tIdx];
   compositeFrameWhite(CLS.sstCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_SST,CLS.sstOff,CLS.obsTail,dispStr);
   compositeFrameWhite(CLS.calCtx,CLS_CW,CLS_CH,CLS_PLT,CLS_DOM_CAL,CLS.calOff,CLS.calTail,dispStr);
-  clsDrawExtras();
+  clsDrawExtras(dispStr);
   document.getElementById('cls-time-display').textContent=observedData.year[tIdx]+' / '+String(observedData.month[tIdx]).padStart(2,'0');
   const scrub=document.getElementById('cls-scrubber');
   if(scrub) scrub.value=frame;

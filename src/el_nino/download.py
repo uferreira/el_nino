@@ -36,7 +36,7 @@ FILL_VALUE = -32767
 
 REQUEST_TIMEOUT = 60   # seconds; ERDDAP for long series can be slow
 
-# RAPID near-real-time URLs tried in order; {id} → zero-padded station_id.
+# RAPID near-real-time URLs tried in order; {id} tozero-padded station_id.
 # URL 1: FD hourly CSV (same data as ERDDAP FD, different transport).
 # URL 2: Station RAPID stream (StationZero datum, GMT).
 # URL 3: ERDDAP Research Quality Data Set (RQDS) endpoint.
@@ -264,7 +264,7 @@ def _load_rapid(station_id: str) -> pd.DataFrame:
             _save_raw(f"data/input/rapid_{station_id}_raw.csv", resp.text)
             print(
                 f"  RAPID: {len(df):,} records  "
-                f"({df['time_utc'].iloc[0]} → {df['time_utc'].iloc[-1]})"
+                f"({df['time_utc'].iloc[0]} to{df['time_utc'].iloc[-1]})"
             )
             return df
 
@@ -455,7 +455,7 @@ def load_sst(
 
     print(
         f"  SST: {len(df)} months  "
-        f"({df['YR'].iloc[0]}/{df['MON'].iloc[0]:02d} → "
+        f"({df['YR'].iloc[0]}/{df['MON'].iloc[0]:02d} to"
         f"{df['YR'].iloc[-1]}/{df['MON'].iloc[-1]:02d})"
     )
 
@@ -545,7 +545,7 @@ def _load_sea_level_erddap(
 
     print(
         f"  {station_name}: {len(df):,} hourly obs  "
-        f"({df['time_utc'].iloc[0]} → {df['time_utc'].iloc[-1]})"
+        f"({df['time_utc'].iloc[0]} to{df['time_utc'].iloc[-1]})"
     )
 
     df_rapid = _load_rapid(station_id)
@@ -570,7 +570,7 @@ def _load_sea_level_erddap(
 
     print(
         f"  {station_name}: {len(monthly)} monthly means  "
-        f"({monthly['YR'].iloc[0]}/{monthly['MON'].iloc[0]:02d} → "
+        f"({monthly['YR'].iloc[0]}/{monthly['MON'].iloc[0]:02d} to"
         f"{monthly['YR'].iloc[-1]}/{monthly['MON'].iloc[-1]:02d})"
     )
 
@@ -666,7 +666,7 @@ def load_sea_level_rqd(url: str, station_name: str) -> dict:
 
     print(
         f"  {station_name} (RQD): {len(monthly_mean)} monthly means  "
-        f"({monthly_mean['YR'].iloc[0]}/{monthly_mean['MON'].iloc[0]:02d} → "
+        f"({monthly_mean['YR'].iloc[0]}/{monthly_mean['MON'].iloc[0]:02d} to"
         f"{monthly_mean['YR'].iloc[-1]}/{monthly_mean['MON'].iloc[-1]:02d})"
     )
     return {
@@ -709,7 +709,7 @@ def load_sea_level(
     5. Deduplicate on timestamp (keeping the last), drop NaN observations.
     6. Attempt RAPID extension: try three near-real-time URLs in order;
        append only observations strictly after the last FD timestamp.
-    7. Aggregate hourly → monthly via resample("MS").mean().
+    7. Aggregate hourly tomonthly via resample("MS").mean().
 
     Parameters
     ----------
@@ -898,7 +898,7 @@ def _self_test() -> None:
 
     # --- 2. Years in ascending order ---
     assert np.all(np.diff(IYR) >= 0), "FAIL: years not in ascending order"
-    print(f"  PASS 2: years ascending  ({IYR[0]} → {IYR[-1]})")
+    print(f"  PASS 2: years ascending  ({IYR[0]} to{IYR[-1]})")
 
     # --- 3. Months all in [1, 12] ---
     assert int(MES.min()) >= 1 and int(MES.max()) <= 12, (

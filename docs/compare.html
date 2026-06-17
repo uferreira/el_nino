@@ -536,6 +536,22 @@ function cmpGetTimeLabel(preps, startIndices, frame) {
   return bestStr;
 }
 
+function cmpGetGroupLabel(preps, startIndices, frame, group) {
+  if (!preps.length) return '—';
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let bestYM = -1, bestStr = '—';
+  for (let k=0; k<preps.length; k++) {
+    if (preps[k].group !== group) continue;
+    const d = preps[k].data;
+    let idx = startIndices[k] + frame;
+    if (idx >= d.year.length) idx = d.year.length - 1;
+    if (idx < 0) continue;
+    const ym = d.year[idx]*12 + d.month[idx];
+    if (ym > bestYM) { bestYM = ym; bestStr = mo[d.month[idx]-1] + ' ' + d.year[idx]; }
+  }
+  return bestStr;
+}
+
 function cmpAlignedStartIndices(preps, align) {
   if (!align || preps.length === 0) return preps.map(() => 0);
   // Find the latest start date across all selected datasets
@@ -618,22 +634,22 @@ function cmpRenderFrame(params) {
     cmpCtx.fill();
   }
 
-  // Time label — update text element and draw light pill on canvas
+  // Time label — update text element and draw per-panel pills
   const tlabel = cmpGetTimeLabel(CMP.activePreps, CMP.startIndices, CMP.frame);
   document.getElementById('cmp-time-display').textContent = tlabel;
   document.getElementById('cmp-scrubber').value = CMP.frame;
-  if (tlabel && tlabel !== '—') {
-    const plt = PLT_SST;
-    cmpCtx.font = 'bold 13px monospace';
-    const tw = cmpCtx.measureText(tlabel).width;
+  cmpCtx.font = 'bold 13px monospace';
+  cmpCtx.textAlign = 'left';
+  for (const [group, plt] of [['sst', PLT_SST], ['sl', PLT_SSH]]) {
+    const lbl = cmpGetGroupLabel(CMP.activePreps, CMP.startIndices, CMP.frame, group);
+    if (!lbl || lbl === '—') continue;
+    const tw = cmpCtx.measureText(lbl).width;
     cmpCtx.fillStyle = 'rgba(240,240,240,0.85)';
     cmpCtx.beginPath();
     cmpCtx.roundRect(plt.l+6, plt.t+6, tw+16, 22, 4);
     cmpCtx.fill();
     cmpCtx.fillStyle = '#111111';
-    cmpCtx.textAlign = 'left';
-    cmpCtx.fillText(tlabel, plt.l+14, plt.t+22);
-    cmpCtx.textAlign = 'left';
+    cmpCtx.fillText(lbl, plt.l+14, plt.t+22);
   }
 }
 
