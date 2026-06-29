@@ -341,10 +341,17 @@ footer a:hover { text-decoration:underline; }
         </div>
       </div>
       <div class="param-row">
-        <label>Steps per frame <span id="lbl-att-spf">180</span></label>
+        <label>Steps per frame <span id="lbl-att-spf">12</span></label>
         <div class="param-inline">
-          <input type="range" id="sl-att-spf" min="10" max="900" step="10" value="180">
-          <input type="number" id="nb-att-spf" value="180" min="10" step="10">
+          <input type="range" id="sl-att-spf" min="1" max="240" step="1" value="12">
+          <input type="number" id="nb-att-spf" value="12" min="1" step="1">
+        </div>
+      </div>
+      <div class="param-row">
+        <label>Frame delay ms <span id="lbl-att-delay">35</span></label>
+        <div class="param-inline">
+          <input type="range" id="sl-att-delay" min="0" max="180" step="5" value="35">
+          <input type="number" id="nb-att-delay" value="35" min="0" step="5">
         </div>
       </div>
       <div class="param-row">
@@ -363,7 +370,7 @@ footer a:hover { text-decoration:underline; }
         <div>Equation<strong>Duffing</strong></div>
         <div>Step size<strong>0.04 mo</strong></div>
         <div>Forcing<strong>Annual</strong></div>
-        <div>Potential<strong>Double well</strong></div>
+        <div>Speed<strong id="att-speed-readout">~0.4 yr/s</strong></div>
       </div>
     </div>
 
@@ -1216,7 +1223,7 @@ const ATT_POIN_PLT={l:34,r:288,t:18,b:156};
 const ATT = {
   running:false, paused:false,
   t:0, X:0, Y:0, step:0,
-  totalSteps:0, burnSteps:0, spf:180, tailLen:240,
+  totalSteps:0, burnSteps:0, spf:12, delay:35, tailLen:240,
   years:240, burnYears:20, params:null,
   tail:[], timeTrail:[], poincare:[], lastPoinMonth:-1, rafId:null,
   canvas:null, ctx:null, off:null, offCtx:null,
@@ -1470,7 +1477,7 @@ function attLoop() {
   attDrawFrame();
   attStatus();
   if (done) { attFinish(); return; }
-  ATT.rafId = requestAnimationFrame(attLoop);
+  ATT.rafId = setTimeout(()=>requestAnimationFrame(attLoop), ATT.delay);
 }
 
 function attStart() {
@@ -1479,7 +1486,8 @@ function attStart() {
   ATT.years = Math.max(1, parseInt(document.getElementById('nb-att-years').value)||240);
   ATT.burnYears = Math.max(0, parseInt(document.getElementById('nb-att-burn').value)||20);
   ATT.burnYears = Math.min(ATT.burnYears, Math.max(0, ATT.years-1));
-  ATT.spf = Math.max(1, parseInt(document.getElementById('nb-att-spf').value)||180);
+  ATT.spf = Math.max(1, parseInt(document.getElementById('nb-att-spf').value)||12);
+  ATT.delay = Math.max(0, parseInt(document.getElementById('nb-att-delay').value)||0);
   ATT.tailLen = Math.max(10, parseInt(document.getElementById('nb-att-tail').value)||240);
   ATT.totalSteps = Math.round(ATT.years * 12 / ATT_DT);
   ATT.burnSteps = Math.round(ATT.burnYears * 12 / ATT_DT);
@@ -1492,7 +1500,7 @@ function attStart() {
   setBtn('att-run', true); setBtn('att-pause', false);
   document.getElementById('att-pause').innerHTML='&#9646;&#9646; Pause';
   attStatus();
-  ATT.rafId = requestAnimationFrame(attLoop);
+  ATT.rafId = setTimeout(()=>requestAnimationFrame(attLoop), ATT.delay);
 }
 
 function attPause() {
@@ -1504,7 +1512,7 @@ function attPause() {
     btn.innerHTML='&#9654; Resume';
   } else {
     btn.innerHTML='&#9646;&#9646; Pause';
-    ATT.rafId = requestAnimationFrame(attLoop);
+    ATT.rafId = setTimeout(()=>requestAnimationFrame(attLoop), ATT.delay);
   }
   attStatus();
 }
@@ -1536,6 +1544,15 @@ function attStatus() {
   const pct = ATT.totalSteps > 0 ? (ATT.step / ATT.totalSteps * 100).toFixed(1) : '0.0';
   const painted = Math.max(0, elapsed - ATT.burnYears);
   el.innerHTML = `<span class="${cls}">${st}</span> &nbsp;·&nbsp; ${elapsed.toFixed(1)}/${ATT.years} years (${pct}%) &nbsp;·&nbsp; painted ${painted.toFixed(1)} years`;
+}
+
+function updateAttSpeed() {
+  const spf = parseInt(document.getElementById('nb-att-spf').value)||12;
+  const delay = parseInt(document.getElementById('nb-att-delay').value)||0;
+  const fps = 1000 / Math.max(16, delay + 16);
+  const yearsPerSec = spf * fps * ATT_DT / 12;
+  const el = document.getElementById('att-speed-readout');
+  if (el) el.textContent = '~' + yearsPerSec.toFixed(2) + ' yr/s';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2229,7 +2246,7 @@ function linkSlider(slId, nbId, lblId, fmt) {
   const nb=document.getElementById(nbId);
   const lb=document.getElementById(lblId);
   if (!sl||!nb||!lb) return;
-  function upd(v) { sl.value=v; nb.value=v; lb.textContent=fmt(parseFloat(v)); updateEffSpeed(); }
+  function upd(v) { sl.value=v; nb.value=v; lb.textContent=fmt(parseFloat(v)); updateEffSpeed(); updateAttSpeed(); }
   sl.addEventListener('input',  ()=>upd(sl.value));
   nb.addEventListener('change', ()=>upd(nb.value));
   upd(sl.value);
@@ -2268,13 +2285,14 @@ linkSlider('sl-Y0','nb-Y0','lbl-Y0',f2);
 linkSlider('sl-att-years','nb-att-years','lbl-att-years',fInt);
 linkSlider('sl-att-burn','nb-att-burn','lbl-att-burn',fInt);
 linkSlider('sl-att-spf','nb-att-spf','lbl-att-spf',fInt);
+linkSlider('sl-att-delay','nb-att-delay','lbl-att-delay',fInt);
 linkSlider('sl-att-tail','nb-att-tail','lbl-att-tail',fInt);
 
 function resetParams() {
   const d=[['nb-K1',.121847],['nb-K3',-.03046],['nb-FA',.4873],['nb-FF',-60],
            ['nb-B',-.35465],['nb-tend',600],['nb-spf',1],['nb-delay',30],
            ['nb-styear',1975],['nb-X0',0],['nb-Y0',0],['nb-tstart',0.5],
-           ['nb-att-years',240],['nb-att-burn',20],['nb-att-spf',180],['nb-att-tail',240]];
+           ['nb-att-years',240],['nb-att-burn',20],['nb-att-spf',12],['nb-att-delay',35],['nb-att-tail',240]];
   d.forEach(([id,val])=>{ document.getElementById(id).value=val; });
   linkSlider('sl-K1','nb-K1','lbl-K1',f4); linkSlider('sl-K3','nb-K3','lbl-K3',f4);
   linkSlider('sl-FA','nb-FA','lbl-FA',f4); linkSlider('sl-FF','nb-FF','lbl-FF',fDeg);
@@ -2285,6 +2303,7 @@ function resetParams() {
   linkSlider('sl-att-years','nb-att-years','lbl-att-years',fInt);
   linkSlider('sl-att-burn','nb-att-burn','lbl-att-burn',fInt);
   linkSlider('sl-att-spf','nb-att-spf','lbl-att-spf',fInt);
+  linkSlider('sl-att-delay','nb-att-delay','lbl-att-delay',fInt);
   linkSlider('sl-att-tail','nb-att-tail','lbl-att-tail',fInt);
   s2Reset(); attReset(); cmpReset();
 }
@@ -2308,6 +2327,7 @@ window.addEventListener('load', () => {
   attInit();
   cmpInit();
   updateEffSpeed();
+  updateAttSpeed();
   const dotSl = document.getElementById('g-dot-size');
   if (dotSl) {
     dotSl.addEventListener('input', function() {
