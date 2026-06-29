@@ -236,7 +236,7 @@ footer a:hover { text-decoration:underline; }
       <div class="param-row">
         <label>Start time (months) <span id="lbl-tstart">0</span></label>
         <div class="param-inline">
-          <input type="number" id="nb-tstart" value="0" step="12" min="0">
+          <input type="number" id="nb-tstart" value="0.5" step="0.5" min="0">
         </div>
       </div>
     </div>
@@ -795,30 +795,50 @@ function seasonColorAlpha(month, alpha) {
 
 const CAL_SSH_TICKS={x:[-300,-200,-100,0,100,200,300],y:[-60,-40,-20,0,20,40,60]};
 
-// 3. RK4 STEP — exact translation of NL3System.java / DoubleWell.java
+// 3. RKF5 STEP — exact translation of NL3System.java / DoubleWell.java
 // ═══════════════════════════════════════════════════════
-const W_ANN = 2 * Math.PI / 12;
+const W_ANN = 0.523599;
 
-function rk4Step(t, X, Y, p, h) {
+function rkf5Step(t, X, Y, p, h) {
+  const W = p.W || W_ANN;
   const FFr  = p.FF  * Math.PI / 180;
   const FF2r = p.FF2 * Math.PI / 180;
   function rhs(tt, xx, yy) {
     return (p.K0 + p.K1*xx + p.K2*xx*xx + p.K3*xx*xx*xx
           + p.K4*xx*xx*xx*xx + p.K5*xx*xx*xx*xx*xx
-          + p.FA *Math.cos(FFr) *Math.cos(W_ANN*tt)
-          + p.FA *Math.sin(FFr) *Math.sin(W_ANN*tt)
-          + p.FA2*Math.cos(FF2r)*Math.cos(2*W_ANN*tt)
-          + p.FA2*Math.sin(FF2r)*Math.sin(2*W_ANN*tt)
+          + p.FA *Math.cos(FFr) *Math.cos(W*tt)
+          + p.FA *Math.sin(FFr) *Math.sin(W*tt)
+          + p.FA2*Math.cos(FF2r)*Math.cos(2*W*tt)
+          + p.FA2*Math.sin(FF2r)*Math.sin(2*W*tt)
           + p.B*yy);
   }
-  const k1x=h*Y,             k1y=h*rhs(t,X,Y);
-  const k2x=h*(Y+k1y/2),    k2y=h*rhs(t+h/2,X+k1x/2,Y+k1y/2);
-  const k3x=h*(Y+k2y/2),    k3y=h*rhs(t+h/2,X+k2x/2,Y+k2y/2);
-  const k4x=h*(Y+k3y),      k4y=h*rhs(t+h,  X+k3x,  Y+k3y);
+  const k1x = h*Y;
+  const k1y = h*rhs(t, X, Y);
+  const k2x = h*(Y + k1y/4);
+  const k2y = h*rhs(t + h/4, X + k1x/4, Y + k1y/4);
+  const k3x = h*(Y + (3/32)*k1y + (9/32)*k2y);
+  const k3y = h*rhs(t + (3/8)*h, X + (3/32)*k1x + (9/32)*k2x, Y + (3/32)*k1y + (9/32)*k2y);
+  const k4x = h*(Y + (1932/2197)*k1y - (7200/2197)*k2y + (7296/2197)*k3y);
+  const k4y = h*rhs(t + (12/13)*h,
+                    X + (1932/2197)*k1x - (7200/2197)*k2x + (7296/2197)*k3x,
+                    Y + (1932/2197)*k1y - (7200/2197)*k2y + (7296/2197)*k3y);
+  const k5x = h*(Y + (439/216)*k1y - 8*k2y + (3680/513)*k3y - (845/4104)*k4y);
+  const k5y = h*rhs(t + h,
+                    X + (439/216)*k1x - 8*k2x + (3680/513)*k3x - (845/4104)*k4x,
+                    Y + (439/216)*k1y - 8*k2y + (3680/513)*k3y - (845/4104)*k4y);
+  const k6x = h*(Y - (8/27)*k1y + 2*k2y - (3544/2565)*k3y + (1859/4104)*k4y - (11/40)*k5y);
+  const k6y = h*rhs(t + h/2,
+                    X - (8/27)*k1x + 2*k2x - (3544/2565)*k3x + (1859/4104)*k4x - (11/40)*k5x,
+                    Y - (8/27)*k1y + 2*k2y - (3544/2565)*k3y + (1859/4104)*k4y - (11/40)*k5y);
   return {
-    X: X+(k1x+2*k2x+2*k3x+k4x)/6,
-    Y: Y+(k1y+2*k2y+2*k3y+k4y)/6
+    X: X + (16/135)*k1x + (6656/12825)*k3x + (28561/56430)*k4x - (9/50)*k5x + (2/55)*k6x,
+    Y: Y + (16/135)*k1y + (6656/12825)*k3y + (28561/56430)*k4y - (9/50)*k5y + (2/55)*k6y
   };
+}
+
+function getStartTime() {
+  const v = parseFloat(document.getElementById('nb-tstart').value);
+  return Number.isFinite(v) ? Math.max(0, v) : 0.5;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1055,7 +1075,7 @@ function s2Loop() {
   for (let i=0; i<S2.spf; i++) {
     if (S2.t >= S2.t_end) { s2Finish(); return; }
     const s2t = S2.step * dt;
-    const s=rk4Step(S2.t, S2.X, S2.Y, p, dt);
+    const s=rkf5Step(S2.t, S2.X, S2.Y, p, dt);
     S2.X=s.X; S2.Y=s.Y; S2.t+=dt; S2.step++;
     if (!isFinite(S2.X)||Math.abs(S2.X)>200) { s2Finish(); return; }
     const s2Month = (Math.floor(s2t) % 12) + 1;
@@ -1074,7 +1094,7 @@ function s2Start() {
   if (S2.running) return;
   S2.params    = getParams();
   S2.t_end     = parseFloat(document.getElementById('nb-tend').value)||600;
-  S2.t_start   = Math.max(0, parseFloat(document.getElementById('nb-tstart').value)||0);
+  S2.t_start   = getStartTime();
   S2.spf       = parseInt(document.getElementById('nb-spf').value)||1;
   S2.delay     = parseInt(document.getElementById('nb-delay').value);
   S2.startYear = parseInt(document.getElementById('nb-styear').value)||1975;
@@ -1141,7 +1161,7 @@ function s2RedrawToFrame(targetStep) {
 
   for (let i = 0; i < target; i++) {
     const s2t = step * dt;
-    const s = rk4Step(t, X, Y, p, dt);
+    const s = rkf5Step(t, X, Y, p, dt);
     X = s.X; Y = s.Y; t += dt; step++;
     if (!isFinite(X) || Math.abs(X) > 200) break;
     const s2Month = (Math.floor(s2t) % 12) + 1;
@@ -1292,7 +1312,7 @@ function attLoop() {
   for (let i=0; i<n; i++) {
     if (ATT.step >= ATT.totalSteps) { done = true; break; }
     const prevX=ATT.X, prevY=ATT.Y;
-    const s = rk4Step(ATT.t, ATT.X, ATT.Y, p, ATT_DT);
+    const s = rkf5Step(ATT.t, ATT.X, ATT.Y, p, ATT_DT);
     ATT.X=s.X; ATT.Y=s.Y; ATT.t+=ATT_DT; ATT.step++;
     if (!isFinite(ATT.X) || !isFinite(ATT.Y) || Math.abs(ATT.X)>200 || Math.abs(ATT.Y)>200) {
       done = true; break;
@@ -1322,7 +1342,7 @@ function attStart() {
   ATT.tailLen = Math.max(10, parseInt(document.getElementById('nb-att-tail').value)||240);
   ATT.totalSteps = Math.round(ATT.years * 12 / ATT_DT);
   ATT.burnSteps = Math.round(ATT.burnYears * 12 / ATT_DT);
-  ATT.t=0; ATT.step=0;
+  ATT.t=getStartTime(); ATT.step=0;
   ATT.X=parseFloat(document.getElementById('nb-X0').value)||0;
   ATT.Y=parseFloat(document.getElementById('nb-Y0').value)||0;
   ATT.tail=[];
@@ -1684,8 +1704,8 @@ function redrawToFrame(targetFrame) {
       }
     }
     const prevMonthFloor=Math.floor(modStep/5);
-    const prevModT=modStep*DT_MOD;
-    const s=rk4Step(prevModT,modX,modY,p,DT_MOD);
+    const prevModT=getStartTime()+modStep*DT_MOD;
+    const s=rkf5Step(prevModT,modX,modY,p,DT_MOD);
     modX=s.X; modY=s.Y; modStep++;
     const modMonth=(Math.floor(prevModT)%12)+1;
     pushTail(modTail, modX, modY, modMonth, CMP_TAIL, CMP.modOffCtx, CMP_PLT, CMP_DOM_MOD);
@@ -1779,8 +1799,8 @@ function cmpLoop() {
 
     // --- Model step ---
     const prevMonthFloor = Math.floor(CMP.modStep / 5);
-    const prevModT = CMP.modStep * DT_MOD;
-    const s = rk4Step(prevModT, CMP.modX, CMP.modY, p, DT_MOD);
+    const prevModT = getStartTime() + CMP.modStep * DT_MOD;
+    const s = rkf5Step(prevModT, CMP.modX, CMP.modY, p, DT_MOD);
     CMP.modX=s.X; CMP.modY=s.Y; CMP.modStep++;
     if (!isFinite(CMP.modX)||Math.abs(CMP.modX)>200) { done = true; break; }
     const modMonth = (Math.floor(prevModT) % 12) + 1;
@@ -2054,6 +2074,7 @@ function getParams() {
     FF: parseFloat(document.getElementById('nb-FF').value)||-60,
     FA2:0, FF2:0,
     B:  parseFloat(document.getElementById('nb-B').value)||-.35465,
+    W:  W_ANN,
   };
 }
 
@@ -2111,7 +2132,7 @@ linkSlider('sl-att-tail','nb-att-tail','lbl-att-tail',fInt);
 function resetParams() {
   const d=[['nb-K1',.121847],['nb-K3',-.03046],['nb-FA',.4873],['nb-FF',-60],
            ['nb-B',-.35465],['nb-tend',600],['nb-spf',1],['nb-delay',30],
-           ['nb-styear',1975],['nb-X0',0],['nb-Y0',0],
+           ['nb-styear',1975],['nb-X0',0],['nb-Y0',0],['nb-tstart',0.5],
            ['nb-att-years',240],['nb-att-burn',20],['nb-att-spf',180],['nb-att-tail',240]];
   d.forEach(([id,val])=>{ document.getElementById(id).value=val; });
   linkSlider('sl-K1','nb-K1','lbl-K1',f4); linkSlider('sl-K3','nb-K3','lbl-K3',f4);
@@ -2134,7 +2155,7 @@ function resetParams() {
 //
 // Sample the phase trajectory at the start of every calendar month:
 //   - SST observed: irest===0 gives exactly 12 dots per year.
-//   - Duffing model: sample every 25 RK4 steps (= 1 month at dt=0.04).
+//   - Duffing model: sample every 25 RKF5 steps (= 1 month at dt=0.04).
 //
 // 12 Plotly traces, one per month.  Vertical scatter in each column
 // reveals chaos: a perfectly periodic system would produce 12 vertical
