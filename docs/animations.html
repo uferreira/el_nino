@@ -59,14 +59,19 @@ select.month-sel { background:var(--surface); border:1px solid var(--border); bo
 .poin-wrap { margin-top:1.4rem; }
 .poin-label { display:flex; align-items:center; gap:1rem; margin-bottom:.7rem; flex-wrap:wrap; }
 .poin-count { font-family:monospace; font-size:.82rem; color:var(--muted); }
-.attractor-layout { display:grid; grid-template-columns:300px 1fr; gap:1rem; align-items:start; }
+.attractor-layout { display:grid; grid-template-columns:280px minmax(0,1fr) 260px; gap:1rem; align-items:start; }
 .attractor-controls { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:1rem; }
 .attractor-controls .param-row { margin-bottom:.8rem; }
 .attractor-canvas-wrap { min-width:0; }
+.attractor-side { display:grid; gap:.8rem; min-width:0; }
+.side-panel { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:.55rem; }
+.side-panel-title { color:var(--muted); font-size:.76rem; font-weight:600; text-transform:uppercase; letter-spacing:.06em; margin:0 0 .35rem .1rem; }
+.side-panel canvas { display:block; width:100%; height:auto; background:#0a0a0e; border:1px solid var(--border); border-radius:5px; }
 .mini-readout { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; margin-top:.8rem; }
 .mini-readout div { background:var(--surface); border:1px solid var(--border); border-radius:5px; padding:.45rem .55rem; font-size:.76rem; color:var(--muted); }
 .mini-readout strong { display:block; color:var(--text); font-family:monospace; font-size:.86rem; margin-top:.1rem; }
-@media(max-width:900px){ .attractor-layout{ grid-template-columns:1fr; } }
+@media(max-width:1100px){ .attractor-layout{ grid-template-columns:280px minmax(0,1fr); } .attractor-side{ grid-column:1 / -1; grid-template-columns:repeat(3,1fr); } }
+@media(max-width:760px){ .attractor-layout{ grid-template-columns:1fr; } .attractor-side{ grid-template-columns:1fr; } }
 footer { text-align:center; padding:2rem 1rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); }
 footer a { color:var(--accent); text-decoration:none; }
 footer a:hover { text-decoration:underline; }
@@ -365,6 +370,21 @@ footer a:hover { text-decoration:underline; }
     <div class="attractor-canvas-wrap">
       <div class="status-bar" id="att-status"><span class="st-ready">Ready — uses the current Duffing parameters above</span></div>
       <canvas id="duff-attractor-canvas" class="phasecanvas" width="1050" height="620"></canvas>
+    </div>
+
+    <div class="attractor-side">
+      <div class="side-panel">
+        <div class="side-panel-title">Recent X(t)</div>
+        <canvas id="att-time-canvas" width="300" height="160"></canvas>
+      </div>
+      <div class="side-panel">
+        <div class="side-panel-title">Double-Well Potential</div>
+        <canvas id="att-pot-canvas" width="300" height="160"></canvas>
+      </div>
+      <div class="side-panel">
+        <div class="side-panel-title">Poincare Samples</div>
+        <canvas id="att-poin-canvas" width="300" height="180"></canvas>
+      </div>
     </div>
   </div>
 </div>
@@ -1189,14 +1209,18 @@ const ATT_PLT={l:70,r:1018,t:46,b:566};
 const ATT_DOM={xmin:-4.5,xmax:4.5,ymin:-2.0,ymax:2.0};
 const ATT_LABELS={x:'X (model units)', y:'dX/dt'};
 const ATT_DT=0.04;
+const ATT_SIDE_W=300, ATT_TIME_H=160, ATT_POT_H=160, ATT_POIN_H=180;
+const ATT_SIDE_PLT={l:34,r:288,t:18,b:136};
+const ATT_POIN_PLT={l:34,r:288,t:18,b:156};
 
 const ATT = {
   running:false, paused:false,
   t:0, X:0, Y:0, step:0,
   totalSteps:0, burnSteps:0, spf:180, tailLen:240,
   years:240, burnYears:20, params:null,
-  tail:[], rafId:null,
+  tail:[], timeTrail:[], poincare:[], lastPoinMonth:-1, rafId:null,
   canvas:null, ctx:null, off:null, offCtx:null,
+  timeCanvas:null, timeCtx:null, potCanvas:null, potCtx:null, poinCanvas:null, poinCtx:null,
 };
 
 function attInit() {
@@ -1205,6 +1229,12 @@ function attInit() {
   ATT.ctx = ATT.canvas.getContext('2d');
   ATT.off = makeOff(ATT_CW, ATT_CH);
   ATT.offCtx = ATT.off.getContext('2d');
+  ATT.timeCanvas = document.getElementById('att-time-canvas');
+  ATT.timeCtx = ATT.timeCanvas ? ATT.timeCanvas.getContext('2d') : null;
+  ATT.potCanvas = document.getElementById('att-pot-canvas');
+  ATT.potCtx = ATT.potCanvas ? ATT.potCanvas.getContext('2d') : null;
+  ATT.poinCanvas = document.getElementById('att-poin-canvas');
+  ATT.poinCtx = ATT.poinCanvas ? ATT.poinCanvas.getContext('2d') : null;
   attDrawEmpty();
 }
 
@@ -1232,6 +1262,8 @@ function attDrawEmpty() {
   if (!ATT.ctx) return;
   drawBg(ATT.ctx, ATT_CW, ATT_CH, ATT_PLT, ATT_DOM, ATT_LABELS);
   attDrawOverlayText('Long-run Duffing attractor', 'Click Run to integrate many simulated years');
+  ATT.params = getParams();
+  attDrawSidePanels();
 }
 
 function attDrawOverlayText(line1, line2) {
@@ -1258,6 +1290,106 @@ function attAddSegment(x1, y1, x2, y2, month, year) {
   ATT.offCtx.moveTo(p1x, p1y);
   ATT.offCtx.lineTo(p2x, p2y);
   ATT.offCtx.stroke();
+}
+
+function attSideBg(ctx, h, PLT) {
+  ctx.fillStyle='#0a0a0e';
+  ctx.fillRect(0,0,ATT_SIDE_W,h);
+  ctx.strokeStyle='#1a1a2a'; ctx.lineWidth=0.5;
+  for (let i=0; i<=4; i++) {
+    const x=PLT.l + i*(PLT.r-PLT.l)/4;
+    ctx.beginPath(); ctx.moveTo(x,PLT.t); ctx.lineTo(x,PLT.b); ctx.stroke();
+  }
+  for (let i=0; i<=3; i++) {
+    const y=PLT.t + i*(PLT.b-PLT.t)/3;
+    ctx.beginPath(); ctx.moveTo(PLT.l,y); ctx.lineTo(PLT.r,y); ctx.stroke();
+  }
+  ctx.strokeStyle='#363650'; ctx.lineWidth=1;
+  ctx.strokeRect(PLT.l,PLT.t,PLT.r-PLT.l,PLT.b-PLT.t);
+}
+
+function attDrawPotential() {
+  const ctx = ATT.potCtx;
+  if (!ctx) return;
+  const p = ATT.params || getParams();
+  const PLT = ATT_SIDE_PLT;
+  attSideBg(ctx, ATT_POT_H, PLT);
+  const xs = [];
+  const vs = [];
+  for (let i=0; i<=220; i++) {
+    const x = ATT_DOM.xmin + (ATT_DOM.xmax-ATT_DOM.xmin)*i/220;
+    const v = -(p.K0*x + p.K1*x*x/2 + p.K2*x*x*x/3 + p.K3*x*x*x*x/4 + p.K4*x*x*x*x*x/5 + p.K5*x*x*x*x*x*x/6);
+    xs.push(x); vs.push(v);
+  }
+  const vmin = Math.min(...vs), vmax = Math.max(...vs);
+  const mx = x => PLT.l + (x-ATT_DOM.xmin)/(ATT_DOM.xmax-ATT_DOM.xmin)*(PLT.r-PLT.l);
+  const my = v => PLT.b - (v-vmin)/(vmax-vmin || 1)*(PLT.b-PLT.t);
+  ctx.strokeStyle='rgba(255,204,102,0.95)'; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  vs.forEach((v,i) => {
+    const x=mx(xs[i]), y=my(v);
+    if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  if (ATT.tail.length) {
+    const tip = ATT.tail[ATT.tail.length-1];
+    const v = -(p.K0*tip.x + p.K1*tip.x*tip.x/2 + p.K2*tip.x*tip.x*tip.x/3 + p.K3*tip.x*tip.x*tip.x*tip.x/4 + p.K4*tip.x**5/5 + p.K5*tip.x**6/6);
+    ctx.beginPath(); ctx.arc(mx(tip.x), my(v), 4, 0, 2*Math.PI);
+    ctx.fillStyle='#ffffff'; ctx.fill();
+  }
+  ctx.fillStyle='#555568'; ctx.font='10px monospace'; ctx.textAlign='center';
+  ctx.fillText('X', (PLT.l+PLT.r)/2, ATT_POT_H-6);
+  ctx.save(); ctx.translate(11,(PLT.t+PLT.b)/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText('V(X)', 0, 0); ctx.restore();
+}
+
+function attDrawTimeSeries() {
+  const ctx = ATT.timeCtx;
+  if (!ctx) return;
+  const PLT = ATT_SIDE_PLT;
+  attSideBg(ctx, ATT_TIME_H, PLT);
+  const tr = ATT.timeTrail;
+  const yMin=-3.2, yMax=3.2;
+  const mx = i => PLT.l + i/Math.max(1,tr.length-1)*(PLT.r-PLT.l);
+  const my = y => PLT.b - (y-yMin)/(yMax-yMin)*(PLT.b-PLT.t);
+  ctx.strokeStyle='rgba(180,180,180,0.55)'; ctx.setLineDash([4,4]); ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(PLT.l,my(0)); ctx.lineTo(PLT.r,my(0)); ctx.stroke(); ctx.setLineDash([]);
+  if (tr.length > 1) {
+    ctx.strokeStyle='rgba(85,170,255,0.95)'; ctx.lineWidth=1.5;
+    ctx.beginPath();
+    tr.forEach((pt,i) => { if(i===0) ctx.moveTo(mx(i),my(pt.x)); else ctx.lineTo(mx(i),my(pt.x)); });
+    ctx.stroke();
+  }
+  ctx.fillStyle='#555568'; ctx.font='10px monospace'; ctx.textAlign='center';
+  ctx.fillText('recent simulated time', (PLT.l+PLT.r)/2, ATT_TIME_H-6);
+  ctx.save(); ctx.translate(11,(PLT.t+PLT.b)/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText('X', 0, 0); ctx.restore();
+}
+
+function attDrawPoincare() {
+  const ctx = ATT.poinCtx;
+  if (!ctx) return;
+  const PLT = ATT_POIN_PLT, DOM = ATT_DOM;
+  attSideBg(ctx, ATT_POIN_H, PLT);
+  const mx = x => PLT.l + (x-DOM.xmin)/(DOM.xmax-DOM.xmin)*(PLT.r-PLT.l);
+  const my = y => PLT.b - (y-DOM.ymin)/(DOM.ymax-DOM.ymin)*(PLT.b-PLT.t);
+  ctx.strokeStyle='rgba(180,180,180,0.55)'; ctx.setLineDash([4,4]); ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(mx(0),PLT.t); ctx.lineTo(mx(0),PLT.b); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(PLT.l,my(0)); ctx.lineTo(PLT.r,my(0)); ctx.stroke(); ctx.setLineDash([]);
+  for (const pt of ATT.poincare) {
+    const px=mx(pt.x), py=my(pt.y);
+    if (px<PLT.l || px>PLT.r || py<PLT.t || py>PLT.b) continue;
+    ctx.beginPath(); ctx.arc(px, py, 2.8, 0, 2*Math.PI);
+    ctx.fillStyle=attColor(pt.month, pt.year, 0.78); ctx.fill();
+  }
+  ctx.fillStyle='#555568'; ctx.font='10px monospace'; ctx.textAlign='center';
+  ctx.fillText('once per year', (PLT.l+PLT.r)/2, ATT_POIN_H-6);
+}
+
+function attDrawSidePanels() {
+  attDrawTimeSeries();
+  attDrawPotential();
+  attDrawPoincare();
 }
 
 function attDrawFrame() {
@@ -1301,6 +1433,7 @@ function attDrawFrame() {
   ATT.ctx.fillText(`elapsed ${elapsedYears} years`, ATT_PLT.l+20, ATT_PLT.t+28);
   ATT.ctx.fillStyle='#888899'; ATT.ctx.font='12px monospace';
   ATT.ctx.fillText(`painted ${plottedYears} years after transient`, ATT_PLT.l+20, ATT_PLT.t+47);
+  attDrawSidePanels();
 }
 
 function attLoop() {
@@ -1323,6 +1456,14 @@ function attLoop() {
       attAddSegment(prevX, prevY, ATT.X, ATT.Y, month, year);
       ATT.tail.push({x:ATT.X, y:ATT.Y});
       if (ATT.tail.length > ATT.tailLen) ATT.tail.shift();
+      ATT.timeTrail.push({x:ATT.X, y:ATT.Y, step:ATT.step});
+      if (ATT.timeTrail.length > 900) ATT.timeTrail.shift();
+      const monthIndex = Math.floor(ATT.t / 12);
+      if (month === 1 && monthIndex !== ATT.lastPoinMonth) {
+        ATT.poincare.push({x:ATT.X, y:ATT.Y, month, year});
+        if (ATT.poincare.length > 1000) ATT.poincare.shift();
+        ATT.lastPoinMonth = monthIndex;
+      }
     }
   }
 
@@ -1345,7 +1486,7 @@ function attStart() {
   ATT.t=getStartTime(); ATT.step=0;
   ATT.X=parseFloat(document.getElementById('nb-X0').value)||0;
   ATT.Y=parseFloat(document.getElementById('nb-Y0').value)||0;
-  ATT.tail=[];
+  ATT.tail=[]; ATT.timeTrail=[]; ATT.poincare=[]; ATT.lastPoinMonth=-1;
   ATT.running=true; ATT.paused=false;
   ATT.offCtx.clearRect(0,0,ATT_CW,ATT_CH);
   setBtn('att-run', true); setBtn('att-pause', false);
@@ -1379,7 +1520,7 @@ function attFinish() {
 
 function attReset() {
   attFinish();
-  ATT.t=0; ATT.X=0; ATT.Y=0; ATT.step=0; ATT.tail=[]; ATT.totalSteps=0; ATT.burnSteps=0;
+  ATT.t=0; ATT.X=0; ATT.Y=0; ATT.step=0; ATT.tail=[]; ATT.timeTrail=[]; ATT.poincare=[]; ATT.lastPoinMonth=-1; ATT.totalSteps=0; ATT.burnSteps=0;
   if (ATT.offCtx) ATT.offCtx.clearRect(0,0,ATT_CW,ATT_CH);
   attDrawEmpty();
   const st = document.getElementById('att-status');
