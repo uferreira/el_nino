@@ -59,18 +59,21 @@ select.month-sel { background:var(--surface); border:1px solid var(--border); bo
 .poin-wrap { margin-top:1.4rem; }
 .poin-label { display:flex; align-items:center; gap:1rem; margin-bottom:.7rem; flex-wrap:wrap; }
 .poin-count { font-family:monospace; font-size:.82rem; color:var(--muted); }
-.attractor-layout { display:grid; grid-template-columns:280px minmax(0,1fr) 260px; gap:1rem; align-items:start; }
+.attractor-layout { display:grid; grid-template-columns:260px minmax(0,1fr); gap:1rem; align-items:start; }
 .attractor-controls { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:1rem; }
 .attractor-controls .param-row { margin-bottom:.8rem; }
+.attractor-controls select { width:100%; background:var(--surface); border:1px solid var(--border); border-radius:4px; color:var(--text); font-size:.82rem; padding:.35rem .45rem; }
+.check-row { display:flex; align-items:center; gap:.55rem; color:var(--text); font-size:.82rem; cursor:pointer; margin:.25rem 0 .8rem; }
+.check-row input { width:16px; height:16px; accent-color:var(--accent); }
 .attractor-canvas-wrap { min-width:0; }
-.attractor-side { display:grid; gap:.8rem; min-width:0; }
+.attractor-side { grid-column:2; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.8rem; min-width:0; }
 .side-panel { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:.55rem; }
 .side-panel-title { color:var(--muted); font-size:.76rem; font-weight:600; text-transform:uppercase; letter-spacing:.06em; margin:0 0 .35rem .1rem; }
 .side-panel canvas { display:block; width:100%; height:auto; background:#0a0a0e; border:1px solid var(--border); border-radius:5px; }
 .mini-readout { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; margin-top:.8rem; }
 .mini-readout div { background:var(--surface); border:1px solid var(--border); border-radius:5px; padding:.45rem .55rem; font-size:.76rem; color:var(--muted); }
 .mini-readout strong { display:block; color:var(--text); font-family:monospace; font-size:.86rem; margin-top:.1rem; }
-@media(max-width:1100px){ .attractor-layout{ grid-template-columns:280px minmax(0,1fr); } .attractor-side{ grid-column:1 / -1; grid-template-columns:repeat(3,1fr); } }
+@media(max-width:1100px){ .attractor-layout{ grid-template-columns:240px minmax(0,1fr); } .attractor-side{ grid-column:1 / -1; grid-template-columns:repeat(3,1fr); } }
 @media(max-width:760px){ .attractor-layout{ grid-template-columns:1fr; } .attractor-side{ grid-template-columns:1fr; } }
 footer { text-align:center; padding:2rem 1rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); }
 footer a { color:var(--accent); text-decoration:none; }
@@ -312,20 +315,19 @@ footer a:hover { text-decoration:underline; }
 </div>
 </section>
 <!-- ══════════════════════════════════════════════════════
-     SECTION 2B: Weekly Duffing attractor frames
+     SECTION 2B: Duffing attractor sample frames
      ══════════════════════════════════════════════════════ -->
 <section id="duffing-attractor">
 <div class="container">
-  <h2>Weekly Duffing Attractor</h2>
+  <h2>Duffing Attractor Sampling</h2>
   <p class="section-desc">
-    Each of the 52 frames fixes one equal model week of the year and plots one phase-space point for every
-    simulated year. Week 1 therefore compares Week 1 across the complete year range, followed by
-    the equivalent annual view for each subsequent week.
+    Each frame fixes one phase within the annual forcing cycle and plots one phase-space point for
+    every simulated year. Choose daily, weekly, or monthly sampling to control the temporal detail.
   </p>
 
   <div class="attractor-layout">
     <div class="attractor-controls">
-      <div class="ctrl-head">Weekly Frames</div>
+      <div class="ctrl-head">Attractor Frames</div>
       <div class="param-row">
         <label for="nb-att-start">First year</label>
         <div class="param-inline">
@@ -337,6 +339,14 @@ footer a:hover { text-decoration:underline; }
         <div class="param-inline">
           <input type="number" id="nb-att-end" value="2026" step="1">
         </div>
+      </div>
+      <div class="param-row">
+        <label for="att-sampling">Sample interval</label>
+        <select id="att-sampling">
+          <option value="daily">Daily (365 frames/year)</option>
+          <option value="weekly" selected>Weekly (52 frames/year)</option>
+          <option value="monthly">Monthly (12 frames/year)</option>
+        </select>
       </div>
       <div class="param-row">
         <label>Frame duration (ms) <span id="lbl-att-delay">300</span></label>
@@ -359,31 +369,35 @@ footer a:hover { text-decoration:underline; }
           <input type="number" id="nb-att-zoom" value="1" min="0.5" max="4" step="0.1">
         </div>
       </div>
+      <label class="check-row" for="att-show-track">
+        <input type="checkbox" id="att-show-track" checked>
+        <span>Show shaded orbit track</span>
+      </label>
       <div class="btn-row">
         <button id="att-run" onclick="attStart()">&#9654; Play</button>
         <button id="att-pause" class="secondary" onclick="attPause()" disabled>&#9646;&#9646; Pause</button>
         <button id="att-reset" class="danger" onclick="attReset()">&#8635; Reset</button>
       </div>
       <div class="btn-row">
-        <button class="secondary" onclick="attStep(-1)" title="Previous week">&#8592;</button>
-        <button class="secondary" onclick="attStep(1)" title="Next week">&#8594;</button>
+        <button class="secondary" onclick="attStep(-1)" title="Previous sample">&#8592;</button>
+        <button class="secondary" onclick="attStep(1)" title="Next sample">&#8594;</button>
       </div>
       <div class="mini-readout">
         <div>Equation<strong>Duffing</strong></div>
         <div>Step size<strong>&le; 0.04 mo</strong></div>
-        <div>Frames<strong>52 weeks</strong></div>
+        <div>Frames<strong id="att-frame-readout">52 weeks</strong></div>
         <div>Points/frame<strong id="att-count-readout">52 years</strong></div>
       </div>
     </div>
 
     <div class="attractor-canvas-wrap">
-      <div class="status-bar" id="att-status"><span class="st-ready">Ready — 52 weekly frames using the current Duffing parameters</span></div>
+      <div class="status-bar" id="att-status"><span class="st-ready">Ready — weekly frames using the current Duffing parameters</span></div>
       <canvas id="duff-attractor-canvas" class="phasecanvas" width="1050" height="620"></canvas>
     </div>
 
     <div class="attractor-side">
       <div class="side-panel">
-        <div class="side-panel-title">Current Week X by Year</div>
+        <div class="side-panel-title">Current Sample X by Year</div>
         <canvas id="att-time-canvas" width="300" height="160"></canvas>
       </div>
       <div class="side-panel">
@@ -391,10 +405,18 @@ footer a:hover { text-decoration:underline; }
         <canvas id="att-pot-canvas" width="300" height="160"></canvas>
       </div>
       <div class="side-panel">
-        <div class="side-panel-title">All 52 Weekly Samples</div>
+        <div class="side-panel-title">All Phase Samples</div>
         <canvas id="att-poin-canvas" width="300" height="180"></canvas>
       </div>
     </div>
+  </div>
+  <div class="science-box" style="margin-top:1rem;max-width:none;">
+    <strong>Parameter note.</strong> The Wikimedia reference caption
+    (&alpha;=&minus;1, &beta;=1, &delta;=0.02, &gamma;=3, &omega;=1, with a sine-offset forcing)
+    describes a different Duffing simulation. At this page&rsquo;s default settings, the ALADO El Ni&ntilde;o
+    fit uses K1=0.121847, K3=&minus;0.03046, B=&minus;0.35465, FA=0.4873, FF=&minus;60&deg;, and
+    W=0.523599 rad/month. Its forcing is FA cos(Wt &minus; FF), exactly as in the original ALADO model.
+    Point colors identify simulated years; the optional gray track shows their flow through one forcing cycle.
   </div>
 </div>
 </section>
@@ -1216,7 +1238,7 @@ function s2RedrawToFrame(targetStep) {
 }
 
 // ═══════════════════════════════════════════════════════
-// 5c. SECTION 2B — Weekly Duffing attractor
+// 5c. SECTION 2B — Duffing attractor sampling
 // ═══════════════════════════════════════════════════════
 const ATT_CW=1050, ATT_CH=620;
 const ATT_PLT={l:70,r:1018,t:46,b:566};
@@ -1557,15 +1579,24 @@ function updateAttSpeed() {
   const pointEl = document.getElementById('nb-att-point');
   const delayEl = document.getElementById('nb-att-delay');
   const zoomEl = document.getElementById('nb-att-zoom');
+  const trackEl = document.getElementById('att-show-track');
   if (pointEl) ATT.pointSize = Math.max(2, parseFloat(pointEl.value)||5);
   if (delayEl) ATT.delay = Math.max(100, parseInt(delayEl.value)||300);
   if (zoomEl) ATT.zoom = Math.min(4, Math.max(.5, parseFloat(zoomEl.value)||1));
+  if (trackEl) ATT.showTrack = trackEl.checked;
   if (ATT.canvas && ATT.frames && ATT.frames.length) attDrawFrame();
 }
 
-// Weekly-frame renderer. One frame contains the same week from every year.
-const ATT_FRAMES_PER_YEAR=52;
-const ATT_MONTHS_PER_WEEK=12/ATT_FRAMES_PER_YEAR;
+// One frame contains the same forcing-cycle phase from every simulated year.
+const ATT_SAMPLE_MODES={
+  daily:{frames:365,singular:'Day',plural:'days'},
+  weekly:{frames:52,singular:'Week',plural:'weeks'},
+  monthly:{frames:12,singular:'Month',plural:'months'},
+};
+
+function attSampleConfig() {
+  return ATT_SAMPLE_MODES[document.getElementById('att-sampling').value] || ATT_SAMPLE_MODES.weekly;
+}
 
 function attInit() {
   ATT.canvas = document.getElementById('duff-attractor-canvas');
@@ -1578,12 +1609,12 @@ function attInit() {
   ATT.poinCanvas = document.getElementById('att-poin-canvas');
   ATT.poinCtx = ATT.poinCanvas ? ATT.poinCanvas.getContext('2d') : null;
   ATT.frameIndex = 0;
-  attBuildWeeklyFrames();
+  attBuildSampleFrames();
   attDrawFrame();
   attStatus(true);
 }
 
-function attBuildWeeklyFrames() {
+function attBuildSampleFrames() {
   const requestedStart=parseInt(document.getElementById('nb-att-start').value);
   const requestedEnd=parseInt(document.getElementById('nb-att-end').value);
   ATT.startYear = Number.isFinite(requestedStart) ? requestedStart : 1975;
@@ -1594,25 +1625,30 @@ function attBuildWeeklyFrames() {
   ATT.delay = Math.max(100, parseInt(document.getElementById('nb-att-delay').value) || 300);
   ATT.pointSize = Math.max(2, parseFloat(document.getElementById('nb-att-point').value) || 5);
   ATT.zoom = Math.min(4, Math.max(.5, parseFloat(document.getElementById('nb-att-zoom').value) || 1));
+  ATT.showTrack = document.getElementById('att-show-track').checked;
+  ATT.sampleConfig = attSampleConfig();
+  ATT.framesPerYear = ATT.sampleConfig.frames;
   ATT.params = getParams();
-  ATT.frames = Array.from({length:ATT_FRAMES_PER_YEAR}, () => []);
+  ATT.frames = Array.from({length:ATT.framesPerYear}, () => []);
   ATT.series = [];
+  ATT.trackCacheKey = null;
 
   const startTime=getStartTime();
   let t = startTime;
   let X = parseFloat(document.getElementById('nb-X0').value) || 0;
   let Y = parseFloat(document.getElementById('nb-Y0').value) || 0;
   const yearCount=ATT.endYear-ATT.startYear+1;
+  const monthsPerFrame=12/ATT.framesPerYear;
   for (let yearOffset=0; yearOffset<yearCount; yearOffset++) {
-    for (let week=0; week<ATT_FRAMES_PER_YEAR; week++) {
-      const target=startTime+yearOffset*12+week*ATT_MONTHS_PER_WEEK;
+    for (let sample=0; sample<ATT.framesPerYear; sample++) {
+      const target=startTime+yearOffset*12+sample*monthsPerFrame;
       while(t<target-1e-10) {
         const h=Math.min(ATT_DT,target-t);
         const next=rkf5Step(t,X,Y,ATT.params,h);
         X=next.X; Y=next.Y; t+=h;
       }
-      const point={x:X,y:Y,year:ATT.startYear+yearOffset,week:week+1};
-      ATT.frames[week].push(point);
+      const point={x:X,y:Y,year:ATT.startYear+yearOffset,sample:sample+1};
+      ATT.frames[sample].push(point);
       ATT.series.push(point);
     }
   }
@@ -1620,6 +1656,8 @@ function attBuildWeeklyFrames() {
   const count = ATT.endYear-ATT.startYear+1;
   const countEl = document.getElementById('att-count-readout');
   if (countEl) countEl.textContent = count + (count===1 ? ' year' : ' years');
+  const frameEl = document.getElementById('att-frame-readout');
+  if (frameEl) frameEl.textContent = ATT.framesPerYear + ' ' + ATT.sampleConfig.plural;
 }
 
 function attFrameColor(year, alpha=0.9) {
@@ -1715,20 +1753,49 @@ function attDrawPoincare() {
   if(!ctx)return;
   const PLT=ATT_POIN_PLT;
   attSideBg(ctx,ATT_POIN_H,PLT);
-  const mx=week=>PLT.l+(week-.5)/ATT_FRAMES_PER_YEAR*(PLT.r-PLT.l);
+  const mx=sample=>PLT.l+(sample-.5)/ATT.framesPerYear*(PLT.r-PLT.l);
   const my=x=>PLT.b-(x+3.2)/6.4*(PLT.b-PLT.t);
   ctx.strokeStyle='rgba(180,180,180,.45)'; ctx.setLineDash([4,4]);
   ctx.beginPath(); ctx.moveTo(PLT.l,my(0)); ctx.lineTo(PLT.r,my(0)); ctx.stroke(); ctx.setLineDash([]);
-  const hiX=mx(ATT.frameIndex+1), colW=(PLT.r-PLT.l)/ATT_FRAMES_PER_YEAR;
+  const hiX=mx(ATT.frameIndex+1), colW=(PLT.r-PLT.l)/ATT.framesPerYear;
   ctx.fillStyle='rgba(255,204,102,.1)'; ctx.fillRect(hiX-colW/2,PLT.t,colW,PLT.b-PLT.t);
   for(const pt of ATT.series || []) {
-    const px=mx(pt.week), py=my(pt.x);
+    const px=mx(pt.sample), py=my(pt.x);
     if(py<PLT.t||py>PLT.b)continue;
-    ctx.beginPath(); ctx.arc(px,py,pt.week===ATT.frameIndex+1?1.5:.8,0,2*Math.PI);
-    ctx.fillStyle=attFrameColor(pt.year,pt.week===ATT.frameIndex+1?.9:.2); ctx.fill();
+    ctx.beginPath(); ctx.arc(px,py,pt.sample===ATT.frameIndex+1?1.5:.8,0,2*Math.PI);
+    ctx.fillStyle=attFrameColor(pt.year,pt.sample===ATT.frameIndex+1?.9:.2); ctx.fill();
   }
   ctx.fillStyle='#555568'; ctx.font='10px monospace'; ctx.textAlign='center';
-  ctx.fillText('W1       W13       W26       W39       W52',(PLT.l+PLT.r)/2,ATT_POIN_H-6);
+  const labelFrames=[1,Math.round(ATT.framesPerYear*.25),Math.round(ATT.framesPerYear*.5),Math.round(ATT.framesPerYear*.75),ATT.framesPerYear];
+  labelFrames.forEach((value,index) => {
+    ctx.textAlign=index===0?'left':(index===labelFrames.length-1?'right':'center');
+    ctx.fillText(ATT.sampleConfig.singular.charAt(0)+value,mx(value),ATT_POIN_H-6);
+  });
+}
+
+function attDrawOrbitTrack(map) {
+  if(!ATT.showTrack)return;
+  const key=[ATT.startYear,ATT.endYear,ATT.framesPerYear,ATT.zoom].join(':');
+  if(!ATT.trackCanvas)ATT.trackCanvas=makeOff(ATT_CW,ATT_CH);
+  if(ATT.trackCacheKey!==key) {
+    const ctx=ATT.trackCanvas.getContext('2d');
+    ctx.clearRect(0,0,ATT_CW,ATT_CH);
+    ctx.save(); ctx.beginPath(); ctx.rect(ATT_PLT.l,ATT_PLT.t,ATT_PLT.r-ATT_PLT.l,ATT_PLT.b-ATT_PLT.t); ctx.clip();
+    const yearCount=(ATT.frames[0]||[]).length;
+    ctx.strokeStyle='rgba(190,194,205,.12)'; ctx.lineWidth=1.15;
+    for(let yearIndex=0;yearIndex<yearCount;yearIndex++) {
+      ctx.beginPath();
+      for(let sample=0;sample<ATT.framesPerYear;sample++) {
+        const pt=ATT.frames[sample][yearIndex];
+        if(!pt)continue;
+        const px=map.x(pt.x),py=map.y(pt.y);
+        if(sample===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+    }
+    ctx.restore(); ATT.trackCacheKey=key;
+  }
+  ATT.ctx.drawImage(ATT.trackCanvas,0,0);
 }
 
 function attDrawFrame() {
@@ -1736,8 +1803,9 @@ function attDrawFrame() {
   const viewDom=attViewDom();
   drawBg(ATT.ctx,ATT_CW,ATT_CH,ATT_PLT,viewDom,ATT_LABELS,attViewTicks(viewDom),ATT_AXIS_STYLE);
   const frame=ATT.frames[ATT.frameIndex] || [], map=attMap(ATT_PLT,viewDom);
+  attDrawOrbitTrack(map);
   ATT.ctx.fillStyle='rgba(232,232,240,.82)'; ATT.ctx.font='bold 17px sans-serif'; ATT.ctx.textAlign='center';
-  ATT.ctx.fillText(`Week ${ATT.frameIndex+1} — frame ${ATT.frameIndex+1} of ${ATT_FRAMES_PER_YEAR}`,ATT_CW/2,ATT_PLT.t-16);
+  ATT.ctx.fillText(`${ATT.sampleConfig.singular} ${ATT.frameIndex+1} — frame ${ATT.frameIndex+1} of ${ATT.framesPerYear}`,ATT_CW/2,ATT_PLT.t-16);
   for(const pt of frame) {
     const px=map.x(pt.x), py=map.y(pt.y);
     if(px<ATT_PLT.l||px>ATT_PLT.r||py<ATT_PLT.t||py>ATT_PLT.b)continue;
@@ -1748,7 +1816,7 @@ function attDrawFrame() {
   ATT.ctx.fillStyle='rgba(10,10,20,.76)'; ATT.ctx.beginPath();
   ATT.ctx.roundRect(ATT_PLT.l+8,ATT_PLT.t+8,260,48,5); ATT.ctx.fill();
   ATT.ctx.fillStyle='#e8e8f0'; ATT.ctx.font='bold 13px monospace'; ATT.ctx.textAlign='left';
-  ATT.ctx.fillText(`Week ${ATT.frameIndex+1}: ${ATT.startYear} — ${ATT.endYear}`,ATT_PLT.l+20,ATT_PLT.t+28);
+  ATT.ctx.fillText(`${ATT.sampleConfig.singular} ${ATT.frameIndex+1}: ${ATT.startYear} — ${ATT.endYear}`,ATT_PLT.l+20,ATT_PLT.t+28);
   ATT.ctx.fillStyle='#888899'; ATT.ctx.font='12px monospace';
   ATT.ctx.fillText(`${frame.length} annual phase-space points`,ATT_PLT.l+20,ATT_PLT.t+47);
   const legendX=ATT_PLT.r-175, legendY=ATT_PLT.t+24, legendW=145;
@@ -1763,14 +1831,14 @@ function attDrawFrame() {
 
 function attLoop() {
   if(!ATT.running||ATT.paused)return;
-  ATT.frameIndex=(ATT.frameIndex+1)%ATT_FRAMES_PER_YEAR;
+  ATT.frameIndex=(ATT.frameIndex+1)%ATT.framesPerYear;
   attDrawFrame(); attStatus();
   ATT.timerId=setTimeout(attLoop,ATT.delay);
 }
 
 function attStart() {
   if(ATT.running)return;
-  attBuildWeeklyFrames();
+  attBuildSampleFrames();
   ATT.running=true; ATT.paused=false;
   setBtn('att-run',true); setBtn('att-pause',false);
   document.getElementById('att-pause').innerHTML='&#9646;&#9646; Pause';
@@ -1789,8 +1857,8 @@ function attPause() {
 
 function attStep(direction) {
   if(ATT.running&&!ATT.paused)attPause();
-  if(!ATT.running)attBuildWeeklyFrames();
-  ATT.frameIndex=(ATT.frameIndex+direction+ATT_FRAMES_PER_YEAR)%ATT_FRAMES_PER_YEAR;
+  if(!ATT.running)attBuildSampleFrames();
+  ATT.frameIndex=(ATT.frameIndex+direction+ATT.framesPerYear)%ATT.framesPerYear;
   attDrawFrame(); attStatus();
 }
 
@@ -1799,7 +1867,7 @@ function attReset() {
   ATT.running=false; ATT.paused=false; ATT.frameIndex=0;
   setBtn('att-run',false); setBtn('att-pause',true);
   document.getElementById('att-pause').innerHTML='&#9646;&#9646; Pause';
-  attBuildWeeklyFrames(); attDrawFrame(); attStatus(true);
+  attBuildSampleFrames(); attDrawFrame(); attStatus(true);
 }
 
 function attStatus(ready=false) {
@@ -1808,7 +1876,7 @@ function attStatus(ready=false) {
   const cls=ready?'st-ready':(ATT.paused?'st-paused':'st-running');
   const state=ready?'Ready':(ATT.paused?'&#9646;&#9646; Paused':'&#9654; Playing');
   const count=(ATT.frames[ATT.frameIndex]||[]).length;
-  el.innerHTML=`<span class="${cls}">${state}</span> &nbsp;·&nbsp; frame ${ATT.frameIndex+1}/${ATT_FRAMES_PER_YEAR}: Week ${ATT.frameIndex+1} &nbsp;·&nbsp; ${count} points (${ATT.startYear}–${ATT.endYear}) &nbsp;·&nbsp; ${(ATT.zoom||1).toFixed(1)}x zoom`;
+  el.innerHTML=`<span class="${cls}">${state}</span> &nbsp;·&nbsp; frame ${ATT.frameIndex+1}/${ATT.framesPerYear}: ${ATT.sampleConfig.singular} ${ATT.frameIndex+1} &nbsp;·&nbsp; ${count} points (${ATT.startYear}–${ATT.endYear}) &nbsp;·&nbsp; ${(ATT.zoom||1).toFixed(1)}x zoom`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2542,6 +2610,8 @@ linkSlider('sl-Y0','nb-Y0','lbl-Y0',f2);
 linkSlider('sl-att-delay','nb-att-delay','lbl-att-delay',fInt);
 linkSlider('sl-att-point','nb-att-point','lbl-att-point',fInt);
 linkSlider('sl-att-zoom','nb-att-zoom','lbl-att-zoom',fZoom);
+document.getElementById('att-sampling').addEventListener('change',attReset);
+document.getElementById('att-show-track').addEventListener('change',updateAttSpeed);
 let attYearInputTimer=null;
 ['nb-att-start','nb-att-end'].forEach(id => {
   const input=document.getElementById(id);
@@ -2570,6 +2640,8 @@ function resetParams() {
   linkSlider('sl-att-delay','nb-att-delay','lbl-att-delay',fInt);
   linkSlider('sl-att-point','nb-att-point','lbl-att-point',fInt);
   linkSlider('sl-att-zoom','nb-att-zoom','lbl-att-zoom',fZoom);
+  document.getElementById('att-sampling').value='weekly';
+  document.getElementById('att-show-track').checked=true;
   s2Reset(); attReset(); cmpReset();
 }
 
