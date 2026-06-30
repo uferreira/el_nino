@@ -354,6 +354,13 @@ footer a:hover { text-decoration:underline; }
           <input type="number" id="nb-att-point" value="5" min="2" max="10" step="1">
         </div>
       </div>
+      <div class="param-row">
+        <label>Zoom <span id="lbl-att-zoom">1.0x</span></label>
+        <div class="param-inline">
+          <input type="range" id="sl-att-zoom" min="0.5" max="4" step="0.1" value="1">
+          <input type="number" id="nb-att-zoom" value="1" min="0.5" max="4" step="0.1">
+        </div>
+      </div>
       <div class="btn-row">
         <button id="att-run" onclick="attStart()">&#9654; Play</button>
         <button id="att-pause" class="secondary" onclick="attPause()" disabled>&#9646;&#9646; Pause</button>
@@ -882,9 +889,11 @@ function monthLabel(step, startYear) {
  *  DOMAIN = {xmin,xmax,ymin,ymax}
  *  labels = {x:string, y:string}
  */
-function drawBg(ctx, CW, CH, PLT, DOM, labels, ticks) {
+function drawBg(ctx, CW, CH, PLT, DOM, labels, ticks, axisStyle={}) {
   const mx = x => PLT.l + (x-DOM.xmin)/(DOM.xmax-DOM.xmin)*(PLT.r-PLT.l);
   const my = y => PLT.b - (y-DOM.ymin)/(DOM.ymax-DOM.ymin)*(PLT.b-PLT.t);
+  const formatX = axisStyle.formatX || (x => String(x));
+  const formatY = axisStyle.formatY || (y => y.toFixed(0));
 
   ctx.fillStyle = '#0a0a0e';
   ctx.fillRect(0, 0, CW, CH);
@@ -915,31 +924,34 @@ function drawBg(ctx, CW, CH, PLT, DOM, labels, ticks) {
   ctx.strokeRect(PLT.l,PLT.t,PLT.r-PLT.l,PLT.b-PLT.t);
 
   // X tick labels
-  ctx.fillStyle='#555568'; ctx.font='10px monospace'; ctx.textAlign='center';
+  ctx.fillStyle=axisStyle.tickColor || '#555568';
+  ctx.font=axisStyle.tickFont || '10px monospace'; ctx.textAlign='center';
   if (ticks) {
-    ticks.x.forEach(x => ctx.fillText(x, mx(x), PLT.b+14));
+    ticks.x.forEach(x => ctx.fillText(formatX(x), mx(x), PLT.b+(axisStyle.tickOffset || 14)));
   } else {
     for (let x=Math.ceil(DOM.xmin); x<=Math.floor(DOM.xmax); x+=2) {
-      ctx.fillText(x, mx(x), PLT.b+14);
+      ctx.fillText(formatX(x), mx(x), PLT.b+(axisStyle.tickOffset || 14));
     }
   }
-  ctx.fillStyle='#3a3a50';
-  ctx.fillText(labels.x, (PLT.l+PLT.r)/2, CH-3);
+  ctx.fillStyle=axisStyle.labelColor || '#3a3a50';
+  ctx.font=axisStyle.labelFont || '10px monospace';
+  ctx.fillText(labels.x, (PLT.l+PLT.r)/2, axisStyle.xLabelY || CH-3);
 
   // Y tick labels
   ctx.textAlign='right';
-  ctx.fillStyle='#555568';
+  ctx.fillStyle=axisStyle.tickColor || '#555568';
+  ctx.font=axisStyle.tickFont || '10px monospace';
   if (ticks) {
-    ticks.y.forEach(y => ctx.fillText(y.toFixed(0), PLT.l-5, my(y)+4));
+    ticks.y.forEach(y => ctx.fillText(formatY(y), PLT.l-7, my(y)+4));
   } else {
     for (let y=Math.ceil(DOM.ymin); y<=Math.floor(DOM.ymax); y++) {
-      ctx.fillText(y.toFixed(0), PLT.l-5, my(y)+4);
+      ctx.fillText(formatY(y), PLT.l-7, my(y)+4);
     }
   }
   ctx.save();
-  ctx.fillStyle='#3a3a50';
-  ctx.translate(11,(PLT.t+PLT.b)/2); ctx.rotate(-Math.PI/2);
-  ctx.textAlign='center'; ctx.font='10px monospace';
+  ctx.fillStyle=axisStyle.labelColor || '#3a3a50';
+  ctx.translate(axisStyle.yLabelX || 11,(PLT.t+PLT.b)/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.font=axisStyle.labelFont || '10px monospace';
   ctx.fillText(labels.y, 0, 0);
   ctx.restore();
 }
@@ -1546,8 +1558,10 @@ function attLegacyStatus() {
 function updateAttSpeed() {
   const pointEl = document.getElementById('nb-att-point');
   const delayEl = document.getElementById('nb-att-delay');
+  const zoomEl = document.getElementById('nb-att-zoom');
   if (pointEl) ATT.pointSize = Math.max(2, parseFloat(pointEl.value)||5);
   if (delayEl) ATT.delay = Math.max(200, parseInt(delayEl.value)||900);
+  if (zoomEl) ATT.zoom = Math.min(4, Math.max(.5, parseFloat(zoomEl.value)||1));
   if (ATT.canvas && ATT.frames && ATT.frames.length) attDrawFrame();
 }
 
@@ -1578,6 +1592,7 @@ function attBuildMonthlyFrames() {
   document.getElementById('lbl-att-end').textContent = ATT.endYear;
   ATT.delay = Math.max(200, parseInt(document.getElementById('nb-att-delay').value) || 900);
   ATT.pointSize = Math.max(2, parseFloat(document.getElementById('nb-att-point').value) || 5);
+  ATT.zoom = Math.min(4, Math.max(.5, parseFloat(document.getElementById('nb-att-zoom').value) || 1));
   ATT.params = getParams();
   ATT.frames = Array.from({length:12}, () => []);
   ATT.series = [];
@@ -1608,6 +1623,38 @@ function attFrameColor(year, alpha=0.9) {
   const span = Math.max(1, ATT.endYear-ATT.startYear);
   const f = (year-ATT.startYear)/span;
   return `hsla(${205-165*f},88%,65%,${alpha})`;
+}
+
+const ATT_AXIS_STYLE = {
+  tickColor:'#c6c6d4', labelColor:'#f0f0f5',
+  tickFont:'13px monospace', labelFont:'bold 17px sans-serif',
+  tickOffset:19, xLabelY:614, yLabelX:17,
+  formatX:v => Number(v.toFixed(2)).toString(),
+  formatY:v => Number(v.toFixed(2)).toString(),
+};
+
+function attViewDom() {
+  const zoom=ATT.zoom || 1;
+  return {
+    xmin:ATT_DOM.xmin/zoom, xmax:ATT_DOM.xmax/zoom,
+    ymin:ATT_DOM.ymin/zoom, ymax:ATT_DOM.ymax/zoom,
+  };
+}
+
+function attNiceTickValues(min,max,target=7) {
+  const rough=(max-min)/target;
+  const power=10**Math.floor(Math.log10(rough));
+  const scaled=rough/power;
+  const nice=scaled<=1?1:(scaled<=2?2:(scaled<=5?5:10));
+  const step=nice*power, values=[];
+  for(let value=Math.ceil(min/step)*step;value<=max+step*1e-6;value+=step) {
+    values.push(Math.abs(value)<step*1e-6?0:value);
+  }
+  return values;
+}
+
+function attViewTicks(dom) {
+  return {x:attNiceTickValues(dom.xmin,dom.xmax),y:attNiceTickValues(dom.ymin,dom.ymax)};
 }
 
 function attDrawTimeSeries() {
@@ -1683,8 +1730,9 @@ function attDrawPoincare() {
 
 function attDrawFrame() {
   if(!ATT.ctx)return;
-  drawBg(ATT.ctx,ATT_CW,ATT_CH,ATT_PLT,ATT_DOM,ATT_LABELS);
-  const frame=ATT.frames[ATT.monthIndex] || [], map=attMap(ATT_PLT,ATT_DOM);
+  const viewDom=attViewDom();
+  drawBg(ATT.ctx,ATT_CW,ATT_CH,ATT_PLT,viewDom,ATT_LABELS,attViewTicks(viewDom),ATT_AXIS_STYLE);
+  const frame=ATT.frames[ATT.monthIndex] || [], map=attMap(ATT_PLT,viewDom);
   ATT.ctx.fillStyle='rgba(232,232,240,.82)'; ATT.ctx.font='bold 17px sans-serif'; ATT.ctx.textAlign='center';
   ATT.ctx.fillText(`${MO_NAMES[ATT.monthIndex]} — frame ${ATT.monthIndex+1} of 12`,ATT_CW/2,ATT_PLT.t-16);
   for(const pt of frame) {
@@ -1757,7 +1805,7 @@ function attStatus(ready=false) {
   const cls=ready?'st-ready':(ATT.paused?'st-paused':'st-running');
   const state=ready?'Ready':(ATT.paused?'&#9646;&#9646; Paused':'&#9654; Playing');
   const count=(ATT.frames[ATT.monthIndex]||[]).length;
-  el.innerHTML=`<span class="${cls}">${state}</span> &nbsp;·&nbsp; frame ${ATT.monthIndex+1}/12: ${MO_NAMES[ATT.monthIndex]} &nbsp;·&nbsp; ${count} points (${ATT.startYear}–${ATT.endYear})`;
+  el.innerHTML=`<span class="${cls}">${state}</span> &nbsp;·&nbsp; frame ${ATT.monthIndex+1}/12: ${MO_NAMES[ATT.monthIndex]} &nbsp;·&nbsp; ${count} points (${ATT.startYear}–${ATT.endYear}) &nbsp;·&nbsp; ${(ATT.zoom||1).toFixed(1)}x zoom`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2466,7 +2514,8 @@ function updateEffSpeed() {
   if (el) el.textContent = '~' + moPerSec + ' months/sec';
 }
 
-const f4=v=>v.toFixed(4), fDeg=v=>v.toFixed(1)+'°', fInt=v=>Math.round(v).toString(), f2=v=>v.toFixed(2);
+const f4=v=>v.toFixed(4), fDeg=v=>v.toFixed(1)+'°', fInt=v=>Math.round(v).toString(),
+      f2=v=>v.toFixed(2), fZoom=v=>v.toFixed(1)+'x';
 
 linkSlider('sl-K1','nb-K1','lbl-K1',f4);
 linkSlider('sl-K3','nb-K3','lbl-K3',f4);
@@ -2491,12 +2540,13 @@ linkSlider('sl-att-start','nb-att-start','lbl-att-start',fInt);
 linkSlider('sl-att-end','nb-att-end','lbl-att-end',fInt);
 linkSlider('sl-att-delay','nb-att-delay','lbl-att-delay',fInt);
 linkSlider('sl-att-point','nb-att-point','lbl-att-point',fInt);
+linkSlider('sl-att-zoom','nb-att-zoom','lbl-att-zoom',fZoom);
 
 function resetParams() {
   const d=[['nb-K1',.121847],['nb-K3',-.03046],['nb-FA',.4873],['nb-FF',-60],
            ['nb-B',-.35465],['nb-tend',600],['nb-spf',1],['nb-delay',30],
            ['nb-styear',1975],['nb-X0',0],['nb-Y0',0],['nb-tstart',0.5],
-           ['nb-att-start',1975],['nb-att-end',2026],['nb-att-delay',900],['nb-att-point',5]];
+           ['nb-att-start',1975],['nb-att-end',2026],['nb-att-delay',900],['nb-att-point',5],['nb-att-zoom',1]];
   d.forEach(([id,val])=>{ document.getElementById(id).value=val; });
   linkSlider('sl-K1','nb-K1','lbl-K1',f4); linkSlider('sl-K3','nb-K3','lbl-K3',f4);
   linkSlider('sl-FA','nb-FA','lbl-FA',f4); linkSlider('sl-FF','nb-FF','lbl-FF',fDeg);
@@ -2508,6 +2558,7 @@ function resetParams() {
   linkSlider('sl-att-end','nb-att-end','lbl-att-end',fInt);
   linkSlider('sl-att-delay','nb-att-delay','lbl-att-delay',fInt);
   linkSlider('sl-att-point','nb-att-point','lbl-att-point',fInt);
+  linkSlider('sl-att-zoom','nb-att-zoom','lbl-att-zoom',fZoom);
   s2Reset(); attReset(); cmpReset();
 }
 
