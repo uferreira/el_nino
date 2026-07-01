@@ -33,11 +33,13 @@ Dataset → JS variable mapping
 """
 
 import argparse
+import json
 import re
 import subprocess
 import sys
 import time
 from collections import OrderedDict
+from datetime import datetime, timezone
 from pathlib import Path
 
 import matplotlib
@@ -57,9 +59,20 @@ MONTH_NAMES = [
     "Jul","Aug","Sep","Oct","Nov","Dec",
 ]
 
+MONTH_FULL = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December",
+]
+
 OUT_DIR = Path("data/output")
 CONFIG  = Path("config.yaml")
 DOCS    = Path("docs")
+
+# Per-station data-freshness tracking, persisted across runs so a station
+# that fails one run still remembers when it was last successfully refreshed.
+# Lives under data/output/ (gitignored) but is force-committed by the update
+# workflow so it survives the ephemeral CI checkout.
+FRESHNESS_FILE = OUT_DIR / "freshness.json"
 
 # All known datasets: var_name → (dat_filename, length_constant_name)
 DATASETS: OrderedDict[str, tuple[str, str]] = OrderedDict([
@@ -212,6 +225,81 @@ def _count_monthly(dat_file: Path) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Data-freshness tracking
+# ---------------------------------------------------------------------------
+
+def _load_freshness() -> dict:
+    """Load the persisted freshness state, or an empty skeleton if absent/corrupt."""
+    try:
+        state = json.loads(FRESHNESS_FILE.read_text(encoding="utf-8"))
+        if isinstance(state, dict):
+            state.setdefault("stations", {})
+            return state
+    except (FileNotFoundError, ValueError, OSError):
+        pass
+    return {"last_refreshed": None, "stations": {}}
+
+
+def _save_freshness(state: dict) -> None:
+    """Persist the freshness state as pretty JSON (best-effort)."""
+    try:
+        FRESHNESS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        FRESHNESS_FILE.write_text(
+            json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+    except OSError as exc:
+        print(f"  WARNING: could not write {FRESHNESS_FILE}: {exc}", file=sys.stderr)
+
+
+def _fmt_run_date(dt: datetime) -> str:
+    """Format a UTC datetime as e.g. '1 July 2026'."""
+    return f"{dt.day} {MONTH_FULL[dt.month - 1]} {dt.year}"
+
+
+def _fmt_month(ym: str | None) -> str | None:
+    """Format a 'YYYY-MM' string as e.g. 'June 2026'; None if unparseable."""
+    if not ym:
+        return None
+    try:
+        y, m = ym.split("-")
+        return f"{MONTH_FULL[int(m) - 1]} {int(y)}"
+    except (ValueError, IndexError):
+        return None
+
+
+def _stale_notes(state: dict) -> list[str]:
+    """Build subtle 'fetch pending' captions for any station not currently OK."""
+    notes: list[str] = []
+    for entry in state.get("stations", {}).values():
+        if entry.get("ok", True):
+            continue
+        name = entry.get("name", "Station")
+        month = _fmt_month(entry.get("as_of"))
+        if month:
+            notes.append(f"{name} sea level data as of {month} (fetch pending)")
+        else:
+            notes.append(f"{name} sea level data (fetch pending)")
+    return notes
+
+
+def _patch_freshness(html: str, refreshed_label: str, stale_notes: list[str]) -> tuple[str, bool]:
+    """
+    Replace the content between the DATA_FRESHNESS markers in a page.
+
+    Returns (new_html, patched_flag). Pages without the marker (any page but
+    index.html) are left untouched.
+    """
+    inner = f"Data last refreshed: {refreshed_label} UTC"
+    for note in stale_notes:
+        inner += f'<br><span class="stale">{note}</span>'
+    pattern = r"(<!--DATA_FRESHNESS-->).*?(<!--/DATA_FRESHNESS-->)"
+    new_html, count = re.subn(
+        pattern, lambda m: m.group(1) + inner + m.group(2), html, flags=re.DOTALL
+    )
+    return new_html, count > 0
+
+
+# ---------------------------------------------------------------------------
 # Pipeline runners
 # ---------------------------------------------------------------------------
 
@@ -279,6 +367,11 @@ def main() -> None:
         help="Update only the SST (NINO1+2) array; skip all sea level stations",
     )
     parser.add_argument(
+        "--sl-only", action="store_true",
+        help="Update only the sea level stations; skip the SST/NINO pipelines "
+             "(their existing JS blocks are left untouched)",
+    )
+    parser.add_argument(
         "--no-push", action="store_true",
         help="Update HTML files but skip the git add/commit/push step",
     )
@@ -291,6 +384,10 @@ def main() -> None:
         help="YAML config file (default: config.yaml)",
     )
     args = parser.parse_args()
+
+    if args.sst_only and args.sl_only:
+        print("ERROR: --sst-only and --sl-only are mutually exclusive.", file=sys.stderr)
+        sys.exit(1)
 
     config_path = Path(args.config)
     if not config_path.exists():
@@ -316,29 +413,45 @@ def main() -> None:
 
     t0 = time.time()
     step = 1
+    run_dt   = datetime.now(timezone.utc)
+    run_date = run_dt.strftime("%Y-%m-%d")
+
+    freshness = _load_freshness()
+    loaded_data: dict[str, dict] = {}
+    # Most recent (year, month) of data seen, for the commit message.
+    latest_ym: tuple[int, int] | None = None
 
     # ── SST pipelines ─────────────────────────────────────────────────────────
-    print(f"[{step}] SST NINO1+2 pipeline (absolute) …"); step += 1
-    sst_dat, sst_result = _run_sst_nino12(cfg, hn1, hn2, ndots, OUT_DIR)
-    sst_data = _load_dat(str(sst_dat))
-    sst_yr0 = int(sst_result["IYR"][0]);  sst_m0 = int(sst_result["MES"][0])
-    sst_yr1 = int(sst_result["IYR"][-1]); sst_m1 = int(sst_result["MES"][-1])
-    sst_n   = sum(1 for v in sst_data["irest"] if v == 0)
-    print(f"  {_month_label(sst_yr0,sst_m0)} – {_month_label(sst_yr1,sst_m1)}  ({sst_n} months)")
+    # Skipped entirely under --sl-only: the SST/NINO JS blocks are simply left
+    # out of loaded_data, so _patch_dataset leaves their existing blocks intact.
+    sst_data = None
+    sst_yr0 = sst_m0 = sst_yr1 = sst_m1 = sst_n = 0
 
-    # Additional SST indices (anomaly)
-    loaded_data: dict[str, dict] = {"observedData": sst_data}
-    sst_idx_map = {idx["key"]: idx for idx in cfg.get("sst_indices", [])}
-    for key in ("nino3", "nino4", "nino34"):
-        if key not in sst_idx_map:
-            continue
-        label = sst_idx_map[key]["label"]
-        print(f"[{step}] SST {label} pipeline (anomaly) …"); step += 1
-        dat, _ = _run_sst_index(cfg, key, hn1, hn2, ndots, OUT_DIR)
-        js_var = f"{key}Data"  # nino3Data, nino4Data, nino34Data
-        loaded_data[js_var] = _load_dat(str(dat))
-        n = sum(1 for v in loaded_data[js_var]["irest"] if v == 0)
-        print(f"  {label}: {n} months")
+    if not args.sl_only:
+        print(f"[{step}] SST NINO1+2 pipeline (absolute) …"); step += 1
+        sst_dat, sst_result = _run_sst_nino12(cfg, hn1, hn2, ndots, OUT_DIR)
+        sst_data = _load_dat(str(sst_dat))
+        sst_yr0 = int(sst_result["IYR"][0]);  sst_m0 = int(sst_result["MES"][0])
+        sst_yr1 = int(sst_result["IYR"][-1]); sst_m1 = int(sst_result["MES"][-1])
+        sst_n   = sum(1 for v in sst_data["irest"] if v == 0)
+        latest_ym = (sst_yr1, sst_m1)
+        print(f"  {_month_label(sst_yr0,sst_m0)} – {_month_label(sst_yr1,sst_m1)}  ({sst_n} months)")
+
+        # Additional SST indices (anomaly)
+        loaded_data["observedData"] = sst_data
+        sst_idx_map = {idx["key"]: idx for idx in cfg.get("sst_indices", [])}
+        for key in ("nino3", "nino4", "nino34"):
+            if key not in sst_idx_map:
+                continue
+            label = sst_idx_map[key]["label"]
+            print(f"[{step}] SST {label} pipeline (anomaly) …"); step += 1
+            dat, _ = _run_sst_index(cfg, key, hn1, hn2, ndots, OUT_DIR)
+            js_var = f"{key}Data"  # nino3Data, nino4Data, nino34Data
+            loaded_data[js_var] = _load_dat(str(dat))
+            n = sum(1 for v in loaded_data[js_var]["irest"] if v == 0)
+            print(f"  {label}: {n} months")
+    else:
+        print(f"[{step}] Skipping SST pipelines (--sl-only); existing blocks kept."); step += 1
 
     # ── Sea level pipelines ───────────────────────────────────────────────────
     cal_data = None
@@ -366,6 +479,14 @@ def main() -> None:
                 yr0 = int(result["IYR"][0]);  m0 = int(result["MES"][0])
                 yr1 = int(result["IYR"][-1]); m1 = int(result["MES"][-1])
                 print(f"  {_month_label(yr0,m0)} – {_month_label(yr1,m1)}  ({n} months)")
+                latest_ym = (yr1, m1)
+                # Record a fresh, successful fetch for this station.
+                freshness["stations"][key] = {
+                    "name": st["name"],
+                    "last_success": run_date,
+                    "as_of": f"{yr1}-{m1:02d}",
+                    "ok": True,
+                }
                 if key == "callao":
                     cal_data  = loaded_data[js_var]
                     cal_yr0, cal_m0, cal_yr1, cal_m1, cal_n = yr0, m0, yr1, m1, n
@@ -382,7 +503,25 @@ def main() -> None:
                     file=sys.stderr,
                 )
                 failed_stations.append(st["name"])
+                # Mark stale but preserve the last-known-good date/month so the
+                # freshness footnote can say "as of <month> (fetch pending)".
+                prev = freshness["stations"].get(key, {})
+                freshness["stations"][key] = {
+                    "name": st["name"],
+                    "last_success": prev.get("last_success"),
+                    "as_of": prev.get("as_of"),
+                    "ok": False,
+                }
                 continue
+
+    # ── Freshness bookkeeping ─────────────────────────────────────────────────
+    freshness["last_refreshed"] = run_date
+    if not args.dry_run:
+        _save_freshness(freshness)
+    refreshed_label = _fmt_run_date(run_dt)
+    stale_notes     = _stale_notes(freshness)
+    if stale_notes:
+        print("  Freshness: " + "; ".join(stale_notes))
 
     # ── Patch all HTML files ──────────────────────────────────────────────────
     print(f"[{step}] Patching HTML files …"); step += 1
@@ -398,12 +537,17 @@ def main() -> None:
             html, _ = _patch_dataset(html, var_name, len_var, data)
 
         # Stats bar update (index.html only, only when both SST and Callao present)
-        if html_path.name == "index.html" and cal_data is not None:
+        if (html_path.name == "index.html"
+                and sst_data is not None and cal_data is not None):
             html = _patch_stats_bar(
                 html,
                 sst_yr0, sst_m0, sst_yr1, sst_m1, sst_n,
                 cal_yr0, cal_m0, cal_yr1, cal_m1, cal_n,
             )
+
+        # Data-freshness footnote (index.html landing page only).
+        if html_path.name == "index.html":
+            html, _ = _patch_freshness(html, refreshed_label, stale_notes)
 
         if html == original:
             print(f"  Unchanged: {html_path}")
@@ -419,7 +563,10 @@ def main() -> None:
     # ── Git push ──────────────────────────────────────────────────────────────
     if not args.dry_run and not args.no_push and patched_files:
         print(f"[{step}] Committing and pushing …"); step += 1
-        month_str = f"{sst_yr1}-{sst_m1:02d}"
+        if latest_ym is not None:
+            month_str = f"{latest_ym[0]}-{latest_ym[1]:02d}"
+        else:
+            month_str = run_dt.strftime("%Y-%m")
         msg = f"data: update ENSO arrays through {month_str} [auto]"
         add_targets = [str(p) for p in patched_files]
         cmds = [

@@ -17,6 +17,8 @@ header { background:linear-gradient(180deg,#0d0d18 0%,var(--bg) 100%); border-bo
 footer { text-align:center; padding:2rem 1rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); margin-top:3rem; }
 footer a { color:var(--accent); text-decoration:none; }
 footer a:hover { text-decoration:underline; }
+.data-freshness { margin-top:.9rem; color:var(--muted); font-size:.72rem; line-height:1.6; opacity:.85; }
+.data-freshness .stale { color:#c9a34a; }
 .esra-header { text-align:center; padding:.6rem 1rem .3rem; border-bottom:1px solid var(--border); background:var(--surface); }
 .esra-full { display:block; font-size:clamp(.9rem,2vw,1.1rem); font-weight:600; color:var(--text); letter-spacing:.04em; }
 .esra-abbr { font-size:.75rem; letter-spacing:.25em; color:var(--accent); text-transform:uppercase; }
@@ -138,6 +140,7 @@ p.abstract-text { color:var(--muted); font-size:.95rem; line-height:1.75; }
     &nbsp;&middot;&nbsp;
     <a href="https://uhslc.soest.hawaii.edu" target="_blank" rel="noopener">UHSLC</a>
   </p>
+  <p class="data-freshness"><!--DATA_FRESHNESS-->Data last refreshed: &mdash;<!--/DATA_FRESHNESS--></p>
 </footer>
 
 </body>

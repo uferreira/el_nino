@@ -21,6 +21,7 @@ Run with:
 """
 
 import importlib.util
+import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -135,10 +136,19 @@ stations:
 """
 
 
-def test_one_station_fails_others_patched(tmp_path, monkeypatch, capsys):
-    uw = _load_update_website()
+_FRESHNESS_MARKER = (
+    '<p class="data-freshness"><!--DATA_FRESHNESS-->old<!--/DATA_FRESHNESS--></p>'
+)
 
-    # --- Stub the pipeline runners so no network / heavy compute happens. ---
+
+def _setup(uw, tmp_path, monkeypatch, *, callao_fails, argv_extra=None,
+           prior_freshness=None):
+    """
+    Wire update_website's I/O to temp locations and stub the pipeline runners.
+
+    Returns (index_path, old_blocks). Callao raises RuntimeError when
+    ``callao_fails`` is True; every other station succeeds.
+    """
     dummy_new = {"x": [0.0, 1.0], "y": [1.0, 2.0],
                  "year": [2000, 2000], "month": [1, 2], "irest": [0, 0]}
     monkeypatch.setattr(uw, "_load_dat", lambda p: dict(dummy_new))
@@ -151,25 +161,32 @@ def test_one_station_fails_others_patched(tmp_path, monkeypatch, capsys):
                         lambda *a, **k: (Path("x.dat"), {}))
 
     def fake_run_sl(st, *a, **k):
-        if st["name"] == "Callao":
+        if callao_fails and st["name"] == "Callao":
             raise RuntimeError("UHSLC timeout on ERDDAP and RQD")
         return Path("x.dat"), {"IYR": [2000, 2001], "MES": [1, 12]}
 
     monkeypatch.setattr(uw, "_run_sl", fake_run_sl)
 
-    # --- Build a temp index.html holding an old JS block for every dataset. ---
+    # index.html: an old JS block for every dataset + the freshness marker.
     old_data = {"x": [9.0], "y": [9.0], "year": [1999], "month": [1], "irest": [0]}
     old_blocks = {
         var: uw._build_js_block(var, lenvar, old_data)
         for var, (fn, lenvar) in uw.DATASETS.items()
     }
     idx = tmp_path / "index.html"
-    idx.write_text("<html>\n" + "\n".join(old_blocks.values()) + "\n</html>\n",
-                   encoding="utf-8")
+    idx.write_text(
+        "<html>\n" + "\n".join(old_blocks.values())
+        + "\n" + _FRESHNESS_MARKER + "\n</html>\n",
+        encoding="utf-8",
+    )
 
-    # Point the script at our temp locations.
     monkeypatch.setattr(uw, "HTML_FILES", [idx])
     monkeypatch.setattr(uw, "OUT_DIR", tmp_path / "out")
+    fresh = tmp_path / "freshness.json"
+    monkeypatch.setattr(uw, "FRESHNESS_FILE", fresh)
+    if prior_freshness is not None:
+        fresh.parent.mkdir(parents=True, exist_ok=True)
+        fresh.write_text(json.dumps(prior_freshness), encoding="utf-8")
 
     local_file = tmp_path / "sst_hist.txt"
     local_file.write_text("header\n", encoding="utf-8")
@@ -178,16 +195,20 @@ def test_one_station_fails_others_patched(tmp_path, monkeypatch, capsys):
         _MIN_CONFIG.format(local_file=local_file.as_posix()), encoding="utf-8"
     )
 
-    monkeypatch.setattr(
-        uw.sys, "argv",
-        ["update_website.py", "--no-push", "--config", str(cfg_path)],
-    )
+    argv = ["update_website.py", "--no-push", "--config", str(cfg_path)]
+    argv += argv_extra or []
+    monkeypatch.setattr(uw.sys, "argv", argv)
+    return idx, old_blocks, fresh
+
+
+def test_one_station_fails_others_patched(tmp_path, monkeypatch, capsys):
+    uw = _load_update_website()
+    idx, old_blocks, _ = _setup(uw, tmp_path, monkeypatch, callao_fails=True)
 
     # Should complete without SystemExit despite Callao failing.
     uw.main()
 
     final = idx.read_text(encoding="utf-8")
-
     # Callao failed → its old block is left untouched.
     assert old_blocks["callaoData"] in final
     # A healthy station (Talara) and the SST block were patched to new data.
@@ -197,3 +218,63 @@ def test_one_station_fails_others_patched(tmp_path, monkeypatch, capsys):
 
     err = capsys.readouterr().err
     assert "Callao" in err
+
+
+def test_failed_station_marked_stale_in_freshness(tmp_path, monkeypatch):
+    uw = _load_update_website()
+    prior = {
+        "last_refreshed": "2026-06-05",
+        "stations": {
+            "callao": {"name": "Callao", "last_success": "2026-06-05",
+                       "as_of": "2026-05", "ok": True},
+        },
+    }
+    idx, _, fresh = _setup(uw, tmp_path, monkeypatch,
+                           callao_fails=True, prior_freshness=prior)
+
+    uw.main()
+
+    state = json.loads(fresh.read_text(encoding="utf-8"))
+    # Callao is now stale but keeps its last-known-good month.
+    assert state["stations"]["callao"]["ok"] is False
+    assert state["stations"]["callao"]["as_of"] == "2026-05"
+    # A healthy station recorded a fresh success.
+    assert state["stations"]["talara"]["ok"] is True
+    assert state["last_refreshed"] is not None
+
+    # The index.html footnote surfaces the stale station subtly.
+    final = idx.read_text(encoding="utf-8")
+    assert "Data last refreshed:" in final
+    assert "Callao sea level data as of May 2026 (fetch pending)" in final
+
+
+def test_sl_only_leaves_sst_blocks_untouched(tmp_path, monkeypatch):
+    uw = _load_update_website()
+
+    # --sl-only must not even call the SST runners.
+    def _boom(*a, **k):
+        raise AssertionError("SST pipeline ran under --sl-only")
+
+    idx, old_blocks, _ = _setup(uw, tmp_path, monkeypatch, callao_fails=False,
+                                argv_extra=["--sl-only"])
+    monkeypatch.setattr(uw, "_run_sst_nino12", _boom)
+    monkeypatch.setattr(uw, "_run_sst_index", _boom)
+
+    uw.main()
+
+    final = idx.read_text(encoding="utf-8")
+    # SST/NINO blocks are left exactly as they were …
+    assert old_blocks["observedData"] in final
+    assert old_blocks["nino3Data"] in final
+    # … while sea level stations were refreshed.
+    assert old_blocks["talaraData"] not in final
+    assert old_blocks["callaoData"] not in final
+
+
+def test_sst_only_and_sl_only_mutually_exclusive(tmp_path, monkeypatch):
+    uw = _load_update_website()
+    idx, _, _ = _setup(uw, tmp_path, monkeypatch, callao_fails=False,
+                       argv_extra=["--sst-only", "--sl-only"])
+    with pytest.raises(SystemExit) as exc:
+        uw.main()
+    assert exc.value.code == 1

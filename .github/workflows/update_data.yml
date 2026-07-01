@@ -2,12 +2,22 @@ name: Update ENSO data
 
 on:
   schedule:
-    # 1st of every month at 06:00 UTC
-    - cron: '0 6 1,15 * *'
+    # Full run — SST + all sea level stations.
+    # 5th of the month, 06:00 UTC (NOAA CPC updates the SST indices around the
+    # 3rd–4th, so the 5th leaves a safety buffer).
+    - cron: '0 6 5 * *'
+    # Sea level refresh only — skip the SST/NINO pipelines (they would just
+    # re-produce identical deterministic output from the same NOAA file).
+    # 18th of the month, 06:00 UTC.
+    - cron: '0 6 18 * *'
   workflow_dispatch:
     inputs:
       sst_only:
-        description: 'Update SST only (skip Callao sea level)'
+        description: 'Update SST only (skip all sea level stations)'
+        type: boolean
+        default: false
+      sl_only:
+        description: 'Update sea level only (skip SST/NINO pipelines)'
         type: boolean
         default: false
 
@@ -41,18 +51,31 @@ jobs:
       - name: Run update script
         run: |
           FLAG=""
+          # Manual dispatch inputs take precedence …
           if [ "${{ github.event.inputs.sst_only }}" = "true" ]; then
             FLAG="--sst-only"
+          elif [ "${{ github.event.inputs.sl_only }}" = "true" ]; then
+            FLAG="--sl-only"
+          # … otherwise pick the mode from which cron schedule fired.
+          # The 18th schedule is the sea-level-only refresh.
+          elif [ "${{ github.event.schedule }}" = "0 6 18 * *" ]; then
+            FLAG="--sl-only"
           fi
+          echo "Running: python scripts/update_website.py --no-push $FLAG"
           python scripts/update_website.py --no-push $FLAG
 
-      - name: Commit and push if HTML changed
+      - name: Commit and push if data changed
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/index.html
+          # Stage every page update_website.py can patch plus the freshness
+          # tracker (force-added: data/output/ is gitignored but this file must
+          # persist across the ephemeral CI checkout to remember stale stations).
+          git add docs/index.html docs/animations.html docs/familiar_attractor.html \
+                  docs/ensemble.html docs/compare.html
+          git add -f data/output/freshness.json
           if git diff --cached --quiet; then
-            echo "No changes — docs/index.html is already up to date."
+            echo "No changes — site data is already up to date."
           else
             MONTH=$(date -u '+%Y-%m')
             git commit -m "data: update ENSO arrays through ${MONTH} [auto]"
