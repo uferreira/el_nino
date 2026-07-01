@@ -10,6 +10,7 @@ dependency on pandas beyond this module boundary.
 from __future__ import annotations
 
 import shutil
+import time
 import warnings
 from datetime import datetime, timezone
 from io import StringIO
@@ -35,6 +36,12 @@ ERDDAP_BASE = (
 FILL_VALUE = -32767
 
 REQUEST_TIMEOUT = 60   # seconds; ERDDAP for long series can be slow
+
+# Retry policy for transient network failures (timeouts, dropped connections).
+# UHSLC's ERDDAP/RQD servers intermittently stall; a couple of backed-off
+# retries turns a hard failure into a recoverable blip. Non-transient errors
+# (e.g. HTTP 404) are never retried.
+RETRY_BACKOFFS = (2, 5, 10)   # seconds to wait before attempts 2, 3, 4
 
 # RAPID near-real-time URLs tried in order; {id} tozero-padded station_id.
 # URL 1: FD hourly CSV (same data as ERDDAP FD, different transport).
@@ -67,27 +74,52 @@ def _fetch(url: str, label: str) -> requests.Response:
     """
     Perform a GET request and return the response.
 
+    Transient failures (connection timeouts and dropped connections) are
+    retried with exponential backoff per ``RETRY_BACKOFFS`` before giving up.
+    UHSLC's servers stall intermittently, so a couple of backed-off retries
+    turn an otherwise-fatal blip into a recoverable one. HTTP errors (e.g. a
+    404) are *not* retried — they will not fix themselves — and are raised
+    immediately.
+
     Wraps network errors in a RuntimeError with a human-readable message
     that includes the URL — useful when the failure is deep in a pipeline.
     """
-    try:
-        resp = requests.get(url, timeout=REQUEST_TIMEOUT)
-        resp.raise_for_status()
-        return resp
-    except requests.exceptions.Timeout:
-        raise RuntimeError(
-            f"Timeout after {REQUEST_TIMEOUT}s downloading {label}.\n"
-            f"URL: {url}"
-        ) from None
-    except requests.exceptions.HTTPError as exc:
-        raise RuntimeError(
-            f"HTTP {exc.response.status_code} downloading {label}.\n"
-            f"URL: {url}"
-        ) from exc
-    except requests.exceptions.RequestException as exc:
-        raise RuntimeError(
-            f"Network error downloading {label}: {exc}"
-        ) from exc
+    # One attempt per backoff plus the initial try (e.g. 2/5/10 → 4 attempts).
+    total_attempts = len(RETRY_BACKOFFS) + 1
+    for attempt in range(total_attempts):
+        try:
+            resp = requests.get(url, timeout=REQUEST_TIMEOUT)
+            resp.raise_for_status()
+            return resp
+        except (
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError,
+        ) as exc:
+            # Transient: retry with backoff unless this was the last attempt.
+            if attempt < len(RETRY_BACKOFFS):
+                wait = RETRY_BACKOFFS[attempt]
+                warnings.warn(
+                    f"Transient network error downloading {label} "
+                    f"(attempt {attempt + 1}/{total_attempts}): {exc}. "
+                    f"Retrying in {wait}s …",
+                    stacklevel=2,
+                )
+                time.sleep(wait)
+                continue
+            raise RuntimeError(
+                f"Network error downloading {label} after "
+                f"{total_attempts} attempts: {exc}\n"
+                f"URL: {url}"
+            ) from exc
+        except requests.exceptions.HTTPError as exc:
+            raise RuntimeError(
+                f"HTTP {exc.response.status_code} downloading {label}.\n"
+                f"URL: {url}"
+            ) from exc
+        except requests.exceptions.RequestException as exc:
+            raise RuntimeError(
+                f"Network error downloading {label}: {exc}"
+            ) from exc
 
 
 def _snap_to_hour(series: pd.Series) -> pd.Series:

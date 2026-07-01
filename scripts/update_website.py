@@ -353,19 +353,36 @@ def main() -> None:
         "palau":        "palauData",
     }
 
+    failed_stations: list[str] = []
+
     if not args.sst_only:
         for key, st in cfg["stations"].items():
             js_var = _sl_var.get(key, f"{key}Data")
             print(f"[{step}] {st['name']} sea level pipeline …"); step += 1
-            dat, result = _run_sl(st, hn1, hn2, ndots, OUT_DIR)
-            loaded_data[js_var] = _load_dat(str(dat))
-            n = sum(1 for v in loaded_data[js_var]["irest"] if v == 0)
-            yr0 = int(result["IYR"][0]);  m0 = int(result["MES"][0])
-            yr1 = int(result["IYR"][-1]); m1 = int(result["MES"][-1])
-            print(f"  {_month_label(yr0,m0)} – {_month_label(yr1,m1)}  ({n} months)")
-            if key == "callao":
-                cal_data  = loaded_data[js_var]
-                cal_yr0, cal_m0, cal_yr1, cal_m1, cal_n = yr0, m0, yr1, m1, n
+            try:
+                dat, result = _run_sl(st, hn1, hn2, ndots, OUT_DIR)
+                loaded_data[js_var] = _load_dat(str(dat))
+                n = sum(1 for v in loaded_data[js_var]["irest"] if v == 0)
+                yr0 = int(result["IYR"][0]);  m0 = int(result["MES"][0])
+                yr1 = int(result["IYR"][-1]); m1 = int(result["MES"][-1])
+                print(f"  {_month_label(yr0,m0)} – {_month_label(yr1,m1)}  ({n} months)")
+                if key == "callao":
+                    cal_data  = loaded_data[js_var]
+                    cal_yr0, cal_m0, cal_yr1, cal_m1, cal_n = yr0, m0, yr1, m1, n
+            except RuntimeError as exc:
+                # A single flaky station (e.g. Callao when UHSLC times out) must
+                # not abort the whole update. Skip it: without its entry in
+                # loaded_data, _patch_dataset leaves that station's existing JS
+                # block untouched (stale but not broken), and — for Callao —
+                # cal_data stays None so _patch_stats_bar is skipped entirely.
+                print(
+                    f"  WARNING: {st['name']} sea level pipeline failed; "
+                    f"leaving its existing data in place.\n"
+                    f"  {exc}",
+                    file=sys.stderr,
+                )
+                failed_stations.append(st["name"])
+                continue
 
     # ── Patch all HTML files ──────────────────────────────────────────────────
     print(f"[{step}] Patching HTML files …"); step += 1
@@ -417,6 +434,13 @@ def main() -> None:
                 print(f"  stderr: {r.stderr.strip()}")
                 break
             print(f"  OK: {' '.join(cmd[:2])}")
+
+    if failed_stations:
+        print(
+            f"\nWARNING: {len(failed_stations)} sea level station(s) failed "
+            f"and kept their previous data: {', '.join(failed_stations)}",
+            file=sys.stderr,
+        )
 
     print(f"\nDone in {time.time()-t0:.1f}s")
 
