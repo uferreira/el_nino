@@ -1,4 +1,35 @@
 {
-  "last_refreshed": null,
-  "stations": {}
+  "last_refreshed": "2026-07-05",
+  "stations": {
+    "callao": {
+      "as_of": "2026-07",
+      "last_success": "2026-07-05",
+      "name": "Callao",
+      "ok": true
+    },
+    "honolulu": {
+      "as_of": "2026-07",
+      "last_success": "2026-07-05",
+      "name": "Honolulu",
+      "ok": true
+    },
+    "la_libertad": {
+      "as_of": "2026-07",
+      "last_success": "2026-07-05",
+      "name": "La Libertad",
+      "ok": true
+    },
+    "palau": {
+      "as_of": "2026-07",
+      "last_success": "2026-07-05",
+      "name": "Palau",
+      "ok": true
+    },
+    "talara": {
+      "as_of": "2025-08",
+      "last_success": "2026-07-05",
+      "name": "Talara",
+      "ok": true
+    }
+  }
 }
