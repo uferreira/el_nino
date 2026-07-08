@@ -299,6 +299,21 @@ footer a:hover { text-decoration:underline; }
       </div>
     </div>
 
+    <div class="ctrl-head" style="margin-top:1.1rem">View</div>
+    <div class="param-grid">
+      <div class="param-row">
+        <label>Zoom <span id="lbl-s2-zoom">1.0x</span></label>
+        <div class="param-inline">
+          <input type="range" id="sl-s2-zoom" min="0.3" max="4" step="0.1" value="1">
+          <input type="number" id="nb-s2-zoom" value="1" min="0.3" max="4" step="0.1">
+        </div>
+      </div>
+      <label class="check-row" for="s2-autofit" style="display:flex;align-items:center;gap:.45rem;margin-top:.2rem;">
+        <input type="checkbox" id="s2-autofit" checked>
+        Auto-fit axes to the trajectory
+      </label>
+    </div>
+
     <div class="btn-row">
       <button id="s2-run"   onclick="s2Start()">&#9654; Run</button>
       <button id="s2-pause" class="secondary" onclick="s2Pause()" disabled>&#9646;&#9646; Pause</button>
@@ -1112,13 +1127,54 @@ const S2 = {
   totalSteps:0, wasRunningBeforeScrub:false,
   tail:[], rafId:null,
   canvas:null, ctx:null, off:null, offCtx:null,
+  dom:{...S2_DOM}, zoom:1, autofit:true, fitDom:null,
 };
+
+// Integrate the current parameters over the whole run and return the (X, dX/dt)
+// extents, so the axes can be fitted to the trajectory instead of clipping it.
+function s2ComputeFit() {
+  const p = S2.params || getParams();
+  const dt = S2.dt || 0.1;
+  const tStart = S2.t_start || 0;
+  const tEnd = S2.t_end || 600;
+  let X = S2.startX, Y = S2.startY, t = tStart;
+  let xmin=X, xmax=X, ymin=Y, ymax=Y;
+  const n = Math.max(1, Math.round((tEnd - tStart) / dt));
+  for (let i=0; i<n; i++) {
+    const s = rkf5Step(t, X, Y, p, dt);
+    X = s.X; Y = s.Y; t += dt;
+    if (!isFinite(X) || !isFinite(Y) || Math.abs(X) > 200) break;
+    if (X<xmin)xmin=X; if(X>xmax)xmax=X; if(Y<ymin)ymin=Y; if(Y>ymax)ymax=Y;
+  }
+  const mgx = Math.max(0.4, (xmax-xmin)*0.08), mgy = Math.max(0.3, (ymax-ymin)*0.08);
+  return {xmin:xmin-mgx, xmax:xmax+mgx, ymin:ymin-mgy, ymax:ymax+mgy};
+}
+
+// Build the current view domain from the base (fitted or default) and the zoom.
+function s2SetView() {
+  const base = (S2.autofit && S2.fitDom) ? S2.fitDom : S2_DOM;
+  const z = S2.zoom || 1;
+  const cx=(base.xmin+base.xmax)/2, cy=(base.ymin+base.ymax)/2;
+  const hx=(base.xmax-base.xmin)/2/z, hy=(base.ymax-base.ymin)/2/z;
+  S2.dom = {xmin:cx-hx, xmax:cx+hx, ymin:cy-hy, ymax:cy+hy};
+}
+
+// Re-read the View controls and repaint at the new scale.
+function s2UpdateView() {
+  const zEl=document.getElementById('nb-s2-zoom'), afEl=document.getElementById('s2-autofit');
+  if (zEl) S2.zoom = Math.min(4, Math.max(0.3, parseFloat(zEl.value)||1));
+  if (afEl) S2.autofit = afEl.checked;
+  if (S2.autofit && !S2.fitDom && S2.totalSteps>0) S2.fitDom = s2ComputeFit();
+  s2SetView();
+  if (S2.totalSteps>0) s2RedrawToFrame(S2.step); else s2DrawBg();
+}
 
 function s2Init() {
   S2.canvas = document.getElementById('duff-canvas');
   S2.ctx    = S2.canvas.getContext('2d');
   S2.off    = makeOff(S2_CW, S2_CH);
   S2.offCtx = S2.off.getContext('2d');
+  s2SetView();
   s2DrawBg();
 
   const scrubEl = document.getElementById('s2-scrubber');
@@ -1162,13 +1218,13 @@ function s2Init() {
 }
 
 function s2DrawBg() {
-  drawBg(S2.ctx, S2_CW, S2_CH, S2_PLT, S2_DOM, S2_LABELS);
+  drawBg(S2.ctx, S2_CW, S2_CH, S2_PLT, S2.dom, S2_LABELS);
 }
 
 function s2Frame() {
   s2DrawBg();
   ctx_s2 = S2.ctx;
-  compositeFrame(ctx_s2, S2_CW, S2_CH, S2_PLT, S2_DOM, S2.off, S2.tail,
+  compositeFrame(ctx_s2, S2_CW, S2_CH, S2_PLT, S2.dom, S2.off, S2.tail,
     monthLabel(Math.floor(S2.step * S2.dt), S2.startYear));
 }
 
@@ -1182,7 +1238,7 @@ function s2Loop() {
     S2.X=s.X; S2.Y=s.Y; S2.t+=dt; S2.step++;
     if (!isFinite(S2.X)||Math.abs(S2.X)>200) { s2Finish(); return; }
     const s2Month = (Math.floor(s2t) % 12) + 1;
-    pushTail(S2.tail, S2.X, S2.Y, s2Month, S2_TAIL, S2.offCtx, S2_PLT, S2_DOM);
+    pushTail(S2.tail, S2.X, S2.Y, s2Month, S2_TAIL, S2.offCtx, S2_PLT, S2.dom);
   }
   s2Frame();
   s2Status();
@@ -1206,6 +1262,8 @@ function s2Start() {
   S2.Y = parseFloat(document.getElementById('nb-Y0').value)||0;
   S2.startX = S2.X; S2.startY = S2.Y;
   S2.totalSteps = Math.round((S2.t_end - S2.t_start) / S2.dt);
+  S2.fitDom = S2.autofit ? s2ComputeFit() : null;   // fit axes to this run
+  s2SetView();
   S2.tail = []; S2.running=true; S2.paused=false;
   S2.offCtx.clearRect(0,0,S2_CW,S2_CH);
   s2DrawBg();
@@ -1234,6 +1292,7 @@ function s2Finish() {
 }
 function s2Reset() {
   s2Finish(); S2.t=0; S2.step=0; S2.X=0; S2.Y=0; S2.tail=[]; S2.totalSteps=0;
+  S2.fitDom=null; s2SetView();
   S2.offCtx.clearRect(0,0,S2_CW,S2_CH);
   s2DrawBg();
   const _s2scrubR = document.getElementById('s2-scrubber');
@@ -1268,12 +1327,12 @@ function s2RedrawToFrame(targetStep) {
     X = s.X; Y = s.Y; t += dt; step++;
     if (!isFinite(X) || Math.abs(X) > 200) break;
     const s2Month = (Math.floor(s2t) % 12) + 1;
-    pushTail(tail, X, Y, s2Month, S2_TAIL, S2.offCtx, S2_PLT, S2_DOM);
+    pushTail(tail, X, Y, s2Month, S2_TAIL, S2.offCtx, S2_PLT, S2.dom);
   }
 
   S2.X = X; S2.Y = Y; S2.t = t; S2.step = step; S2.tail = tail;
   s2DrawBg();
-  compositeFrame(S2.ctx, S2_CW, S2_CH, S2_PLT, S2_DOM, S2.off, S2.tail,
+  compositeFrame(S2.ctx, S2_CW, S2_CH, S2_PLT, S2.dom, S2.off, S2.tail,
     monthLabel(Math.floor(step * dt), S2.startYear));
 
   const s2tNow = step * dt;
@@ -2796,6 +2855,9 @@ linkSlider('sl-Y0','nb-Y0','lbl-Y0',f2);
 linkSlider('sl-att-delay','nb-att-delay','lbl-att-delay',fInt);
 linkSlider('sl-att-point','nb-att-point','lbl-att-point',fInt);
 linkSlider('sl-att-zoom','nb-att-zoom','lbl-att-zoom',fZoom);
+linkSlider('sl-s2-zoom','nb-s2-zoom','lbl-s2-zoom',fZoom);
+['sl-s2-zoom','nb-s2-zoom'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('input',s2UpdateView); });
+{ const _s2af=document.getElementById('s2-autofit'); if(_s2af) _s2af.addEventListener('change',s2UpdateView); }
 document.getElementById('att-sampling').addEventListener('change',attReset);
 document.getElementById('att-show-track').addEventListener('change',updateAttSpeed);
 let attYearInputTimer=null;
