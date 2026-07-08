@@ -202,21 +202,21 @@ footer a:hover { text-decoration:underline; }
       <div class="param-row">
         <label>K1 — linear (double-well) <span id="lbl-K1">0.1218</span></label>
         <div class="param-inline">
-          <input type="range" id="sl-K1" min="0.01" max="0.5" step="0.001" value="0.121847">
+          <input type="range" id="sl-K1" min="0.01" max="1.2" step="0.001" value="0.121847">
           <input type="number" id="nb-K1" value="0.121847" step="0.001">
         </div>
       </div>
       <div class="param-row">
         <label>K3 — cubic (bounded) <span id="lbl-K3">−0.0305</span></label>
         <div class="param-inline">
-          <input type="range" id="sl-K3" min="-0.2" max="-0.001" step="0.0001" value="-0.03046">
+          <input type="range" id="sl-K3" min="-1.2" max="-0.001" step="0.0001" value="-0.03046">
           <input type="number" id="nb-K3" value="-0.03046" step="0.0001">
         </div>
       </div>
       <div class="param-row">
         <label>FA — annual forcing amplitude <span id="lbl-FA">0.4873</span></label>
         <div class="param-inline">
-          <input type="range" id="sl-FA" min="0.0" max="2.0" step="0.01" value="0.4873">
+          <input type="range" id="sl-FA" min="0.0" max="3.5" step="0.01" value="0.4873">
           <input type="number" id="nb-FA" value="0.4873" step="0.01">
         </div>
       </div>
@@ -329,9 +329,44 @@ footer a:hover { text-decoration:underline; }
 <div class="container">
   <h2>Duffing Attractor Sampling</h2>
   <p class="section-desc">
-    Each frame fixes one phase within the annual forcing cycle and plots one phase-space point for
-    every simulated year. Choose daily, weekly, or monthly sampling to control the temporal detail. The <em>forcing period</em> option instead strobes once per forcing cycle T=2&pi;/W — the classic Poincar&eacute; section. With the <strong>Chaos preset</strong> (x&Prime; + 0.3x&prime; &minus; x + x&sup3; = 0.5cos(1.2t)) and a long year range it reproduces the fractal Duffing strange attractor from the literature.
+    With <em>daily / weekly / monthly</em> sampling each frame fixes one phase of the annual ENSO forcing
+    cycle and plots one phase-space point for every simulated year — the &ldquo;familiar attractor&rdquo;
+    view. The <em>strange-attractor flow</em> option is different: it seeds a coloured grid of initial
+    conditions and lets them all evolve together under the Duffing flow, so you watch the whole cloud
+    stretch and fold through four forcing periods — exactly the
+    <a href="https://en.wikipedia.org/wiki/Duffing_equation" target="_blank" rel="noopener">Wikipedia</a>
+    Duffing strange-attractor animation.
   </p>
+  <div class="science-box">
+    <strong>What the &#127744; Chaos preset (Wikipedia) does.</strong>
+    It integrates the <em>same</em> generalised Duffing equation used everywhere on this page for the
+    El Ni&ntilde;o model —
+    <br><br>
+    <span style="font-family:monospace">dX/dt = Y,&nbsp;&nbsp; dY/dt = K1&middot;X + K3&middot;X&sup3; + B&middot;Y + FA&middot;cos(W&middot;t &minus; FF)</span>
+    <br><br>
+    — only the <em>coefficients</em> change, not the equation. The ENSO fit (ALADO / DoubleWell.21.5)
+    sits in a strongly damped, annually forced regime whose attractor is a regular limit cycle. The
+    preset switches the coefficients to the classic chaotic regime of the Wikipedia figure,
+    x&Prime; + 0.02&thinsp;x&prime; &minus; x + x&sup3; = 3&thinsp;sin(t)
+    &nbsp;(&alpha;=&minus;1, &beta;=1, &delta;=0.02, &gamma;=3, &omega;=1):
+    <br><br>
+    <span style="font-family:monospace">
+    K1 = &minus;&alpha; = +1 &nbsp;(double-well)&nbsp;&nbsp;&middot;&nbsp;&nbsp;
+    K3 = &minus;&beta; = &minus;1 &nbsp;(cubic nonlinearity)<br>
+    B = &minus;&delta; = &minus;0.02 &nbsp;(very light damping)&nbsp;&nbsp;&middot;&nbsp;&nbsp;
+    FA = &gamma; = 3 &nbsp;(strong forcing)<br>
+    W = &omega; = 1 rad/time (period T = 2&pi;)&nbsp;&nbsp;&middot;&nbsp;&nbsp;
+    FF = +90&deg; &nbsp;(so FA&middot;cos(Wt&minus;FF) = 3&thinsp;sin&thinsp;t)
+    </span>
+    <br><br>
+    With very light damping, a strong double-well and hard off-resonant forcing, a compact blob of
+    initial conditions never settles: it is stretched and folded repeatedly, tracing out the fractal
+    strange attractor. The preset seeds a coloured square grid of trajectories and integrates them all
+    through four forcing periods (8&pi;); each animation frame is a snapshot of the whole cloud at one
+    instant, and the colours (fixed by each point&rsquo;s starting position) show how the flow folds.
+    Press &#9654; Play to watch the strange attractor form, then loop. Press &#8617; Defaults to return
+    to the El Ni&ntilde;o parameters.
+  </div>
 
   <div class="attractor-layout">
     <div class="attractor-controls">
@@ -354,7 +389,7 @@ footer a:hover { text-decoration:underline; }
           <option value="daily">Daily (365 frames/year)</option>
           <option value="weekly" selected>Weekly (52 frames/year)</option>
           <option value="monthly">Monthly (12 frames/year)</option>
-          <option value="forcing">Forcing period T=2&pi;/W (Poincar&eacute; strobe)</option>
+          <option value="flow">Strange-attractor flow (Wikipedia point cloud)</option>
         </select>
       </div>
       <div class="param-row">
@@ -1596,13 +1631,18 @@ function updateAttSpeed() {
   if (ATT.canvas && ATT.frames && ATT.frames.length) attDrawFrame();
 }
 
-// One frame contains the same forcing-cycle phase from every simulated year.
+// daily/weekly/monthly: one frame = one forcing-cycle phase, one point per simulated year.
+// flow: one frame = a snapshot of a whole ensemble of trajectories at one instant (Wikipedia style).
 const ATT_SAMPLE_MODES={
   daily:{frames:365,singular:'Day',plural:'days'},
-  forcing:{frames:1,singular:'Strobe',plural:'strobe / forcing period'},
+  flow:{frames:160,singular:'Frame',plural:'flow frames'},
   weekly:{frames:52,singular:'Week',plural:'weeks'},
   monthly:{frames:12,singular:'Month',plural:'months'},
 };
+
+// Wikipedia strange-attractor flow configuration.
+const ATT_FLOW={grid:44, seed:2.0, periods:4, dtInt:0.02, targetFrames:160};
+const ATT_FLOW_DOM={xmin:-3.0, xmax:3.0, ymin:-4.5, ymax:4.5};
 
 function attSampleConfig() {
   return ATT_SAMPLE_MODES[document.getElementById('att-sampling').value] || ATT_SAMPLE_MODES.weekly;
@@ -1642,40 +1682,19 @@ function attBuildSampleFrames() {
   ATT.frames = Array.from({length:ATT.framesPerYear}, () => []);
   ATT.series = [];
   ATT.trackCacheKey = null;
+  ATT.flowToken = (ATT.flowToken||0)+1;   // cancel any in-flight flow build
 
   const startTime=getStartTime();
   let t = startTime;
   let X = parseFloat(document.getElementById('nb-X0').value) || 0;
   let Y = parseFloat(document.getElementById('nb-Y0').value) || 0;
   const yearCount=ATT.endYear-ATT.startYear+1;
-  if (document.getElementById('att-sampling').value === 'forcing') {
-    // Poincare section strobed once per forcing period T = 2*pi/W (NOT per
-    // calendar year - the two only coincide when W = 2*pi/12). This is how
-    // the classic Duffing strange-attractor figure is produced: integrate
-    // thousands of forcing cycles, discard the transient, plot one dot per
-    // cycle. Use the Chaos preset (K1=1, K3=-1, B=-0.3, FA=0.5, W=1.2) and
-    // a long year range to reproduce the fractal section.
-    const T = 2*Math.PI/(ATT.params.W || W_ANN);
-    const nCycles = Math.floor(yearCount*12/T);
-    const burn = Math.min(50, Math.floor(nCycles*0.1));   // transient cut
-    for (let k=1; k<=nCycles; k++) {
-      const target = startTime + k*T;
-      while (t < target-1e-10) {
-        const h = Math.min(ATT_DT, target-t);
-        const next = rkf5Step(t, X, Y, ATT.params, h);
-        X = next.X; Y = next.Y; t += h;
-      }
-      if (k <= burn || !isFinite(X) || !isFinite(Y)) continue;
-      const point = {x:X, y:Y, year:ATT.startYear+Math.floor(k*T/12), sample:1};
-      ATT.frames[0].push(point);
-      ATT.series.push(point);
-    }
-    const countEl0 = document.getElementById('att-count-readout');
-    if (countEl0) countEl0.textContent = ATT.frames[0].length + ' strobe points';
-    const frameEl0 = document.getElementById('att-frame-readout');
-    if (frameEl0) frameEl0.textContent = 'T = ' + T.toFixed(3) + ' months';
+  if (document.getElementById('att-sampling').value === 'flow') {
+    attBuildFlow();
     return;
   }
+  ATT.flowMode = false;
+  ATT.flowBuilding = false;
   const monthsPerFrame=12/ATT.framesPerYear;
   for (let yearOffset=0; yearOffset<yearCount; yearOffset++) {
     for (let sample=0; sample<ATT.framesPerYear; sample++) {
@@ -1698,6 +1717,75 @@ function attBuildSampleFrames() {
   if (frameEl) frameEl.textContent = ATT.framesPerYear + ' ' + ATT.sampleConfig.plural;
 }
 
+// ── Wikipedia strange-attractor flow: seed a coloured grid of initial
+//    conditions and integrate them all together, storing a snapshot of the
+//    whole ensemble at a sequence of instants. Built asynchronously in small
+//    chunks so the page never freezes, even for thousands of trajectories.
+function attBuildFlow() {
+  ATT.flowMode = true;
+  ATT.flowBuilding = true;
+  const p = ATT.params;
+  const N = ATT_FLOW.grid, S = ATT_FLOW.seed, nP = N*N;
+  const px = new Float64Array(nP), py = new Float64Array(nP);
+  ATT.flowColors = new Array(nP);
+  for (let iy=0; iy<N; iy++) {
+    for (let ix=0; ix<N; ix++) {
+      const k = iy*N+ix;
+      px[k] = -S + 2*S*ix/(N-1);
+      py[k] = -S + 2*S*iy/(N-1);
+      ATT.flowColors[k] = `hsl(${Math.round(360*ix/(N-1))},88%,${Math.round(40+34*iy/(N-1))}%)`;
+    }
+  }
+  const W = p.W || W_ANN;
+  const Ttot = ATT_FLOW.periods * 2*Math.PI / W;        // four forcing periods
+  const dtI = ATT_FLOW.dtInt;
+  const steps = Math.max(ATT_FLOW.targetFrames, Math.round(Ttot/dtI));
+  const snapEvery = Math.max(1, Math.round(steps/ATT_FLOW.targetFrames));
+  const nFrames = 1 + Math.floor(steps/snapEvery);
+  ATT.frames = new Array(nFrames);
+  const snap = () => { const a=new Array(nP); for (let k=0;k<nP;k++) a[k]={x:px[k],y:py[k],ci:k}; return a; };
+  ATT.frames[0] = snap();
+  ATT.framesPerYear = nFrames;
+  ATT.flowTtot = Ttot;
+  ATT.flowBuilt = 1;                                     // frames ready to show
+  ATT.series = [];
+  const countEl0 = document.getElementById('att-count-readout');
+  if (countEl0) countEl0.textContent = nP.toLocaleString() + ' trajectories';
+  const frameEl0 = document.getElementById('att-frame-readout');
+  if (frameEl0) frameEl0.textContent = nFrames + ' frames · ' + ATT_FLOW.periods + ' periods (8π)';
+  clearTimeout(ATT.flowTimer);
+  attFlowStep({px,py,p,dtI,steps,snapEvery,nP,tt:0,s:0,frameIdx:1,token:ATT.flowToken});
+}
+
+function attFlowStep(state) {
+  if (state.token !== ATT.flowToken) return;            // superseded by a newer build
+  const {px,py,p,dtI,steps,snapEvery,nP} = state;
+  const chunk = Math.max(1, Math.round(4500/nP));       // time-steps per tick (stays responsive)
+  let done=false;
+  for (let c=0; c<chunk; c++) {
+    if (state.s >= steps) { done=true; break; }
+    for (let k=0;k<nP;k++){ if(!isFinite(px[k]))continue; const nx=rkf5Step(state.tt,px[k],py[k],p,dtI); px[k]=nx.X; py[k]=nx.Y; }
+    state.tt += dtI; state.s++;
+    if (state.s % snapEvery === 0 && state.frameIdx < ATT.frames.length) {
+      const a=new Array(nP); for (let k=0;k<nP;k++) a[k]={x:px[k],y:py[k],ci:k};
+      ATT.frames[state.frameIdx++] = a;
+      ATT.flowBuilt = state.frameIdx;
+    }
+  }
+  const st=document.getElementById('att-status');
+  if (st && ATT.flowBuilding && !ATT.running) {
+    st.innerHTML=`<span class="st-ready">Building strange-attractor flow … ${Math.min(100,Math.round(state.s/steps*100))}%</span>`;
+  }
+  if (done) {
+    ATT.flowBuilding=false;
+    for (let i=1;i<ATT.frames.length;i++) if(!ATT.frames[i]) ATT.frames[i]=ATT.frames[i-1];
+    ATT.flowBuilt = ATT.frames.length;
+    if (!ATT.running) attStatus(true);
+    return;
+  }
+  ATT.flowTimer = setTimeout(()=>attFlowStep(state), 0);
+}
+
 function attFrameColor(year, alpha=0.9) {
   const span = Math.max(1, ATT.endYear-ATT.startYear);
   const f = (year-ATT.startYear)/span;
@@ -1714,10 +1802,17 @@ const ATT_AXIS_STYLE = {
 
 function attViewDom() {
   const zoom=ATT.zoom || 1;
+  const base = ATT.flowMode ? ATT_FLOW_DOM : ATT_DOM;
   return {
-    xmin:ATT_DOM.xmin/zoom, xmax:ATT_DOM.xmax/zoom,
-    ymin:ATT_DOM.ymin/zoom, ymax:ATT_DOM.ymax/zoom,
+    xmin:base.xmin/zoom, xmax:base.xmax/zoom,
+    ymin:base.ymin/zoom, ymax:base.ymax/zoom,
   };
+}
+
+function attPointColor(pt) {
+  if (pt.ci!=null && ATT.flowColors) return ATT.flowColors[pt.ci];
+  if (pt.col) return pt.col;
+  return attFrameColor(pt.year!=null ? pt.year : ATT.startYear);
 }
 
 function attNiceTickValues(min,max,target=7) {
@@ -1741,6 +1836,12 @@ function attDrawTimeSeries() {
   if (!ctx) return;
   const PLT = ATT_SIDE_PLT;
   attSideBg(ctx, ATT_TIME_H, PLT);
+  if (ATT.flowMode) {
+    ctx.fillStyle='#6a6a80'; ctx.font='11px monospace'; ctx.textAlign='center';
+    ctx.fillText('ensemble flow —', (PLT.l+PLT.r)/2, (PLT.t+PLT.b)/2-6);
+    ctx.fillText('no single time series', (PLT.l+PLT.r)/2, (PLT.t+PLT.b)/2+10);
+    return;
+  }
   const frame = ATT.frames[ATT.frameIndex] || [];
   const mx = i => PLT.l + i/Math.max(1,frame.length-1)*(PLT.r-PLT.l);
   const my = x => PLT.b - (x+3.2)/6.4*(PLT.b-PLT.t);
@@ -1777,9 +1878,13 @@ function attDrawPotential() {
   const my=v=>PLT.b-(v-vmin)/(vmax-vmin||1)*(PLT.b-PLT.t);
   ctx.strokeStyle='rgba(255,204,102,.95)'; ctx.lineWidth=1.5; ctx.beginPath();
   vs.forEach((v,i)=>{ if(i===0)ctx.moveTo(mx(xs[i]),my(v));else ctx.lineTo(mx(xs[i]),my(v)); }); ctx.stroke();
-  for (const pt of ATT.frames[ATT.frameIndex] || []) {
-    ctx.beginPath(); ctx.arc(mx(pt.x),my(potential(pt.x)),1.8,0,2*Math.PI);
-    ctx.fillStyle=attFrameColor(pt.year,.7); ctx.fill();
+  const potFrame = ATT.frames[ATT.frameIndex] || [];
+  const potStep = ATT.flowMode ? Math.max(1, Math.round(potFrame.length/400)) : 1;
+  for (let pi=0; pi<potFrame.length; pi+=potStep) {
+    const pt=potFrame[pi];
+    if(pt.x<ATT_DOM.xmin||pt.x>ATT_DOM.xmax)continue;
+    ctx.beginPath(); ctx.arc(mx(pt.x),my(potential(pt.x)),1.4,0,2*Math.PI);
+    ctx.fillStyle=attPointColor(pt); ctx.fill();
   }
   ctx.fillStyle='#555568'; ctx.font='10px monospace'; ctx.textAlign='center';
   ctx.fillText('X',(PLT.l+PLT.r)/2,ATT_POT_H-6);
@@ -1791,6 +1896,12 @@ function attDrawPoincare() {
   if(!ctx)return;
   const PLT=ATT_POIN_PLT;
   attSideBg(ctx,ATT_POIN_H,PLT);
+  if (ATT.flowMode) {
+    ctx.fillStyle='#6a6a80'; ctx.font='11px monospace'; ctx.textAlign='center';
+    ctx.fillText('flow mode:', (PLT.l+PLT.r)/2, (PLT.t+PLT.b)/2-6);
+    ctx.fillText('see main panel', (PLT.l+PLT.r)/2, (PLT.t+PLT.b)/2+10);
+    return;
+  }
   const mx=sample=>PLT.l+(sample-.5)/ATT.framesPerYear*(PLT.r-PLT.l);
   const my=x=>PLT.b-(x+3.2)/6.4*(PLT.b-PLT.t);
   ctx.strokeStyle='rgba(180,180,180,.45)'; ctx.setLineDash([4,4]);
@@ -1813,7 +1924,8 @@ function attDrawPoincare() {
 
 function attDrawOrbitTrack(map) {
   if(!ATT.showTrack)return;
-  if(ATT.framesPerYear<2)return;  // forcing-period strobe: dots only, no track
+  if(ATT.flowMode)return;         // flow ensemble: snapshots, no per-year track
+  if(ATT.framesPerYear<2)return;  // strobe: dots only, no track
   const key=[ATT.startYear,ATT.endYear,ATT.framesPerYear,ATT.zoom].join(':');
   if(!ATT.trackCanvas)ATT.trackCanvas=makeOff(ATT_CW,ATT_CH);
   if(ATT.trackCacheKey!==key) {
@@ -1844,33 +1956,55 @@ function attDrawFrame() {
   const frame=ATT.frames[ATT.frameIndex] || [], map=attMap(ATT_PLT,viewDom);
   attDrawOrbitTrack(map);
   ATT.ctx.fillStyle='rgba(232,232,240,.82)'; ATT.ctx.font='bold 17px sans-serif'; ATT.ctx.textAlign='center';
-  ATT.ctx.fillText(`${ATT.sampleConfig.singular} ${ATT.frameIndex+1} — frame ${ATT.frameIndex+1} of ${ATT.framesPerYear}`,ATT_CW/2,ATT_PLT.t-16);
-  for(const pt of frame) {
-    const px=map.x(pt.x), py=map.y(pt.y);
-    if(px<ATT_PLT.l||px>ATT_PLT.r||py<ATT_PLT.t||py>ATT_PLT.b)continue;
-    ATT.ctx.beginPath(); ATT.ctx.arc(px,py,ATT.pointSize||5,0,2*Math.PI);
-    ATT.ctx.fillStyle=attFrameColor(pt.year); ATT.ctx.fill();
-    ATT.ctx.strokeStyle='rgba(255,255,255,.42)'; ATT.ctx.lineWidth=.7; ATT.ctx.stroke();
+  if(ATT.flowMode){
+    ATT.ctx.fillText('Duffing strange attractor — flow of an initial-condition cloud',ATT_CW/2,ATT_PLT.t-16);
+  } else {
+    ATT.ctx.fillText(`${ATT.sampleConfig.singular} ${ATT.frameIndex+1} — frame ${ATT.frameIndex+1} of ${ATT.framesPerYear}`,ATT_CW/2,ATT_PLT.t-16);
+  }
+  if(ATT.flowMode){
+    const r=Math.max(1.2,(ATT.pointSize||5)*0.42);
+    for(const pt of frame){
+      const px=map.x(pt.x), py=map.y(pt.y);
+      if(px<ATT_PLT.l||px>ATT_PLT.r||py<ATT_PLT.t||py>ATT_PLT.b)continue;
+      ATT.ctx.beginPath(); ATT.ctx.arc(px,py,r,0,2*Math.PI);
+      ATT.ctx.fillStyle=attPointColor(pt); ATT.ctx.fill();
+    }
+  } else {
+    for(const pt of frame) {
+      const px=map.x(pt.x), py=map.y(pt.y);
+      if(px<ATT_PLT.l||px>ATT_PLT.r||py<ATT_PLT.t||py>ATT_PLT.b)continue;
+      ATT.ctx.beginPath(); ATT.ctx.arc(px,py,ATT.pointSize||5,0,2*Math.PI);
+      ATT.ctx.fillStyle=attPointColor(pt); ATT.ctx.fill();
+      ATT.ctx.strokeStyle='rgba(255,255,255,.42)'; ATT.ctx.lineWidth=.7; ATT.ctx.stroke();
+    }
   }
   ATT.ctx.fillStyle='rgba(10,10,20,.76)'; ATT.ctx.beginPath();
   ATT.ctx.roundRect(ATT_PLT.l+8,ATT_PLT.t+8,260,48,5); ATT.ctx.fill();
   ATT.ctx.fillStyle='#e8e8f0'; ATT.ctx.font='bold 13px monospace'; ATT.ctx.textAlign='left';
-  ATT.ctx.fillText(`${ATT.sampleConfig.singular} ${ATT.frameIndex+1}: ${ATT.startYear} — ${ATT.endYear}`,ATT_PLT.l+20,ATT_PLT.t+28);
-  ATT.ctx.fillStyle='#888899'; ATT.ctx.font='12px monospace';
-  ATT.ctx.fillText(`${frame.length} annual phase-space points`,ATT_PLT.l+20,ATT_PLT.t+47);
-  const legendX=ATT_PLT.r-175, legendY=ATT_PLT.t+24, legendW=145;
-  const grad=ATT.ctx.createLinearGradient(legendX,0,legendX+legendW,0);
-  grad.addColorStop(0,attFrameColor(ATT.startYear)); grad.addColorStop(1,attFrameColor(ATT.endYear));
-  ATT.ctx.fillStyle=grad; ATT.ctx.fillRect(legendX,legendY,legendW,5);
-  ATT.ctx.fillStyle='#888899'; ATT.ctx.font='10px monospace'; ATT.ctx.textAlign='left';
-  ATT.ctx.fillText(String(ATT.startYear),legendX,legendY+18);
-  ATT.ctx.textAlign='right'; ATT.ctx.fillText(String(ATT.endYear),legendX+legendW,legendY+18);
+  if(ATT.flowMode){
+    const per=(ATT.flowTtot?(ATT.frameIndex/Math.max(1,ATT.framesPerYear-1))*ATT_FLOW.periods:0);
+    ATT.ctx.fillText(`period ${per.toFixed(2)} / ${ATT_FLOW.periods}`,ATT_PLT.l+20,ATT_PLT.t+28);
+    ATT.ctx.fillStyle='#888899'; ATT.ctx.font='12px monospace';
+    ATT.ctx.fillText(`${frame.length.toLocaleString()} trajectories, coloured by origin`,ATT_PLT.l+20,ATT_PLT.t+47);
+  } else {
+    ATT.ctx.fillText(`${ATT.sampleConfig.singular} ${ATT.frameIndex+1}: ${ATT.startYear} — ${ATT.endYear}`,ATT_PLT.l+20,ATT_PLT.t+28);
+    ATT.ctx.fillStyle='#888899'; ATT.ctx.font='12px monospace';
+    ATT.ctx.fillText(`${frame.length} phase-space points in this frame`,ATT_PLT.l+20,ATT_PLT.t+47);
+    const legendX=ATT_PLT.r-175, legendY=ATT_PLT.t+24, legendW=145;
+    const grad=ATT.ctx.createLinearGradient(legendX,0,legendX+legendW,0);
+    grad.addColorStop(0,attFrameColor(ATT.startYear)); grad.addColorStop(1,attFrameColor(ATT.endYear));
+    ATT.ctx.fillStyle=grad; ATT.ctx.fillRect(legendX,legendY,legendW,5);
+    ATT.ctx.fillStyle='#888899'; ATT.ctx.font='10px monospace'; ATT.ctx.textAlign='left';
+    ATT.ctx.fillText(String(ATT.startYear),legendX,legendY+18);
+    ATT.ctx.textAlign='right'; ATT.ctx.fillText(String(ATT.endYear),legendX+legendW,legendY+18);
+  }
   attDrawSidePanels();
 }
 
 function attLoop() {
   if(!ATT.running||ATT.paused)return;
-  ATT.frameIndex=(ATT.frameIndex+1)%ATT.framesPerYear;
+  const mod = ATT.flowMode ? Math.max(1, ATT.flowBuilt||1) : ATT.framesPerYear;
+  ATT.frameIndex=(ATT.frameIndex+1)%mod;
   attDrawFrame(); attStatus();
   ATT.timerId=setTimeout(attLoop,ATT.delay);
 }
@@ -1897,7 +2031,8 @@ function attPause() {
 function attStep(direction) {
   if(ATT.running&&!ATT.paused)attPause();
   if(!ATT.running)attBuildSampleFrames();
-  ATT.frameIndex=(ATT.frameIndex+direction+ATT.framesPerYear)%ATT.framesPerYear;
+  const mod = ATT.flowMode ? Math.max(1, ATT.flowBuilt||1) : ATT.framesPerYear;
+  ATT.frameIndex=(ATT.frameIndex+direction+mod)%mod;
   attDrawFrame(); attStatus();
 }
 
@@ -1915,6 +2050,11 @@ function attStatus(ready=false) {
   const cls=ready?'st-ready':(ATT.paused?'st-paused':'st-running');
   const state=ready?'Ready':(ATT.paused?'&#9646;&#9646; Paused':'&#9654; Playing');
   const count=(ATT.frames[ATT.frameIndex]||[]).length;
+  if (ATT.flowMode) {
+    const per=((ATT.frameIndex)/Math.max(1,ATT.framesPerYear-1))*ATT_FLOW.periods;
+    el.innerHTML=`<span class="${cls}">${state}</span> &nbsp;·&nbsp; frame ${ATT.frameIndex+1}/${ATT.framesPerYear} &nbsp;·&nbsp; period ${per.toFixed(2)}/${ATT_FLOW.periods} &nbsp;·&nbsp; ${count.toLocaleString()} trajectories &nbsp;·&nbsp; ${(ATT.zoom||1).toFixed(1)}x zoom`;
+    return;
+  }
   el.innerHTML=`<span class="${cls}">${state}</span> &nbsp;·&nbsp; frame ${ATT.frameIndex+1}/${ATT.framesPerYear}: ${ATT.sampleConfig.singular} ${ATT.frameIndex+1} &nbsp;·&nbsp; ${count} points (${ATT.startYear}–${ATT.endYear}) &nbsp;·&nbsp; ${(ATT.zoom||1).toFixed(1)}x zoom`;
 }
 
@@ -2662,24 +2802,26 @@ let attYearInputTimer=null;
 });
 
 function presetChaos() {
-  // Classic chaotic Duffing regime from the Wikipedia figure:
-  //     x'' + 0.3 x' - x + x^3 = 0.5 cos(1.2 t)
+  // Classic chaotic Duffing regime from the Wikipedia strange-attractor
+  // animation:  x'' + 0.02 x' - x + x^3 = 3 sin(t)
+  //     (alpha=-1, beta=1, delta=0.02, gamma=3, omega=1).
   // In this page's convention (dY/dt = K1*X + K3*X^3 + B*Y + FA*cos(W*t-FF)):
-  //     K1 = +1, K3 = -1, B = -0.3, FA = 0.5, FF = 0, W = 1.2 rad/month.
-  // The strange attractor only appears in the Poincare strobe sampled at
-  // the forcing period, over thousands of cycles - so also switch the
-  // sampling mode and widen the year range.
-  const d=[['nb-K1',1],['nb-K3',-1],['nb-FA',0.5],['nb-FF',0],['nb-B',-0.3],['nb-W',1.2],
+  //     K1 = -alpha = +1,  K3 = -beta = -1,  B = -delta = -0.02,
+  //     FA = gamma = 3,  W = omega = 1,  FF = +90 deg  (so the drive is
+  //     FA*cos(Wt-90) = 3*sin(t), matching Wikipedia's sin-forcing offset).
+  // The strange attractor is shown with the "flow" sampling mode: a coloured
+  // grid of initial conditions integrated through four forcing periods (8pi).
+  const d=[['nb-K1',1],['nb-K3',-1],['nb-FA',3],['nb-FF',90],['nb-B',-0.02],['nb-W',1],
            ['nb-X0',1],['nb-Y0',0],
-           ['nb-att-start',1975],['nb-att-end',6975],['nb-att-point',2],['nb-att-zoom',2]];
+           ['nb-att-point',3],['nb-att-zoom',1],['nb-att-delay',100],['sl-att-delay',100]];
   d.forEach(([id,val])=>{ const el=document.getElementById(id); if (el) el.value=val; });
   ['sl-K1','sl-K3','sl-FA','sl-FF','sl-B','sl-W','sl-X0','sl-Y0'].forEach(id=>{
     const sl=document.getElementById(id), nb=document.getElementById(id.replace('sl-','nb-'));
     if (sl && nb) sl.value=nb.value;
   });
-  const sel=document.getElementById('att-sampling'); if (sel) sel.value='forcing';
+  const sel=document.getElementById('att-sampling'); if (sel) sel.value='flow';
   const st=document.getElementById('att-status');
-  if (st) st.innerHTML='<span class="st-ready">Chaos preset loaded - integrating 5,000 years of strobe points ...</span>';
+  if (st) st.innerHTML='<span class="st-ready">Chaos preset loaded — integrating a colour-coded cloud of trajectories through 4 forcing periods …</span>';
   setTimeout(()=>{ attInit(); }, 30);
 }
 
