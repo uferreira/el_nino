@@ -329,11 +329,13 @@ footer a:hover { text-decoration:underline; }
 <div class="container">
   <h2>Duffing Attractor Sampling</h2>
   <p class="section-desc">
-    With <em>daily / weekly / monthly</em> sampling each frame fixes one phase of the annual ENSO forcing
-    cycle and plots one phase-space point for every simulated year — the &ldquo;familiar attractor&rdquo;
-    view. The <em>strange-attractor flow</em> option is different: it seeds a coloured grid of initial
-    conditions and lets them all evolve together under the Duffing flow, so you watch the whole cloud
-    stretch and fold through four forcing periods — exactly the
+    Every mode uses the same idea: a frame fixes one phase of the forcing cycle and plots one phase-space
+    point for every simulated cycle. With <em>daily / weekly / monthly</em> the cycle is the calendar year
+    (annual ENSO forcing) and each frame carries one dot per year — the &ldquo;familiar attractor&rdquo;.
+    The <em>strange attractor — many years</em> option does the same thing at the equation&rsquo;s true
+    forcing period T&nbsp;=&nbsp;2&pi;/W: our Duffing simulation is run for thousands of cycles and frame
+    <em>k</em> keeps the state at phase <em>k</em> of every cycle. More cycles &rarr; more dots; sweeping the
+    phase across the frames makes the attractor stretch and fold, reproducing the
     <a href="https://en.wikipedia.org/wiki/Duffing_equation" target="_blank" rel="noopener">Wikipedia</a>
     Duffing strange-attractor animation.
   </p>
@@ -359,13 +361,14 @@ footer a:hover { text-decoration:underline; }
     FF = +90&deg; &nbsp;(so FA&middot;cos(Wt&minus;FF) = 3&thinsp;sin&thinsp;t)
     </span>
     <br><br>
-    With very light damping, a strong double-well and hard off-resonant forcing, a compact blob of
-    initial conditions never settles: it is stretched and folded repeatedly, tracing out the fractal
-    strange attractor. The preset seeds a coloured square grid of trajectories and integrates them all
-    through four forcing periods (8&pi;); each animation frame is a snapshot of the whole cloud at one
-    instant, and the colours (fixed by each point&rsquo;s starting position) show how the flow folds.
-    Press &#9654; Play to watch the strange attractor form, then loop. Press &#8617; Defaults to return
-    to the El Ni&ntilde;o parameters.
+    With very light damping, a strong double-well and hard off-resonant forcing the trajectory never
+    settles: it is stretched and folded forever, tracing out the fractal strange attractor. The preset
+    runs our Duffing simulation for thousands of forcing cycles and, following the project&rsquo;s
+    &ldquo;one dot per year&rdquo; sketch, records the state once per cycle at each of 36 phases. Frame
+    <em>k</em> is therefore a dense cross-section of the attractor at phase <em>k</em>; each dot keeps the
+    colour of its own cycle at phase&nbsp;0, so the colours show how the points flow as the phase advances.
+    The attractor fills in as it integrates. Press &#9654; Play to sweep the phase and watch it stretch and
+    fold; press &#8617; Defaults to return to the El Ni&ntilde;o parameters.
   </div>
 
   <div class="attractor-layout">
@@ -389,7 +392,7 @@ footer a:hover { text-decoration:underline; }
           <option value="daily">Daily (365 frames/year)</option>
           <option value="weekly" selected>Weekly (52 frames/year)</option>
           <option value="monthly">Monthly (12 frames/year)</option>
-          <option value="flow">Strange-attractor flow (Wikipedia point cloud)</option>
+          <option value="flow">Strange attractor — many years (Wikipedia, per forcing cycle)</option>
         </select>
       </div>
       <div class="param-row">
@@ -1640,8 +1643,12 @@ const ATT_SAMPLE_MODES={
   monthly:{frames:12,singular:'Month',plural:'months'},
 };
 
-// Wikipedia strange-attractor flow configuration.
-const ATT_FLOW={grid:44, seed:2.0, periods:4, dtInt:0.02, targetFrames:160};
+// Strange-attractor "many years" sampling: run ONE long trajectory of our
+// Duffing simulation and, for each frame = one fixed phase of the forcing
+// cycle, keep one dot per cycle ("year"). More cycles -> more dots. Sweeping
+// the phase across the frames makes the attractor stretch and fold, exactly
+// like the Wikipedia animation.
+const ATT_FLOW={phases:36, cycles:3000, burn:150, dtInt:0.02};
 const ATT_FLOW_DOM={xmin:-3.0, xmax:3.0, ymin:-4.5, ymax:4.5};
 
 function attSampleConfig() {
@@ -1717,69 +1724,74 @@ function attBuildSampleFrames() {
   if (frameEl) frameEl.textContent = ATT.framesPerYear + ' ' + ATT.sampleConfig.plural;
 }
 
-// ── Wikipedia strange-attractor flow: seed a coloured grid of initial
-//    conditions and integrate them all together, storing a snapshot of the
-//    whole ensemble at a sequence of instants. Built asynchronously in small
-//    chunks so the page never freezes, even for thousands of trajectories.
+// ── Strange attractor by the "many years" method (matches the project's
+//    sketch): integrate ONE long trajectory of our Duffing simulation and,
+//    for each frame = one fixed phase of the forcing cycle T = 2π/W, record
+//    one dot per cycle. Frame k accumulates the state at phase k/F of every
+//    cycle, so after thousands of cycles each frame is a dense cross-section
+//    of the attractor; sweeping k = 0…F-1 makes it stretch and fold, like the
+//    Wikipedia animation. Each dot keeps the colour of its own trajectory at
+//    phase 0, so "coloration shows how the points flow" between frames.
+//    Built asynchronously (cycle by cycle) so the page never freezes and the
+//    attractor visibly fills in.
 function attBuildFlow() {
   ATT.flowMode = true;
   ATT.flowBuilding = true;
   const p = ATT.params;
-  const N = ATT_FLOW.grid, S = ATT_FLOW.seed, nP = N*N;
-  const px = new Float64Array(nP), py = new Float64Array(nP);
-  ATT.flowColors = new Array(nP);
-  for (let iy=0; iy<N; iy++) {
-    for (let ix=0; ix<N; ix++) {
-      const k = iy*N+ix;
-      px[k] = -S + 2*S*ix/(N-1);
-      py[k] = -S + 2*S*iy/(N-1);
-      ATT.flowColors[k] = `hsl(${Math.round(360*ix/(N-1))},88%,${Math.round(40+34*iy/(N-1))}%)`;
-    }
-  }
   const W = p.W || W_ANN;
-  const Ttot = ATT_FLOW.periods * 2*Math.PI / W;        // four forcing periods
-  const dtI = ATT_FLOW.dtInt;
-  const steps = Math.max(ATT_FLOW.targetFrames, Math.round(Ttot/dtI));
-  const snapEvery = Math.max(1, Math.round(steps/ATT_FLOW.targetFrames));
-  const nFrames = 1 + Math.floor(steps/snapEvery);
-  ATT.frames = new Array(nFrames);
-  const snap = () => { const a=new Array(nP); for (let k=0;k<nP;k++) a[k]={x:px[k],y:py[k],ci:k}; return a; };
-  ATT.frames[0] = snap();
-  ATT.framesPerYear = nFrames;
-  ATT.flowTtot = Ttot;
-  ATT.flowBuilt = 1;                                     // frames ready to show
+  const T = 2*Math.PI/W;                    // forcing period ("one year")
+  const F = ATT_FLOW.phases;                // phase-frames per cycle
+  const ncy = ATT_FLOW.cycles;              // number of cycles ("years")
+  const burn = Math.min(ATT_FLOW.burn, Math.floor(ncy*0.2));
+  ATT.framesPerYear = F;
+  ATT.frames = Array.from({length:F}, () => []);
   ATT.series = [];
+  ATT.flowTtot = T;
+  ATT.flowBuilt = F;                        // all frames exist (fill in over time)
   const countEl0 = document.getElementById('att-count-readout');
-  if (countEl0) countEl0.textContent = nP.toLocaleString() + ' trajectories';
+  if (countEl0) countEl0.textContent = (ncy-burn).toLocaleString() + ' cycles ("years")';
   const frameEl0 = document.getElementById('att-frame-readout');
-  if (frameEl0) frameEl0.textContent = nFrames + ' frames · ' + ATT_FLOW.periods + ' periods (8π)';
+  if (frameEl0) frameEl0.textContent = F + ' phases · T = ' + T.toFixed(3);
   clearTimeout(ATT.flowTimer);
-  attFlowStep({px,py,p,dtI,steps,snapEvery,nP,tt:0,s:0,frameIdx:1,token:ATT.flowToken});
+  const X0 = parseFloat(document.getElementById('nb-X0').value) || 0;
+  const Y0 = parseFloat(document.getElementById('nb-Y0').value) || 0;
+  attFlowStep({X:X0, Y:Y0, t:0, cy:0, cyCol:'#8fcaff', p, T, F, ncy, burn,
+               dtI:ATT_FLOW.dtInt, token:ATT.flowToken});
 }
 
 function attFlowStep(state) {
   if (state.token !== ATT.flowToken) return;            // superseded by a newer build
-  const {px,py,p,dtI,steps,snapEvery,nP} = state;
-  const chunk = Math.max(1, Math.round(4500/nP));       // time-steps per tick (stays responsive)
+  const p=state.p, T=state.T, F=state.F, dtI=state.dtI, dphase=T/F;
+  const batch = 30;                                     // cycles per tick (responsive)
   let done=false;
-  for (let c=0; c<chunk; c++) {
-    if (state.s >= steps) { done=true; break; }
-    for (let k=0;k<nP;k++){ if(!isFinite(px[k]))continue; const nx=rkf5Step(state.tt,px[k],py[k],p,dtI); px[k]=nx.X; py[k]=nx.Y; }
-    state.tt += dtI; state.s++;
-    if (state.s % snapEvery === 0 && state.frameIdx < ATT.frames.length) {
-      const a=new Array(nP); for (let k=0;k<nP;k++) a[k]={x:px[k],y:py[k],ci:k};
-      ATT.frames[state.frameIdx++] = a;
-      ATT.flowBuilt = state.frameIdx;
+  for (let b=0; b<batch; b++) {
+    if (state.cy >= state.ncy) { done=true; break; }
+    for (let k=0; k<F; k++) {
+      const target = state.cy*T + k*dphase;
+      while (state.t < target-1e-9) {
+        const h = Math.min(dtI, target-state.t);
+        const nx = rkf5Step(state.t, state.X, state.Y, p, h);
+        state.X = nx.X; state.Y = nx.Y; state.t += h;
+      }
+      if (!isFinite(state.X) || !isFinite(state.Y)) { done=true; break; }
+      if (k===0) {                                       // colour this cycle by its phase-0 angle
+        const ang = Math.atan2(state.Y, state.X);        // -π…π
+        state.cyCol = `hsl(${Math.round((ang/Math.PI*180)+180)},82%,60%)`;
+      }
+      if (state.cy >= state.burn) {
+        ATT.frames[k].push({x:state.X, y:state.Y, col:state.cyCol, year:state.cy, sample:k+1});
+      }
     }
+    if (done) break;
+    state.cy++;
   }
   const st=document.getElementById('att-status');
   if (st && ATT.flowBuilding && !ATT.running) {
-    st.innerHTML=`<span class="st-ready">Building strange-attractor flow … ${Math.min(100,Math.round(state.s/steps*100))}%</span>`;
+    st.innerHTML=`<span class="st-ready">Building strange attractor … ${Math.min(100,Math.round(state.cy/state.ncy*100))}% (${(ATT.frames[0]||[]).length.toLocaleString()} dots/frame)</span>`;
   }
+  if (!ATT.running) attDrawFrame();                      // let the attractor visibly fill in
   if (done) {
     ATT.flowBuilding=false;
-    for (let i=1;i<ATT.frames.length;i++) if(!ATT.frames[i]) ATT.frames[i]=ATT.frames[i-1];
-    ATT.flowBuilt = ATT.frames.length;
     if (!ATT.running) attStatus(true);
     return;
   }
@@ -1957,7 +1969,7 @@ function attDrawFrame() {
   attDrawOrbitTrack(map);
   ATT.ctx.fillStyle='rgba(232,232,240,.82)'; ATT.ctx.font='bold 17px sans-serif'; ATT.ctx.textAlign='center';
   if(ATT.flowMode){
-    ATT.ctx.fillText('Duffing strange attractor — flow of an initial-condition cloud',ATT_CW/2,ATT_PLT.t-16);
+    ATT.ctx.fillText('Duffing strange attractor — one dot per cycle, swept through the forcing phase',ATT_CW/2,ATT_PLT.t-16);
   } else {
     ATT.ctx.fillText(`${ATT.sampleConfig.singular} ${ATT.frameIndex+1} — frame ${ATT.frameIndex+1} of ${ATT.framesPerYear}`,ATT_CW/2,ATT_PLT.t-16);
   }
@@ -1982,10 +1994,9 @@ function attDrawFrame() {
   ATT.ctx.roundRect(ATT_PLT.l+8,ATT_PLT.t+8,260,48,5); ATT.ctx.fill();
   ATT.ctx.fillStyle='#e8e8f0'; ATT.ctx.font='bold 13px monospace'; ATT.ctx.textAlign='left';
   if(ATT.flowMode){
-    const per=(ATT.flowTtot?(ATT.frameIndex/Math.max(1,ATT.framesPerYear-1))*ATT_FLOW.periods:0);
-    ATT.ctx.fillText(`period ${per.toFixed(2)} / ${ATT_FLOW.periods}`,ATT_PLT.l+20,ATT_PLT.t+28);
+    ATT.ctx.fillText(`phase ${ATT.frameIndex+1} / ${ATT.framesPerYear} of the forcing cycle`,ATT_PLT.l+20,ATT_PLT.t+28);
     ATT.ctx.fillStyle='#888899'; ATT.ctx.font='12px monospace';
-    ATT.ctx.fillText(`${frame.length.toLocaleString()} trajectories, coloured by origin`,ATT_PLT.l+20,ATT_PLT.t+47);
+    ATT.ctx.fillText(`${frame.length.toLocaleString()} dots (one per cycle)`,ATT_PLT.l+20,ATT_PLT.t+47);
   } else {
     ATT.ctx.fillText(`${ATT.sampleConfig.singular} ${ATT.frameIndex+1}: ${ATT.startYear} — ${ATT.endYear}`,ATT_PLT.l+20,ATT_PLT.t+28);
     ATT.ctx.fillStyle='#888899'; ATT.ctx.font='12px monospace';
@@ -2051,8 +2062,7 @@ function attStatus(ready=false) {
   const state=ready?'Ready':(ATT.paused?'&#9646;&#9646; Paused':'&#9654; Playing');
   const count=(ATT.frames[ATT.frameIndex]||[]).length;
   if (ATT.flowMode) {
-    const per=((ATT.frameIndex)/Math.max(1,ATT.framesPerYear-1))*ATT_FLOW.periods;
-    el.innerHTML=`<span class="${cls}">${state}</span> &nbsp;·&nbsp; frame ${ATT.frameIndex+1}/${ATT.framesPerYear} &nbsp;·&nbsp; period ${per.toFixed(2)}/${ATT_FLOW.periods} &nbsp;·&nbsp; ${count.toLocaleString()} trajectories &nbsp;·&nbsp; ${(ATT.zoom||1).toFixed(1)}x zoom`;
+    el.innerHTML=`<span class="${cls}">${state}</span> &nbsp;·&nbsp; phase ${ATT.frameIndex+1}/${ATT.framesPerYear} of forcing cycle &nbsp;·&nbsp; ${count.toLocaleString()} dots (one per cycle) &nbsp;·&nbsp; ${(ATT.zoom||1).toFixed(1)}x zoom`;
     return;
   }
   el.innerHTML=`<span class="${cls}">${state}</span> &nbsp;·&nbsp; frame ${ATT.frameIndex+1}/${ATT.framesPerYear}: ${ATT.sampleConfig.singular} ${ATT.frameIndex+1} &nbsp;·&nbsp; ${count} points (${ATT.startYear}–${ATT.endYear}) &nbsp;·&nbsp; ${(ATT.zoom||1).toFixed(1)}x zoom`;
@@ -2821,7 +2831,7 @@ function presetChaos() {
   });
   const sel=document.getElementById('att-sampling'); if (sel) sel.value='flow';
   const st=document.getElementById('att-status');
-  if (st) st.innerHTML='<span class="st-ready">Chaos preset loaded — integrating a colour-coded cloud of trajectories through 4 forcing periods …</span>';
+  if (st) st.innerHTML='<span class="st-ready">Chaos preset loaded — integrating thousands of forcing cycles, one dot per cycle per phase …</span>';
   setTimeout(()=>{ attInit(); }, 30);
 }
 
