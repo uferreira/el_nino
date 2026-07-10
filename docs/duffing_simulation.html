@@ -432,7 +432,7 @@ footer a:hover { text-decoration:underline; }
       </label>
       <label class="check-row" for="att-trails">
         <input type="checkbox" id="att-trails" checked>
-        <span>Fading motion trails</span>
+        <span>Grey motion tracks (behind particles)</span>
       </label>
       <div class="btn-row">
         <button id="att-run" onclick="attStart()">&#9654; Play</button>
@@ -1520,20 +1520,29 @@ function attDrawFrame(){
   const frame=ATT.frames[ATT.frameIndex]||[];
   drawBg(ATT.ctx,ATT_CW,ATT_CH,ATT_PLT,dom,ATT_LABELS,attViewTicks(dom),ATT_AXIS_STYLE);
 
-  if(ATT.trails && ATT.trailCtx){
-    // Phosphor fade: dim the accumulated trail layer so each dot's recent
-    // positions fade out over roughly one cycle (P frames), then stamp the
-    // current frame's dots on top at full brightness.
-    const fade=Math.pow(0.04,1/Math.max(1,ATT.P));
-    ATT.trailCtx.globalCompositeOperation='destination-out';
-    ATT.trailCtx.fillStyle='rgba(0,0,0,'+(1-fade).toFixed(4)+')';
-    ATT.trailCtx.fillRect(0,0,ATT_CW,ATT_CH);
-    ATT.trailCtx.globalCompositeOperation='source-over';
-    attDrawDots(ATT.trailCtx,frame,map,ATT.pointSize,1,false);
-    ATT.ctx.drawImage(ATT.trail,0,0);
-  } else {
-    attDrawDots(ATT.ctx,frame,map,ATT.pointSize,0.95,true);
+  // Grey back-track: for each simulated year draw ONLY the arc it has already
+  // swept this cycle (phase 0 -> current phase). Nothing ahead of the particle
+  // is drawn, and the previous cycle is not retained -- the track grows fresh as
+  // the phase sweeps and resets at the top of each cycle.
+  const fIdx=ATT.frameIndex;
+  if(ATT.trails && fIdx>0){
+    const g=ATT.ctx, frames=ATT.frames, nYears=frame.length;
+    // Cap total segments for very large N so playback stays smooth. Only the
+    // number of *tracks* is thinned; all N dots are still drawn below.
+    const stride=Math.max(1,Math.ceil((nYears*fIdx)/40000));
+    g.lineJoin='round'; g.lineCap='round'; g.lineWidth=1.1;
+    for(let yi=0; yi<nYears; yi+=stride){
+      for(let j=1; j<=fIdx; j++){
+        const a=frames[j-1][yi], b=frames[j][yi];
+        if(!a||!b) continue;
+        const alpha=0.10+0.42*(j/fIdx);          // solid near the head, fades to the tail
+        g.strokeStyle='rgba(150,150,164,'+alpha.toFixed(3)+')';
+        g.beginPath(); g.moveTo(map.x(a.x),map.y(a.y)); g.lineTo(map.x(b.x),map.y(b.y)); g.stroke();
+      }
+    }
   }
+  // Current dots: exactly N points, bright and colour-coded by year, on top.
+  attDrawDots(ATT.ctx,frame,map,ATT.pointSize,0.95,true);
 
   ATT.ctx.fillStyle='rgba(232,232,240,.85)'; ATT.ctx.font='bold 17px sans-serif'; ATT.ctx.textAlign='center';
   const presetName=ATT.preset==='wiki'?'Wikipedia strange attractor':'El Nino (ALADO) attractor';
