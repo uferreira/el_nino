@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PHASE_PAGE = ROOT / "docs" / "phase_diagrams.html"
 COMPARE_PAGE = ROOT / "docs" / "compare.html"
+DUFFING_PAGE = ROOT / "docs" / "duffing_simulation.html"
 UPDATE_SCRIPT = ROOT / "scripts" / "update_website.py"
 UPDATE_WORKFLOW = ROOT / ".github" / "workflows" / "update_data.yml"
 
@@ -68,6 +69,24 @@ def test_phase_diagrams_use_a_fixed_twelve_month_recent_window():
     assert "point.irest === 0" in compare_html
     assert "CMP_CURRENT_POINT_RADIUS" in compare_html
     assert 'id="cmp-sl-tail"' not in compare_html
+
+
+def test_duffing_attractor_has_synchronized_side_panels():
+    """The attractor must retain the three diagnostic views requested by users."""
+    html = DUFFING_PAGE.read_text(encoding="utf-8")
+
+    for canvas_id in ("att-pot-canvas", "att-time-canvas", "att-phase-canvas"):
+        assert f'id="{canvas_id}"' in html
+    assert "const ATT_SIDE_TRAIL_CYCLES=3;" in html
+    assert "function attPotential(" in html
+    assert "function attDrawPotential(" in html
+    assert "function attDrawTimeHistory(" in html
+    assert "function attDrawPhaseTrail(" in html
+    assert "function attDrawSidePanels(" in html
+    assert "ATT.frames[k].push({x:X, y:Y, year:yearIdx, t:t});" in html
+    assert "attDrawSidePanels();" in html
+    assert "K5*x**6/6" in html
+    assert "File%3ADuffing_oscillator.webm" in html
 
 
 def test_update_script_covers_current_data_pages():

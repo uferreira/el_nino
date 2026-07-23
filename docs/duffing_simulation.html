@@ -61,22 +61,22 @@ select.month-sel { background:var(--surface); border:1px solid var(--border); bo
 .poin-wrap { margin-top:1.4rem; }
 .poin-label { display:flex; align-items:center; gap:1rem; margin-bottom:.7rem; flex-wrap:wrap; }
 .poin-count { font-family:monospace; font-size:.82rem; color:var(--muted); }
-.attractor-layout { display:grid; grid-template-columns:260px minmax(0,1fr); gap:1rem; align-items:start; }
+.attractor-layout { display:grid; grid-template-columns:240px minmax(0,1fr) 225px; gap:1rem; align-items:start; }
 .attractor-controls { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:1rem; }
 .attractor-controls .param-row { margin-bottom:.8rem; }
 .attractor-controls select { width:100%; background:var(--surface); border:1px solid var(--border); border-radius:4px; color:var(--text); font-size:.82rem; padding:.35rem .45rem; }
 .check-row { display:flex; align-items:center; gap:.55rem; color:var(--text); font-size:.82rem; cursor:pointer; margin:.25rem 0 .8rem; }
 .check-row input { width:16px; height:16px; accent-color:var(--accent); }
 .attractor-canvas-wrap { min-width:0; }
-.attractor-side { grid-column:2; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.8rem; min-width:0; }
+.attractor-side { grid-column:3; grid-row:1; display:grid; grid-template-columns:1fr; gap:.75rem; min-width:0; }
 .side-panel { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:.55rem; }
-.side-panel-title { color:var(--muted); font-size:.76rem; font-weight:600; text-transform:uppercase; letter-spacing:.06em; margin:0 0 .35rem .1rem; }
+.side-panel-title { color:var(--muted); font-size:.72rem; font-weight:600; text-align:center; text-transform:uppercase; letter-spacing:.05em; margin:0 0 .35rem; }
 .side-panel canvas { display:block; width:100%; height:auto; background:#0a0a0e; border:1px solid var(--border); border-radius:5px; }
 .mini-readout { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; margin-top:.8rem; }
 .mini-readout div { background:var(--surface); border:1px solid var(--border); border-radius:5px; padding:.45rem .55rem; font-size:.76rem; color:var(--muted); }
 .mini-readout strong { display:block; color:var(--text); font-family:monospace; font-size:.86rem; margin-top:.1rem; }
-@media(max-width:1100px){ .attractor-layout{ grid-template-columns:240px minmax(0,1fr); } .attractor-side{ grid-column:1 / -1; grid-template-columns:repeat(3,1fr); } }
-@media(max-width:760px){ .attractor-layout{ grid-template-columns:1fr; } .attractor-side{ grid-template-columns:1fr; } }
+@media(max-width:1180px){ .attractor-layout{ grid-template-columns:240px minmax(0,1fr); } .attractor-side{ grid-column:2; grid-row:auto; grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media(max-width:760px){ .attractor-layout{ grid-template-columns:1fr; } .attractor-side{ grid-column:1; grid-template-columns:1fr; } }
 footer { text-align:center; padding:2rem 1rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); }
 footer a { color:var(--accent); text-decoration:none; }
 footer a:hover { text-decoration:underline; }
@@ -458,6 +458,21 @@ footer a:hover { text-decoration:underline; }
       <div class="status-bar" id="att-status"><span class="st-ready">Ready — monthly frames, El Niño coefficients</span></div>
       <canvas id="duff-attractor-canvas" class="phasecanvas" width="1050" height="620"></canvas>
     </div>
+
+    <aside class="attractor-side" aria-label="Synchronized Duffing diagnostics">
+      <div class="side-panel">
+        <div class="side-panel-title">Potential V(x) vs. x</div>
+        <canvas id="att-pot-canvas" width="300" height="145"></canvas>
+      </div>
+      <div class="side-panel">
+        <div class="side-panel-title">Recent trajectory t vs. x</div>
+        <canvas id="att-time-canvas" width="300" height="190"></canvas>
+      </div>
+      <div class="side-panel">
+        <div class="side-panel-title">Recent phase path x&#775; vs. x</div>
+        <canvas id="att-phase-canvas" width="300" height="180"></canvas>
+      </div>
+    </aside>
   </div>
   <div class="science-box" style="margin-top:1rem;max-width:none;">
     <strong>What you're looking at.</strong>
@@ -468,6 +483,11 @@ footer a:hover { text-decoration:underline; }
     phase makes the attractor stretch and fold &mdash; the stroboscopic view of the Duffing oscillator. With
     the El&nbsp;Ni&ntilde;o coefficients the model settles to a limit cycle; the Wikipedia preset shows the
     fractal strange attractor.
+    The three synchronized side panels follow the current point of the latest simulated year: the conservative
+    potential V(x), position through the previous three forcing cycles, and that same recent path in phase space.
+    Layout inspired by Cosmia Nebula's
+    <a href="https://en.wikipedia.org/wiki/File%3ADuffing_oscillator.webm" target="_blank" rel="noopener">Duffing oscillator animation</a>,
+    licensed CC BY-SA 4.0.
   </div>
 </div>
 </section>
@@ -1340,6 +1360,9 @@ const ATT_PLT={l:70,r:1018,t:46,b:566};
 const ATT_LABELS={x:'X (model units)', y:'dX/dt'};
 const ATT_TARGET_DT=0.1;              // sub-step target (months) — matches Section-1 dt
 
+const ATT_SIDE_TRAIL_CYCLES=3;
+const ATT_SIDE_RGB='124,167,255';
+const ATT_CURRENT_COLOR='#ffd166';
 // Fixed "Wikipedia strange attractor" coefficients:
 //   x'' + 0.02 x' - x + x^3 = 3 sin(t)   (alpha=-1, beta=1, delta=0.02, gamma=3, omega=1)
 // In this page's convention dY/dt = K1*X + K3*X^3 + B*Y + FA*cos(W*t - FF):
@@ -1363,11 +1386,12 @@ const ATT_AXIS_STYLE={
 };
 
 const ATT={
-  frames:[], P:12, resLabel:'monthly', N:52, burn:0, preset:'elnino',
+  frames:[], orbit:[], P:12, resLabel:'monthly', N:52, burn:0, preset:'elnino',
   params:null, L:12, fitDom:null,
   zoom:1, pointSize:4, delay:120, colorByYear:true, trails:true,
   frameIndex:0, running:false, paused:false, timerId:null,
   canvas:null, ctx:null, trail:null, trailCtx:null,
+  potCanvas:null, timeCanvas:null, phaseCanvas:null,
 };
 
 function attResMode(){
@@ -1381,6 +1405,9 @@ function attInit(){
   ATT.trail=makeOff(ATT_CW,ATT_CH);
   ATT.trailCtx=ATT.trail.getContext('2d');
   attBuild();
+  ATT.potCanvas=document.getElementById('att-pot-canvas');
+  ATT.timeCanvas=document.getElementById('att-time-canvas');
+  ATT.phaseCanvas=document.getElementById('att-phase-canvas');
   attDrawFrame();
   attStatus(true);
 }
@@ -1435,17 +1462,30 @@ function attBuild(){
   const totalYears=ATT.burn+ATT.N;
 
   ATT.frames=Array.from({length:P},()=>[]);
+  ATT.orbit=[];
+  // Retain a dense representative orbit only for the latest displayed year and
+  // enough preceding cycles to feed the synchronized diagnostic panels.
+  const orbitStartYear=Math.max(0,totalYears-(ATT_SIDE_TRAIL_CYCLES+1));
+  const recordOrbit=(yr,time,x,y)=>{
+    if(yr<orbitStartYear) return;
+    const last=ATT.orbit[ATT.orbit.length-1];
+    if(!last || Math.abs(last.t-time)>1e-10){
+      ATT.orbit.push({t:time,x:x,y:y});
+    }
+  };
   let t=t0, X=X0, Y=Y0, blew=false;
   let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
   for(let yr=0; yr<totalYears; yr++){
     for(let k=0; k<P; k++){
+      recordOrbit(yr,t,X,Y);
       if(yr>=ATT.burn){
         const yearIdx=yr-ATT.burn;           // 0 .. N-1
-        ATT.frames[k].push({x:X, y:Y, year:yearIdx});
+        ATT.frames[k].push({x:X, y:Y, year:yearIdx, t:t});
         if(X<xmin)xmin=X; if(X>xmax)xmax=X; if(Y<ymin)ymin=Y; if(Y>ymax)ymax=Y;
       }
       for(let j=0; j<nsub; j++){
         const s=rkf5Step(t,X,Y,p,dtInt); X=s.X; Y=s.Y; t+=dtInt;
+        recordOrbit(yr,t,X,Y);
       }
       if(!isFinite(X)||!isFinite(Y)||Math.abs(X)>1e4){blew=true;break;}
     }
@@ -1517,6 +1557,155 @@ function attDrawDots(ctx,frame,map,radius,alpha,outline){
   }
 }
 
+// Potential associated with the conservative polynomial acceleration:
+// d2x/dt2 = -dV/dx + damping + periodic forcing.
+function attPotential(x,p){
+  const {K0=0,K1=0,K2=0,K3=0,K4=0,K5=0}=p||{};
+  return -(K0*x + K1*x**2/2 + K2*x**3/3 + K3*x**4/4 + K4*x**5/5 + K5*x**6/6);
+}
+
+function attRecentOrbit(current){
+  if(!current) return [];
+  const start=current.t-ATT_SIDE_TRAIL_CYCLES*ATT.L-1e-9;
+  const end=current.t+1e-9;
+  const recent=ATT.orbit.filter(pt=>pt.t>=start && pt.t<=end);
+  return recent.length ? recent : [current];
+}
+
+function attPaddedRange(values,fallbackMin=-1,fallbackMax=1,padding=.1){
+  const finite=values.filter(Number.isFinite);
+  if(!finite.length) return {min:fallbackMin,max:fallbackMax};
+  let min=Math.min(...finite), max=Math.max(...finite);
+  if(max-min<1e-9){
+    const half=Math.max(1,Math.abs(min)*.2);
+    min-=half; max+=half;
+  } else {
+    const pad=(max-min)*padding;
+    min-=pad; max+=pad;
+  }
+  return {min:min,max:max};
+}
+
+function attDrawMiniBg(canvas,dom,xLabel,yLabel){
+  if(!canvas) return null;
+  const ctx=canvas.getContext('2d'), w=canvas.width, h=canvas.height;
+  const PLT={l:43,r:w-12,t:10,b:h-29};
+  const map={
+    x:v=>PLT.l+(v-dom.xmin)/(dom.xmax-dom.xmin)*(PLT.r-PLT.l),
+    y:v=>PLT.b-(v-dom.ymin)/(dom.ymax-dom.ymin)*(PLT.b-PLT.t),
+  };
+  ctx.clearRect(0,0,w,h); ctx.fillStyle='#0a0a0e'; ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle='#202033'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const px=PLT.l+i*(PLT.r-PLT.l)/4, py=PLT.t+i*(PLT.b-PLT.t)/4;
+    ctx.beginPath(); ctx.moveTo(px,PLT.t); ctx.lineTo(px,PLT.b); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(PLT.l,py); ctx.lineTo(PLT.r,py); ctx.stroke();
+  }
+  ctx.strokeStyle='#56566d'; ctx.strokeRect(PLT.l,PLT.t,PLT.r-PLT.l,PLT.b-PLT.t);
+  if(dom.xmin<=0 && dom.xmax>=0){
+    ctx.strokeStyle='rgba(170,170,190,.35)'; ctx.beginPath();
+    ctx.moveTo(map.x(0),PLT.t); ctx.lineTo(map.x(0),PLT.b); ctx.stroke();
+  }
+  if(dom.ymin<=0 && dom.ymax>=0){
+    ctx.strokeStyle='rgba(170,170,190,.35)'; ctx.beginPath();
+    ctx.moveTo(PLT.l,map.y(0)); ctx.lineTo(PLT.r,map.y(0)); ctx.stroke();
+  }
+  const fmt=v=>{
+    const a=Math.abs(v);
+    return a>=1000||a>0&&a<.01 ? v.toExponential(1) : Number(v.toFixed(2)).toString();
+  };
+  ctx.fillStyle='#9999aa'; ctx.font='9px monospace';
+  ctx.textAlign='left'; ctx.fillText(fmt(dom.xmin),PLT.l,PLT.b+11);
+  ctx.textAlign='right'; ctx.fillText(fmt(dom.xmax),PLT.r,PLT.b+11);
+  ctx.textAlign='right'; ctx.fillText(fmt(dom.ymin),PLT.l-4,PLT.b+3);
+  ctx.fillText(fmt(dom.ymax),PLT.l-4,PLT.t+3);
+  ctx.fillStyle='#d6d6df'; ctx.font='11px sans-serif'; ctx.textAlign='center';
+  ctx.fillText(xLabel,(PLT.l+PLT.r)/2,h-4);
+  ctx.save(); ctx.translate(11,(PLT.t+PLT.b)/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText(yLabel,0,0); ctx.restore();
+  return {ctx:ctx,map:map,PLT:PLT};
+}
+
+function attDrawCurrentMarker(plot,x,y){
+  if(!plot||!Number.isFinite(x)||!Number.isFinite(y)) return;
+  const {ctx,map}=plot;
+  ctx.beginPath(); ctx.arc(map.x(x),map.y(y),4.5,0,2*Math.PI);
+  ctx.fillStyle=ATT_CURRENT_COLOR; ctx.fill();
+  ctx.strokeStyle='#fff3c4'; ctx.lineWidth=1.2; ctx.stroke();
+}
+
+function attDrawPotential(current){
+  if(!ATT.potCanvas||!ATT.params) return;
+  const xdom=attViewDom();
+  const samples=Array.from({length:181},(_,i)=>xdom.xmin+i*(xdom.xmax-xdom.xmin)/180);
+  const values=samples.map(x=>attPotential(x,ATT.params));
+  const vr=attPaddedRange(values,-1,1,.08);
+  const plot=attDrawMiniBg(
+    ATT.potCanvas,
+    {xmin:xdom.xmin,xmax:xdom.xmax,ymin:vr.min,ymax:vr.max},
+    'x','V(x)'
+  );
+  if(!plot) return;
+  const {ctx,map}=plot;
+  ctx.strokeStyle='#b8b8c8'; ctx.lineWidth=1.8; ctx.beginPath();
+  samples.forEach((x,i)=>{
+    const px=map.x(x), py=map.y(values[i]);
+    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  });
+  ctx.stroke();
+  if(current) attDrawCurrentMarker(plot,current.x,attPotential(current.x,ATT.params));
+}
+
+function attDrawTimeHistory(current,recent){
+  if(!ATT.timeCanvas||!current) return;
+  const xr=attPaddedRange(recent.map(pt=>pt.x),current.x-1,current.x+1,.12);
+  const plot=attDrawMiniBg(
+    ATT.timeCanvas,
+    {xmin:xr.min,xmax:xr.max,ymin:-ATT_SIDE_TRAIL_CYCLES,ymax:0},
+    'x','t - now (cycles)'
+  );
+  if(!plot) return;
+  const {ctx,map}=plot;
+  ctx.lineCap='round'; ctx.lineWidth=1.7;
+  for(let i=1;i<recent.length;i++){
+    const a=recent[i-1], b=recent[i];
+    const ya=(a.t-current.t)/ATT.L, yb=(b.t-current.t)/ATT.L;
+    const alpha=.2+.75*i/Math.max(1,recent.length-1);
+    ctx.strokeStyle='rgba('+ATT_SIDE_RGB+','+alpha.toFixed(3)+')';
+    ctx.beginPath(); ctx.moveTo(map.x(a.x),map.y(ya)); ctx.lineTo(map.x(b.x),map.y(yb)); ctx.stroke();
+  }
+  attDrawCurrentMarker(plot,current.x,0);
+}
+
+function attDrawPhaseTrail(current,recent){
+  if(!ATT.phaseCanvas||!current) return;
+  const xr=attPaddedRange(recent.map(pt=>pt.x),current.x-1,current.x+1,.12);
+  const yr=attPaddedRange(recent.map(pt=>pt.y),current.y-1,current.y+1,.12);
+  const plot=attDrawMiniBg(
+    ATT.phaseCanvas,
+    {xmin:xr.min,xmax:xr.max,ymin:yr.min,ymax:yr.max},
+    'x','x dot'
+  );
+  if(!plot) return;
+  const {ctx,map}=plot;
+  ctx.lineCap='round'; ctx.lineWidth=1.8;
+  for(let i=1;i<recent.length;i++){
+    const a=recent[i-1], b=recent[i];
+    const alpha=.18+.8*i/Math.max(1,recent.length-1);
+    ctx.strokeStyle='rgba('+ATT_SIDE_RGB+','+alpha.toFixed(3)+')';
+    ctx.beginPath(); ctx.moveTo(map.x(a.x),map.y(a.y)); ctx.lineTo(map.x(b.x),map.y(b.y)); ctx.stroke();
+  }
+  attDrawCurrentMarker(plot,current.x,current.y);
+}
+
+function attDrawSidePanels(){
+  const frame=ATT.frames[ATT.frameIndex]||[];
+  const current=frame.length ? frame[frame.length-1] : null;
+  const recent=attRecentOrbit(current);
+  attDrawPotential(current);
+  attDrawTimeHistory(current,recent);
+  attDrawPhaseTrail(current,recent);
+}
 function attDrawFrame(){
   if(!ATT.ctx) return;
   const dom=attViewDom(), map=attMap(ATT_PLT,dom);
@@ -1567,6 +1756,8 @@ function attDrawFrame(){
     ATT.ctx.fillText('year 1',lx,ly+18);
     ATT.ctx.textAlign='right'; ATT.ctx.fillText('year '+ATT.N,lx+lw,ly+18);
   }
+
+  attDrawSidePanels();
 }
 
 function attLoop(){
