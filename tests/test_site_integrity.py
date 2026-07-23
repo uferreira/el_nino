@@ -109,6 +109,27 @@ def test_phase_diagrams_use_a_fixed_twelve_month_recent_window():
     assert 'id="cmp-sl-tail"' not in compare_html
 
 
+def test_phase_page_has_torus_diagnostics_from_monthly_samples():
+    """Torus views use monthly timestamps and expose eastern/basin SST choices."""
+    html = PHASE_PAGE.read_text(encoding="utf-8")
+
+    assert "plotly-2.27.0.min.js" in html
+    for plot_id in (
+        "torus-joint-plot",
+        "torus-poincare-plot",
+        "torus-delay-plot",
+    ):
+        assert f'id="{plot_id}"' in html
+    assert '<option value="nino12" selected>NINO1+2 anomaly</option>' in html
+    assert '<option value="nino34">NINO3.4 anomaly</option>' in html
+    assert "if(Number(data.irest[i])!==0) continue;" in html
+    assert "matched.length-12" in html
+    assert "function torusPoincarePlot(" in html
+    assert "function torusDelayPlot(" in html
+    assert "torusDiagnosticsInit();" in html
+    assert "scatter reveals the chaotic nature" not in html
+    assert "measures chaos directly" not in html
+
 def test_duffing_attractor_has_synchronized_side_panels():
     """The attractor must retain the three diagnostic views requested by users."""
     html = DUFFING_PAGE.read_text(encoding="utf-8")

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>El Niño Familiar Attractor — Phase Diagrams</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 :root {
@@ -71,6 +72,13 @@ footer a:hover { text-decoration:underline; }
 .date-range-row select { background:var(--surface); border:1px solid var(--border); border-radius:4px; color:var(--text); font-size:.82rem; padding:.2rem .4rem; cursor:pointer; }
 .date-range-row button.apply-btn { padding:.25rem .7rem; font-size:.82rem; background:var(--accent); border:none; border-radius:4px; color:#fff; cursor:pointer; }
 .date-range-row button.apply-btn:hover { opacity:.85; }
+.torus-controls { display:flex; align-items:center; flex-wrap:wrap; gap:.7rem 1.2rem; margin-bottom:1rem; }
+.torus-controls label { color:var(--muted); font-size:.85rem; }
+.torus-controls select { margin-left:.35rem; background:var(--surface); border:1px solid var(--border); border-radius:4px; color:var(--text); padding:.3rem .5rem; }
+.torus-controls input[type=range] { width:150px; vertical-align:middle; accent-color:var(--accent); }
+.diagnostic-plot { width:100%; height:470px; }
+.diagnostic-note { color:var(--muted); font-size:.82rem; margin:.65rem .4rem .2rem; }
+@media(max-width:720px){ .diagnostic-plot{height:390px;} }
 
 /* ── Help panel & floating button ─────────────────────────────────────────── */
 #help-btn {
@@ -421,6 +429,78 @@ footer a:hover { text-decoration:underline; }
 </div>
 </section>
 
+<!-- Quasi-periodicity diagnostics use monthly Fourier-filtered samples only. -->
+<section id="torus-diagnostics">
+<div class="container">
+  <h2>Quasi-periodicity and Torus Diagnostics</h2>
+  <p class="section-desc">
+    Exploratory views of monthly NINO1+2, NINO3.4, and Callao records. Only samples at
+    original monthly timestamps (<code>irest = 0</code>) are shown; Fourier sub-monthly
+    interpolation points are excluded. NINO1+2 × Callao is the default because both
+    describe the eastern Pacific; NINO3.4 is available as a basin-scale comparison.
+  </p>
+  <div class="science-box">
+    <strong>How to read these plots.</strong> A thin, persistent closed curve in a yearly
+    Poincaré section or a robust invariant surface in a delay reconstruction would be
+    compatible with quasi-periodicity. A diffuse cloud may instead reflect noise,
+    non-stationarity, missing variables, or high-dimensional dynamics. These filtered-data
+    figures are diagnostics, not proof of either a KAM torus or chaos.
+  </div>
+
+  <div class="torus-controls">
+    <label for="torus-sst-series">SST index
+      <select id="torus-sst-series">
+        <option value="nino12" selected>NINO1+2 anomaly</option>
+        <option value="nino34">NINO3.4 anomaly</option>
+      </select>
+    </label>
+  </div>
+  <div class="two-col">
+    <div class="plot-box">
+      <div id="torus-joint-plot" class="diagnostic-plot" role="img"
+           aria-label="Joint portrait of an ENSO SST index and Callao sea level anomaly"></div>
+      <p class="diagnostic-note">Time-matched monthly samples. The latest 12 common months are red; earlier samples are blue.</p>
+    </div>
+    <div class="plot-box">
+      <div class="torus-controls">
+        <label for="torus-month">Annual section month
+          <select id="torus-month">
+            <option value="1">January</option><option value="2">February</option>
+            <option value="3">March</option><option value="4">April</option>
+            <option value="5">May</option><option value="6">June</option>
+            <option value="7">July</option><option value="8">August</option>
+            <option value="9">September</option><option value="10">October</option>
+            <option value="11">November</option><option value="12" selected>December</option>
+          </select>
+        </label>
+      </div>
+      <div id="torus-poincare-plot" class="diagnostic-plot" role="img"
+           aria-label="Annual Poincare section of SST and Callao observations"></div>
+      <p class="diagnostic-note">One point per year in the selected month. Colour denotes year; points from different years are not joined.</p>
+    </div>
+  </div>
+
+  <div class="plot-box" style="margin-top:1.2rem;">
+    <div class="torus-controls">
+      <label for="torus-delay-series">Delay reconstruction
+        <select id="torus-delay-series">
+          <option value="callao" selected>Callao SSH anomaly</option>
+          <option value="nino12">NINO1+2 anomaly</option>
+          <option value="nino34">NINO3.4 anomaly</option>
+        </select>
+      </label>
+      <label for="torus-lag">Lag &tau;
+        <input id="torus-lag" type="range" min="2" max="18" step="1" value="6">
+        <strong id="torus-lag-label">6 months</strong>
+      </label>
+    </div>
+    <div id="torus-delay-plot" class="diagnostic-plot" role="img"
+         aria-label="Three-dimensional delay reconstruction of the selected ENSO series"></div>
+    <p class="diagnostic-note">Coordinates are x(t), x(t&minus;&tau;), x(t&minus;2&tau;). Rotate and zoom; vary &tau; to test whether an apparent surface is robust rather than a viewing artefact.</p>
+  </div>
+</div>
+</section>
+
 <footer>
   <div class="container">
     <p>
@@ -543,9 +623,10 @@ footer a:hover { text-decoration:underline; }
         <span style="color:#44cc88;font-weight:600">Green</span> = Callao observed &nbsp;·&nbsp;
         <span style="color:#ff5533;font-weight:600">Red</span> = Duffing model
       </p>
-      <p>Use the month dropdown to focus on a specific season. A periodic system would
-      show 12 neat vertical columns. The scatter reveals the chaotic nature of ENSO:
-      no two annual cycles are identical.</p>
+      <p>Use the month dropdown to focus on a specific season. A periodically locked system would
+      concentrate samples at one or a few repeatable locations. Broad scatter alone does
+      not prove chaos: it can also reflect stochastic forcing, non-stationarity,
+      observational uncertainty, or unresolved variables.</p>
     </div>
   </details>
 
@@ -554,8 +635,9 @@ footer a:hover { text-decoration:underline; }
     <div class="hd">
       <p>The phase diagram extruded through time — the vertical axis is the calendar year.
       Each dot is one monthly data point, colored by calendar month (12 colors = Jan–Dec).</p>
-      <p>Click and drag to rotate the 3D view and reveal the fractal cross-section of the
-      attractor. Vertical scatter within each month's column measures chaos directly.</p>
+      <p>Click and drag to rotate the 3D view and inspect the geometry from different angles.
+      Vertical scatter may be consistent with irregular dynamics, but it does not measure
+      chaos directly.</p>
       <p>The Duffing model (right) reproduces the general shape but not the exact trajectory —
       deterministic chaos amplifies tiny differences over time.</p>
     </div>
@@ -1358,6 +1440,7 @@ let G_DOT = 3.0;
 window.addEventListener('load', () => {
   obs1Init();
   clsInit();
+  torusDiagnosticsInit();
   const dotSl = document.getElementById('g-dot-size');
   if (dotSl) {
     dotSl.addEventListener('input', function() {
@@ -1764,7 +1847,96 @@ function clsRedrawToFrame(targetFrame){
 }
 
 // ═══════════════════════════════════════════════════════
-// 11. HELP PANEL
+// 11. QUASI-PERIODICITY / TORUS DIAGNOSTICS
+// Monthly timestamps only: Fourier interpolation sub-points are never treated as data.
+// ═══════════════════════════════════════════════════════
+const TORUS_PLOT_CONFIG={responsive:true,displaylogo:false,scrollZoom:true};
+const TORUS_COLORS={history:'#2563a6',recent:'#dc2626',current:'#ffb000',grid:'#2a2a40'};
+
+function torusMonthlySeries(data, centre=true){
+  const points=[];
+  for(let i=0;i<data.x.length;i++){
+    if(Number(data.irest[i])!==0) continue;
+    points.push({ym:data.year[i]*12+data.month[i],year:data.year[i],month:data.month[i],value:Number(data.x[i])});
+  }
+  const mean=centre&&points.length?points.reduce((sum,p)=>sum+p.value,0)/points.length:0;
+  return points.map(p=>({...p,value:p.value-mean}));
+}
+function torusSeriesChoice(choice){
+  if(choice==='nino34') return {points:torusMonthlySeries(nino34Data,false),label:'NINO3.4 anomaly (°C)',short:'NINO3.4'};
+  return {points:torusMonthlySeries(observedData,true),label:'NINO1+2 anomaly (°C)',short:'NINO1+2'};
+}
+function torusMatched(choice){
+  const sst=torusSeriesChoice(choice);
+  const ssh=torusMonthlySeries(callaoData,true);
+  const sshByMonth=new Map(ssh.map(p=>[p.ym,p]));
+  const matched=sst.points.filter(p=>sshByMonth.has(p.ym)).map(p=>{
+    const q=sshByMonth.get(p.ym);
+    return {ym:p.ym,year:p.year,month:p.month,sst:p.value,ssh:q.value,date:MO_NAMES[p.month-1]+' '+p.year};
+  });
+  return {matched,label:sst.label,short:sst.short};
+}
+function torusAxis(title){
+  return {title:title,color:'#aaaabc',gridcolor:TORUS_COLORS.grid,zerolinecolor:'#66667a',linecolor:'#44445a',automargin:true};
+}
+function torusLayout(title,xTitle,yTitle){
+  return {title:{text:title,font:{size:15,color:'#e8e8f0'}},paper_bgcolor:'#1a1a28',plot_bgcolor:'#0a0a0e',font:{color:'#b8b8c8'},
+    margin:{l:66,r:24,t:52,b:62},xaxis:torusAxis(xTitle),yaxis:torusAxis(yTitle),legend:{orientation:'h',y:1.08},hovermode:'closest'};
+}
+function torusJointPlot(choice){
+  const {matched,label,short}=torusMatched(choice);
+  const cut=Math.max(0,matched.length-12), old=matched.slice(0,cut), recent=matched.slice(cut), current=matched.slice(-1);
+  const trace=(pts,name,color,width,markers)=>({type:'scatter',mode:markers?'lines+markers':'lines',name:name,
+    x:pts.map(p=>p.sst),y:pts.map(p=>p.ssh),text:pts.map(p=>p.date),hovertemplate:'%{text}<br>'+short+': %{x:.2f} °C<br>Callao: %{y:.1f} mm<extra></extra>',
+    line:{color:color,width:width},marker:{color:color,size:markers?5:3}});
+  const traces=[trace(old,'Earlier record',TORUS_COLORS.history,1.8,false),trace(recent,'Latest 12 months',TORUS_COLORS.recent,3,true)];
+  if(current.length) traces.push({type:'scatter',mode:'markers',name:'Latest sample',x:[current[0].sst],y:[current[0].ssh],text:[current[0].date],
+    hovertemplate:'%{text}<extra></extra>',marker:{color:TORUS_COLORS.current,size:11,line:{color:'#ffffff',width:1.5}}});
+  Plotly.react('torus-joint-plot',traces,torusLayout(short+' × Callao — monthly matched trajectory',label,'Callao SSH anomaly (mm)'),TORUS_PLOT_CONFIG);
+}
+function torusPoincarePlot(choice,month){
+  const {matched,label,short}=torusMatched(choice);
+  const points=matched.filter(p=>p.month===month);
+  const years=points.map(p=>p.year);
+  const trace={type:'scatter',mode:'markers',name:MO_NAMES[month-1],x:points.map(p=>p.sst),y:points.map(p=>p.ssh),text:points.map(p=>String(p.year)),
+    hovertemplate:'%{text}<br>'+short+': %{x:.2f} °C<br>Callao: %{y:.1f} mm<extra></extra>',
+    marker:{size:8,color:years,colorscale:'Viridis',showscale:true,colorbar:{title:'Year',thickness:12},line:{color:'rgba(255,255,255,.45)',width:.7}}};
+  Plotly.react('torus-poincare-plot',[trace],torusLayout('Annual Poincaré section — '+MO_NAMES[month-1],label,'Callao SSH anomaly (mm)'),TORUS_PLOT_CONFIG);
+}
+function torusDelaySeries(choice){
+  if(choice==='callao') return {points:torusMonthlySeries(callaoData,true),label:'Callao SSH anomaly (mm)',short:'Callao SSH'};
+  return torusSeriesChoice(choice);
+}
+function torusDelayPlot(choice,lag){
+  const {points,label,short}=torusDelaySeries(choice);
+  const byMonth=new Map(points.map(p=>[p.ym,p]));
+  const embedded=[];
+  for(const p of points){
+    const p1=byMonth.get(p.ym-lag),p2=byMonth.get(p.ym-2*lag);
+    if(p1&&p2) embedded.push({x:p.value,y:p1.value,z:p2.value,date:MO_NAMES[p.month-1]+' '+p.year});
+  }
+  const cut=Math.max(0,embedded.length-12),old=embedded.slice(0,cut),recent=embedded.slice(cut),current=embedded.slice(-1);
+  const trace=(pts,name,color,width,size)=>({type:'scatter3d',mode:'lines+markers',name:name,x:pts.map(p=>p.x),y:pts.map(p=>p.y),z:pts.map(p=>p.z),text:pts.map(p=>p.date),
+    hovertemplate:'%{text}<br>x(t): %{x:.2f}<br>x(t−τ): %{y:.2f}<br>x(t−2τ): %{z:.2f}<extra></extra>',line:{color:color,width:width},marker:{color:color,size:size,opacity:.75}});
+  const traces=[trace(old,'Earlier record',TORUS_COLORS.history,2,2),trace(recent,'Latest 12 months',TORUS_COLORS.recent,5,3)];
+  if(current.length) traces.push({type:'scatter3d',mode:'markers',name:'Latest sample',x:[current[0].x],y:[current[0].y],z:[current[0].z],text:[current[0].date],hovertemplate:'%{text}<extra></extra>',marker:{color:TORUS_COLORS.current,size:6,line:{color:'#fff',width:1}}});
+  const layout={title:{text:short+' delay reconstruction — τ = '+lag+' months',font:{size:16,color:'#e8e8f0'}},paper_bgcolor:'#1a1a28',font:{color:'#b8b8c8'},margin:{l:0,r:0,t:55,b:0},
+    scene:{bgcolor:'#0a0a0e',xaxis:torusAxis('x(t): '+label),yaxis:torusAxis('x(t−τ)'),zaxis:torusAxis('x(t−2τ)'),aspectmode:'cube'},legend:{orientation:'h',y:1.02},uirevision:choice+'-'+lag};
+  Plotly.react('torus-delay-plot',traces,layout,TORUS_PLOT_CONFIG);
+}
+function torusDiagnosticsInit(){
+  if(typeof Plotly==='undefined') return;
+  const sst=document.getElementById('torus-sst-series'),month=document.getElementById('torus-month');
+  const delaySeries=document.getElementById('torus-delay-series'),lag=document.getElementById('torus-lag'),lagLabel=document.getElementById('torus-lag-label');
+  const redrawPair=()=>{torusJointPlot(sst.value);torusPoincarePlot(sst.value,Number(month.value));};
+  const redrawDelay=()=>{const n=Number(lag.value);lagLabel.textContent=n+(n===1?' month':' months');torusDelayPlot(delaySeries.value,n);};
+  sst.addEventListener('change',redrawPair); month.addEventListener('change',()=>torusPoincarePlot(sst.value,Number(month.value)));
+  delaySeries.addEventListener('change',redrawDelay); lag.addEventListener('input',redrawDelay);
+  redrawPair(); redrawDelay();
+}
+
+// ═══════════════════════════════════════════════════════
+// 12. HELP PANEL
 // ═══════════════════════════════════════════════════════
 function toggleHelp() {
   document.getElementById('help-panel').classList.toggle('open');
