@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import colorsys
 import importlib.util
 import re
 from pathlib import Path
@@ -51,6 +52,43 @@ def test_compare_history_has_readable_contrast():
     assert history is not None
     assert float(history.group(1)) >= 0.55
     assert float(history.group(2)) >= 2.0
+
+
+def test_historical_palettes_reserve_red_for_the_recent_year():
+    """History must stay distinct from red and readable on each background."""
+    compare_html = COMPARE_PAGE.read_text(encoding="utf-8")
+    phase_html = PHASE_PAGE.read_text(encoding="utf-8")
+    duffing_html = DUFFING_PAGE.read_text(encoding="utf-8")
+
+    def palette(html: str, name: str) -> list[str]:
+        match = re.search(rf"const {name}\s*=\s*\[(.*?)\];", html, re.S)
+        assert match
+        return re.findall(r"#[0-9a-fA-F]{6}", match.group(1))
+
+    def hue_and_white_contrast(value: str) -> tuple[float, float]:
+        rgb = tuple(int(value[offset : offset + 2], 16) / 255 for offset in (1, 3, 5))
+        hue = colorsys.rgb_to_hsv(*rgb)[0] * 360
+        linear = tuple(
+            channel / 12.92
+            if channel <= 0.04045
+            else ((channel + 0.055) / 1.055) ** 2.4
+            for channel in rgb
+        )
+        luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+        return hue, 1.05 / (luminance + 0.05)
+
+    compare_colors = palette(compare_html, "CMP_PALETTE")
+    seasonal_colors = palette(phase_html, "Q_COLORS") + palette(
+        duffing_html, "Q_COLORS"
+    )
+    for color in compare_colors + seasonal_colors:
+        hue, _ = hue_and_white_contrast(color)
+        assert 30 < hue < 330, f"historical red-like color: {color}"
+    for color in compare_colors:
+        _, contrast = hue_and_white_contrast(color)
+        assert contrast >= 3.0, f"history is too pale on white: {color}"
+
+    assert "const CMP_RECENT_COLOR = '#dc2626';" in compare_html
 
 
 def test_phase_diagrams_use_a_fixed_twelve_month_recent_window():

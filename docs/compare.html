@@ -327,10 +327,11 @@ const CMP_REGISTRY = [
   { id:'palau',    label:'Palau SL',       data:palauData,    unit:'mm',  group:'sl' },
 ];
 
-// Color palette — one per dataset slot
+// Historical palette — deliberately excludes red (reserved for the latest year)
+// and keeps at least 3:1 contrast against the white plotting background.
 const CMP_PALETTE = [
-  '#ff5533','#4488ff','#44cc88','#ffcc44',
-  '#cc66ff','#44ccff','#ff8844','#88dd44','#ff4499'
+  '#1f5aa6','#00796b','#6a3d9a','#2e7d32',
+  '#006d8f','#455a64','#806000','#3949ab','#00838f'
 ];
 
 const CMP_RECENT_WINDOW_MONTHS = 12;
