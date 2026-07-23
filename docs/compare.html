@@ -393,14 +393,51 @@ function getDomForPrep(p) { return p.group === 'sst' ? CMP.domSST : CMP.domSSH; 
 // ─────────────────────────────────────────────────────────────
 // Domain computation — two panels
 // ─────────────────────────────────────────────────────────────
-function cmpComputeDomains(norm) {
-  if (norm) {
-    const nd = {xmin:-4, xmax:4, ymin:-2, ymax:2};
-    return {sst:nd, ssh:nd};
+function cmpNiceStep(range,target=10) {
+  if (!Number.isFinite(range) || range <= 0) return 1;
+  const rough = range / target;
+  const power = 10 ** Math.floor(Math.log10(rough));
+  const fraction = rough / power;
+  const nice = fraction <= 1 ? 1 : (fraction <= 2 ? 2 : (fraction <= 2.5 ? 2.5 : (fraction <= 5 ? 5 : 10)));
+  return nice * power;
+}
+function cmpRoundedBounds(values, fallbackMin, fallbackMax) {
+  const finite = values.filter(Number.isFinite);
+  if (!finite.length) return {min:fallbackMin, max:fallbackMax};
+  const dataMin = Math.min(...finite), dataMax = Math.max(...finite);
+  const span = Math.max(dataMax-dataMin, Math.abs(dataMax)||Math.abs(dataMin)||1);
+  const pad = span * .04;
+  let min = dataMin-pad, max = dataMax+pad;
+  const step = cmpNiceStep(max-min);
+  min = Math.floor(min/step)*step;
+  max = Math.ceil(max/step)*step;
+  if (min === max) { min -= step; max += step; }
+  return {min:min, max:max};
+}
+function cmpFitDomain(preps, group, norm) {
+  const selected = preps.filter(prep => prep.group === group);
+  const fallback = norm
+    ? {xmin:-4,xmax:4,ymin:-2,ymax:2}
+    : (group === 'sst'
+      ? {xmin:17.5,xmax:32.5,ymin:-2.5,ymax:2.5}
+      : {xmin:-300,xmax:300,ymin:-60,ymax:60});
+  if (!selected.length) return fallback;
+  const xs=[], ys=[];
+  for (const prep of selected) {
+    for (const value of prep.data.x) xs.push(cmpNormX(value,prep,norm));
+    for (const value of prep.data.y) ys.push(cmpNormY(value,prep,norm));
   }
+  const xb=cmpRoundedBounds(xs,fallback.xmin,fallback.xmax);
+  const yb=cmpRoundedBounds(ys,fallback.ymin,fallback.ymax);
+  return {xmin:xb.min,xmax:xb.max,ymin:yb.min,ymax:yb.max};
+}
+function cmpComputeDomains(norm, preps=null) {
+  const sources = preps && preps.length
+    ? preps
+    : CMP_REGISTRY.map(cmpPrepareDataset).filter(Boolean);
   return {
-    sst:{xmin:17.5, xmax:32.5, ymin:-2.5, ymax:2.5},
-    ssh:{xmin:-300,  xmax:300, ymin:-60,  ymax:60 }
+    sst:cmpFitDomain(sources,'sst',norm),
+    ssh:cmpFitDomain(sources,'sl',norm),
   };
 }
 
@@ -775,7 +812,7 @@ function cmpPrepareState() {
   }
   CMP.totalFrames  = cappedTotal;
   CMP.tails  = preps.map(() => []);
-  const doms = cmpComputeDomains(params.norm);
+  const doms = cmpComputeDomains(params.norm, preps);
   CMP.domSST = doms.sst;
   CMP.domSSH = doms.ssh;
   CMP.frame  = 0;

@@ -674,9 +674,59 @@ const talMean  = TAL_N   > 0 ? talaraData.x.reduce((a,b)=>a+b,0)/TAL_N   : 0;
 const llMean   = LALIB_N > 0 ? laLibData.x.reduce((a,b)=>a+b,0)/LALIB_N  : 0;
 const honMean  = HON_N   > 0 ? honoluluData.x.reduce((a,b)=>a+b,0)/HON_N  : 0;
 const palMean  = PAL_N   > 0 ? palauData.x.reduce((a,b)=>a+b,0)/PAL_N    : 0;
+// Dynamic phase-space domains. The legacy defaults are retained while they fit,
+// but any updated series expands the relevant axis with a 4% data margin and
+// readable outward-rounded limits.
+function phaseNiceStep(range,target=10){
+  if(!Number.isFinite(range)||range<=0) return 1;
+  const rough=range/target;
+  const power=10**Math.floor(Math.log10(rough));
+  const fraction=rough/power;
+  const nice=fraction<=1?1:(fraction<=2?2:(fraction<=2.5?2.5:(fraction<=5?5:10)));
+  return nice*power;
+}
+function phaseAxisBounds(values,fallbackMin,fallbackMax){
+  const finite=values.filter(Number.isFinite);
+  if(!finite.length) return {min:fallbackMin,max:fallbackMax};
+  const dataMin=Math.min(...finite), dataMax=Math.max(...finite);
+  if(dataMin>=fallbackMin && dataMax<=fallbackMax){
+    return {min:fallbackMin,max:fallbackMax};
+  }
+  const span=Math.max(dataMax-dataMin,Math.abs(dataMax)||Math.abs(dataMin)||1);
+  const pad=span*.04;
+  let min=Math.min(fallbackMin,dataMin-pad);
+  let max=Math.max(fallbackMax,dataMax+pad);
+  const step=phaseNiceStep(max-min);
+  min=Math.floor(min/step)*step;
+  max=Math.ceil(max/step)*step;
+  return {min:min,max:max};
+}
+function phaseAutoDomain(data,mean,fallback){
+  if(!data) return {...fallback};
+  const xb=phaseAxisBounds((data.x||[]).map(v=>v-mean),fallback.xmin,fallback.xmax);
+  const yb=phaseAxisBounds(data.y||[],fallback.ymin,fallback.ymax);
+  return {xmin:xb.min,xmax:xb.max,ymin:yb.min,ymax:yb.max};
+}
+function phaseAutoTicks(dom){
+  const values=(min,max)=>{
+    const step=phaseNiceStep(max-min,8), out=[];
+    for(let value=Math.ceil(min/step)*step;value<=max+step*1e-9;value+=step){
+      out.push(Math.abs(value)<step*1e-9?0:Number(value.toPrecision(12)));
+    }
+    return out;
+  };
+  return {x:values(dom.xmin,dom.xmax),y:values(dom.ymin,dom.ymax)};
+}
+function phaseFormatTick(value){
+  const absolute=Math.abs(value);
+  const digits=absolute>=10?0:(absolute>=1?1:2);
+  return Number(value.toFixed(digits)).toString();
+}
+function phaseAutoConfig(id,data,N,mean,fallback,labels){
+  const dom=phaseAutoDomain(data,mean,fallback);
+  return {id:id,data:data,N:N,mean:mean,dom:dom,labels:labels,ticks:phaseAutoTicks(dom)};
+}
 
-const ANOM_TICKS    = {x:[-4,-2,0,2,4], y:[-1.5,-1,-0.5,0,0.5,1,1.5]};
-const PAL_SSH_TICKS = {x:[-300,-200,-100,0,100,200,300], y:[-80,-40,0,40,80]};
 
 // irest = i % 5  (NDOTS=5, verified from data file)
 // month is the original monthly point when i % 5 === 0
@@ -698,24 +748,24 @@ const obsMean = observedData.x.reduce((a,b)=>a+b,0)/OBS_N;
 
 const OBS1_CW=700, OBS1_CH=480;
 const OBS1_PLT={l:56,r:680,t:34,b:446};
-const OBS1_DOM_SST={xmin:17.5,xmax:32.5,ymin:-2.5,ymax:2.5};
-const OBS1_DOM_CAL={xmin:-300, xmax:300, ymin:-60,  ymax:60};
+const OBS1_DOM_SST=phaseAutoDomain(observedData,0,{xmin:17.5,xmax:32.5,ymin:-2.5,ymax:2.5});
+const OBS1_DOM_CAL=phaseAutoDomain(callaoData,callaoMean,{xmin:-300,xmax:300,ymin:-60,ymax:60});
 const OBS1_LABELS_SST={x:'SST NINO1+2 (°C)', y:'dT/dt'};
 const OBS1_LABELS_CAL={x:'SSH anom (mm)',    y:'dSL/dt'};
-const CAL_SSH_TICKS={x:[-300,-200,-100,0,100,200,300],y:[-60,-40,-20,0,20,40,60]};
-const SST_ANOM_TICKS={x:[18,20,22,24,26,28,30,32],y:[-2,-1,0,1,2]};
+const CAL_SSH_TICKS=phaseAutoTicks(OBS1_DOM_CAL);
+const SST_ANOM_TICKS=phaseAutoTicks(OBS1_DOM_SST);
 const RECENT_WINDOW_MONTHS=12;
 const MONTHLY_POINT_RADIUS=2.2;
 const CURRENT_POINT_RADIUS=5.5;
 
 const OBS1_EXTRA_CFGS = [
-  { id:'obs1-nino3-canvas',  data:nino3Data,    N:NINO3_N,  mean:0,       dom:{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5}, labels:{x:'NINO3 anom (°C)',   y:'dT/dt'},  ticks:ANOM_TICKS    },
-  { id:'obs1-nino34-canvas', data:nino34Data,   N:NINO34_N, mean:0,       dom:{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5}, labels:{x:'NINO3.4 anom (°C)', y:'dT/dt'},  ticks:ANOM_TICKS    },
-  { id:'obs1-nino4-canvas',  data:nino4Data,    N:NINO4_N,  mean:0,       dom:{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5}, labels:{x:'NINO4 anom (°C)',   y:'dT/dt'},  ticks:ANOM_TICKS    },
-  { id:'obs1-tal-canvas',    data:talaraData,   N:TAL_N,    mean:talMean, dom:{xmin:-300,xmax:300,ymin:-60,ymax:60}, labels:{x:'Talara SSH (mm)',       y:'dSL/dt'}, ticks:CAL_SSH_TICKS },
-  { id:'obs1-lalib-canvas',  data:laLibData,    N:LALIB_N,  mean:llMean,  dom:{xmin:-300,xmax:300,ymin:-60,ymax:60}, labels:{x:'La Libertad SSH (mm)',  y:'dSL/dt'}, ticks:CAL_SSH_TICKS },
-  { id:'obs1-hon-canvas',    data:honoluluData, N:HON_N,    mean:honMean, dom:{xmin:-300,xmax:300,ymin:-60,ymax:60}, labels:{x:'Honolulu SSH (mm)',     y:'dSL/dt'}, ticks:CAL_SSH_TICKS },
-  { id:'obs1-pal-canvas',    data:palauData,    N:PAL_N,    mean:palMean, dom:{xmin:-380,xmax:380,ymin:-100,ymax:100}, labels:{x:'Palau SSH (mm)',     y:'dSL/dt'}, ticks:PAL_SSH_TICKS },
+  phaseAutoConfig('obs1-nino3-canvas',nino3Data,NINO3_N,0,{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5},{x:'NINO3 anom (°C)',y:'dT/dt'}),
+  phaseAutoConfig('obs1-nino34-canvas',nino34Data,NINO34_N,0,{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5},{x:'NINO3.4 anom (°C)',y:'dT/dt'}),
+  phaseAutoConfig('obs1-nino4-canvas',nino4Data,NINO4_N,0,{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5},{x:'NINO4 anom (°C)',y:'dT/dt'}),
+  phaseAutoConfig('obs1-tal-canvas',talaraData,TAL_N,talMean,{xmin:-300,xmax:300,ymin:-60,ymax:60},{x:'Talara SSH (mm)',y:'dSL/dt'}),
+  phaseAutoConfig('obs1-lalib-canvas',laLibData,LALIB_N,llMean,{xmin:-300,xmax:300,ymin:-60,ymax:60},{x:'La Libertad SSH (mm)',y:'dSL/dt'}),
+  phaseAutoConfig('obs1-hon-canvas',honoluluData,HON_N,honMean,{xmin:-300,xmax:300,ymin:-60,ymax:60},{x:'Honolulu SSH (mm)',y:'dSL/dt'}),
+  phaseAutoConfig('obs1-pal-canvas',palauData,PAL_N,palMean,{xmin:-380,xmax:380,ymin:-100,ymax:100},{x:'Palau SSH (mm)',y:'dSL/dt'}),
 ];
 let OBS1_EXTRAS = [];
 
@@ -1168,7 +1218,7 @@ function drawBg(ctx, CW, CH, PLT, DOM, labels, ticks) {
   // X tick labels
   ctx.fillStyle='#555568'; ctx.font='10px monospace'; ctx.textAlign='center';
   if (ticks) {
-    ticks.x.forEach(x => ctx.fillText(x, mx(x), PLT.b+14));
+    ticks.x.forEach(x => ctx.fillText(phaseFormatTick(x), mx(x), PLT.b+14));
   } else {
     for (let x=Math.ceil(DOM.xmin); x<=Math.floor(DOM.xmax); x+=2) {
       ctx.fillText(x, mx(x), PLT.b+14);
@@ -1181,7 +1231,7 @@ function drawBg(ctx, CW, CH, PLT, DOM, labels, ticks) {
   ctx.textAlign='right';
   ctx.fillStyle='#555568';
   if (ticks) {
-    ticks.y.forEach(y => ctx.fillText(y.toFixed(0), PLT.l-5, my(y)+4));
+    ticks.y.forEach(y => ctx.fillText(phaseFormatTick(y), PLT.l-5, my(y)+4));
   } else {
     for (let y=Math.ceil(DOM.ymin); y<=Math.floor(DOM.ymax); y++) {
       ctx.fillText(y.toFixed(0), PLT.l-5, my(y)+4);
@@ -1322,20 +1372,20 @@ window.addEventListener('load', () => {
 
 const CLS_CW=700, CLS_CH=480;
 const CLS_PLT={l:56,r:680,t:34,b:446};
-const CLS_DOM_SST={xmin:17.5,xmax:32.5,ymin:-2.5,ymax:2.5};
-const CLS_DOM_CAL={xmin:-300, xmax:300,  ymin:-60,  ymax:60};
+const CLS_DOM_SST=phaseAutoDomain(observedData,0,{xmin:17.5,xmax:32.5,ymin:-2.5,ymax:2.5});
+const CLS_DOM_CAL=phaseAutoDomain(callaoData,callaoMean,{xmin:-300,xmax:300,ymin:-60,ymax:60});
 const CLS_LABELS_SST={x:'SST NINO1+2 (°C)', y:'dT/dt'};
 const CLS_LABELS_CAL={x:'SSH anomaly (mm)',  y:'dSL/dt'};
-const SST_ABS_TICKS={x:[18,20,22,24,26,28,30,32],y:[-2,-1,0,1,2]};
+const SST_ABS_TICKS=phaseAutoTicks(CLS_DOM_SST);
 
 const CLS_EXTRA_CFGS = [
-  { id:'cls-nino3-canvas',  data:nino3Data,    N:NINO3_N,  mean:0,       dom:{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5}, labels:{x:'NINO3 anom (°C)',   y:'dT/dt'},  ticks:ANOM_TICKS    },
-  { id:'cls-nino34-canvas', data:nino34Data,   N:NINO34_N, mean:0,       dom:{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5}, labels:{x:'NINO3.4 anom (°C)', y:'dT/dt'},  ticks:ANOM_TICKS    },
-  { id:'cls-nino4-canvas',  data:nino4Data,    N:NINO4_N,  mean:0,       dom:{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5}, labels:{x:'NINO4 anom (°C)',   y:'dT/dt'},  ticks:ANOM_TICKS    },
-  { id:'cls-tal-canvas',    data:talaraData,   N:TAL_N,    mean:talMean, dom:{xmin:-300,xmax:300,ymin:-60,ymax:60}, labels:{x:'Talara SSH (mm)',       y:'dSL/dt'}, ticks:CAL_SSH_TICKS },
-  { id:'cls-lalib-canvas',  data:laLibData,    N:LALIB_N,  mean:llMean,  dom:{xmin:-300,xmax:300,ymin:-60,ymax:60}, labels:{x:'La Libertad SSH (mm)',  y:'dSL/dt'}, ticks:CAL_SSH_TICKS },
-  { id:'cls-hon-canvas',    data:honoluluData, N:HON_N,    mean:honMean, dom:{xmin:-300,xmax:300,ymin:-60,ymax:60}, labels:{x:'Honolulu SSH (mm)',     y:'dSL/dt'}, ticks:CAL_SSH_TICKS },
-  { id:'cls-pal-canvas',    data:palauData,    N:PAL_N,    mean:palMean, dom:{xmin:-380,xmax:380,ymin:-100,ymax:100}, labels:{x:'Palau SSH (mm)',     y:'dSL/dt'}, ticks:PAL_SSH_TICKS },
+  phaseAutoConfig('cls-nino3-canvas',nino3Data,NINO3_N,0,{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5},{x:'NINO3 anom (°C)',y:'dT/dt'}),
+  phaseAutoConfig('cls-nino34-canvas',nino34Data,NINO34_N,0,{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5},{x:'NINO3.4 anom (°C)',y:'dT/dt'}),
+  phaseAutoConfig('cls-nino4-canvas',nino4Data,NINO4_N,0,{xmin:-4,xmax:4,ymin:-1.5,ymax:1.5},{x:'NINO4 anom (°C)',y:'dT/dt'}),
+  phaseAutoConfig('cls-tal-canvas',talaraData,TAL_N,talMean,{xmin:-300,xmax:300,ymin:-60,ymax:60},{x:'Talara SSH (mm)',y:'dSL/dt'}),
+  phaseAutoConfig('cls-lalib-canvas',laLibData,LALIB_N,llMean,{xmin:-300,xmax:300,ymin:-60,ymax:60},{x:'La Libertad SSH (mm)',y:'dSL/dt'}),
+  phaseAutoConfig('cls-hon-canvas',honoluluData,HON_N,honMean,{xmin:-300,xmax:300,ymin:-60,ymax:60},{x:'Honolulu SSH (mm)',y:'dSL/dt'}),
+  phaseAutoConfig('cls-pal-canvas',palauData,PAL_N,palMean,{xmin:-380,xmax:380,ymin:-100,ymax:100},{x:'Palau SSH (mm)',y:'dSL/dt'}),
 ];
 let CLS_EXTRAS = [];
 
@@ -1431,14 +1481,14 @@ function drawBgWhite(ctx, CW, CH, PLT, DOM, labels, ticks) {
   ctx.strokeRect(PLT.l,PLT.t,PLT.r-PLT.l,PLT.b-PLT.t);
   ctx.fillStyle='#555555'; ctx.font='10px monospace'; ctx.textAlign='center';
   if(ticks){
-    ticks.x.forEach(x=>ctx.fillText(x,mx(x),PLT.b+14));
+    ticks.x.forEach(x=>ctx.fillText(phaseFormatTick(x),mx(x),PLT.b+14));
   } else {
     for(let x=Math.ceil(DOM.xmin);x<=Math.floor(DOM.xmax);x+=2) ctx.fillText(x,mx(x),PLT.b+14);
   }
   ctx.fillStyle='#333333'; ctx.fillText(labels.x,(PLT.l+PLT.r)/2,CH-3);
   ctx.textAlign='right'; ctx.fillStyle='#555555';
   if(ticks){
-    ticks.y.forEach(y=>ctx.fillText(y.toFixed(0),PLT.l-5,my(y)+4));
+    ticks.y.forEach(y=>ctx.fillText(phaseFormatTick(y),PLT.l-5,my(y)+4));
   } else {
     for(let y=Math.ceil(DOM.ymin);y<=Math.floor(DOM.ymax);y++) ctx.fillText(y.toFixed(0),PLT.l-5,my(y)+4);
   }

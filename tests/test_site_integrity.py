@@ -89,6 +89,46 @@ def test_duffing_attractor_has_synchronized_side_panels():
     assert "File%3ADuffing_oscillator.webm" in html
 
 
+def test_phase_plot_axes_are_derived_from_every_embedded_series():
+    """Updated observations must never outgrow hard-coded phase-plot axes."""
+    phase_html = PHASE_PAGE.read_text(encoding="utf-8")
+    duffing_html = DUFFING_PAGE.read_text(encoding="utf-8")
+    compare_html = COMPARE_PAGE.read_text(encoding="utf-8")
+    talara_match = re.search(
+        r"const talaraData = \{\s*x:\s*\[([^\]]+)\],\s*y:\s*\[([^\]]+)\],",
+        phase_html,
+    )
+    assert talara_match
+    talara_x = [float(value) for value in talara_match.group(1).split(",")]
+    talara_y = [float(value) for value in talara_match.group(2).split(",")]
+    talara_mean = sum(talara_x) / len(talara_x)
+    assert max(value - talara_mean for value in talara_x) > 300
+    assert min(talara_y) < -60
+    for html in (phase_html, duffing_html):
+        assert "function phaseAutoDomain(" in html
+        assert "function phaseAutoConfig(" in html
+        for data_name in (
+            "nino3Data",
+            "nino34Data",
+            "nino4Data",
+            "talaraData",
+            "laLibData",
+            "honoluluData",
+            "palauData",
+        ):
+            assert re.search(
+                rf"phaseAutoConfig\([^)]*\b{data_name}\b",
+                html,
+            )
+
+    assert "const OBS1_DOM_CAL=phaseAutoDomain(callaoData" in phase_html
+    assert "const CLS_DOM_CAL=phaseAutoDomain(callaoData" in phase_html
+    assert "const CMP_DOM_CAL=phaseAutoDomain(callaoData" in duffing_html
+    assert "function cmpFitDomain(" in compare_html
+    assert "cmpComputeDomains(params.norm, preps)" in compare_html
+
+
+
 def test_update_script_covers_current_data_pages():
     uw = _load_update_website()
     names = {path.name for path in uw.HTML_FILES}
