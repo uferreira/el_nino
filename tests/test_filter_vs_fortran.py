@@ -1,28 +1,31 @@
 """
 tests/test_filter_vs_fortran.py
 ================================
-Scientific validation: verify that the Python filter.py produces results
-numerically identical to the reference Fortran program.
+Scientific validation of the translated filter and corrected derivatives.
 
-Three tests
------------
+Four tests
+----------
+test_vectorized_filter_matches_literal_fortran_loops
+    Always-running comparison of passa_baixa with literal reference loops.
+
 test_python_matches_fortran
     End-to-end: compile the Fortran, run both programs on identical 5-year
-    synthetic input, compare T and dT/dt column-by-column.  Skipped when
-    gfortran is not installed.
+    synthetic input, and compare reconstructed T. Skipped unless the source
+    path and gfortran are available.
 
 test_filter_preserves_low_frequency
-    Amplitude ratios in the passband and stopband: slow mode (≈17 months)
-    must survive, fast mode (≈3 months) must be blocked.
+    Amplitude ratios in the passband and stopband: slow mode (34 months)
+    must survive, fast mode (≈6 months) must be blocked.
 
 test_deri_fourier_derivative_accuracy
     VST from deri_fourier must match the analytical derivative of an exact
-    Fourier basis mode within 1 % at interior grid points.
+    Fourier basis mode to floating-point precision.
 
 Run with:
     pytest tests/test_filter_vs_fortran.py -v
 """
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -37,14 +40,65 @@ from el_nino.filter import deri_fourier, passa_baixa
 # Paths
 # ---------------------------------------------------------------------------
 
-FORTRAN_SRC = Path(
-    "/Users/uggopinho/Documents/estudos/ElNino/FORTRAN/"
-    "filterfouriergr197501_202502.f"
-)
+_FORTRAN_SRC_ENV = os.environ.get("EL_NINO_FORTRAN_SRC")
+FORTRAN_SRC = Path(_FORTRAN_SRC_ENV) if _FORTRAN_SRC_ENV else None
 
 # These filenames are hardcoded inside the Fortran source — do not change.
 _FORT_INPUT  = "sst_combined_1975.2_2025.02_ENTRADA.dat"
 _FORT_OUTPUT = "sva.2_filter_10_9_1975.2_2025.02_SAIDA.dat"
+
+
+def _passa_baixa_loop_oracle(
+    HN1: float,
+    HN2: float,
+    values: np.ndarray,
+) -> np.ndarray:
+    """Literal slow loop oracle for Fortran PASSA_BAIXA."""
+    st0 = np.asarray(values, dtype=float)
+    nt = len(st0)
+    nm1 = nt - 1
+    sta = st0 - st0.mean()
+    first, last = sta[0], sta[-1]
+    for it in range(nt):
+        sta[it] -= first + it * (last - first) / nm1
+
+    iw_max = nm1 // 2
+    fourier = np.zeros(iw_max + 1)
+    for iw in range(1, iw_max + 1):
+        for it in range(1, nm1 + 1):
+            fourier[iw] += (
+                (2.0 / nm1)
+                * sta[it]
+                * np.sin(iw * it * np.pi / nm1)
+            )
+
+    w1 = nm1 / HN1
+    w2 = nm1 / HN2
+    dw2 = abs(w2 - w1) / 2.0
+    w0 = (w1 + w2) / 2.0
+    result = np.zeros(nt)
+    for it in range(nt):
+        for iiw in range(nm1 // 2, nm1 + 1):
+            iw = nt - iiw
+            coefficient = fourier[iw] if 1 <= iw <= iw_max else 0.0
+            factor = 1.0 / (1.0 + np.exp((iw - w0) / dw2))
+            result[it] += (
+                factor * coefficient * np.sin(iw * it * np.pi / nm1)
+            )
+        result[it] += st0.mean() + first + it * (last - first) / nm1
+    return result
+
+
+def test_vectorized_filter_matches_literal_fortran_loops():
+    """The always-running oracle protects the translated loop indices."""
+    rng = np.random.default_rng(20260723)
+    signal = rng.normal(size=37)
+
+    expected = _passa_baixa_loop_oracle(10.0, 9.0, signal)
+    actual = passa_baixa(10.0, 9.0, signal)
+
+    np.testing.assert_allclose(actual, expected, rtol=2e-14, atol=2e-14)
+
 
 
 # ---------------------------------------------------------------------------
@@ -238,17 +292,16 @@ def parse_fortran_output(lines: list[str]) -> tuple[np.ndarray, np.ndarray]:
 
 def test_python_matches_fortran(tmp_path):
     """
-    Run Fortran and Python on the same 5-year synthetic SST series and
-    compare column by column.
+    Run Fortran and Python on the same 5-year synthetic SST series.
 
-    Both T and dT/dt must agree within 0.01, which equals the rounding
-    precision of the Fortran F7.2 output format.  Any difference larger
-    than this indicates a real algorithmic discrepancy, not just formatting.
+    Reconstructed T must agree within 0.01, the Fortran F7.2 output precision.
+    dT/dt is diagnostic because Python intentionally corrects the legacy NT
+    denominator to NM1; its correctness is covered by the analytical test.
 
     Skipped when gfortran is not installed or the Fortran source is absent.
     """
-    if not FORTRAN_SRC.exists():
-        pytest.skip(f"Fortran source not found: {FORTRAN_SRC}")
+    if FORTRAN_SRC is None or not FORTRAN_SRC.exists():
+        pytest.skip("set EL_NINO_FORTRAN_SRC to enable compiler comparison")
 
     exe = tmp_path / "fortran_filter"
     if not compile_fortran(FORTRAN_SRC, exe):
@@ -292,15 +345,12 @@ def test_python_matches_fortran(tmp_path):
         )
 
     max_err_T  = float(err_T.max())
-    max_err_dT = float(err_dT.max())
+    max_err_dT = float(err_dT.max())  # legacy Fortran scale, diagnostic only
     print(f"\nMax |ΔT|  = {max_err_T:.6f}  (tolerance 0.01)")
-    print(f"Max |ΔdT| = {max_err_dT:.6f}  (tolerance 0.01)")
+    print(f"Max |ΔdT| = {max_err_dT:.6f}  (legacy NT denominator diagnostic)")
 
     assert max_err_T  < 0.01, (
         f"T column mismatch: max |ΔT| = {max_err_T:.6f} ≥ 0.01"
-    )
-    assert max_err_dT < 0.01, (
-        f"dT column mismatch: max |ΔdT| = {max_err_dT:.6f} ≥ 0.01"
     )
 
 
@@ -317,8 +367,8 @@ def test_filter_preserves_low_frequency():
     so passa_baixa's detrending step leaves it untouched — giving a clean
     single-mode input with no spectral leakage.
 
-    Pass band: IW=7  → period = NM1/7 ≈ 17 months  → ratio must be > 0.9
-    Stop band: IW=40 → period = NM1/40 ≈ 3 months   → ratio must be < 0.1
+    Pass band: IW=7  → full period = 2×NM1/7 = 34 months → ratio > 0.9
+    Stop band: IW=40 → full period = 2×NM1/40 ≈ 6 months → ratio < 0.1
     """
     NT  = 120
     NM1 = NT - 1
@@ -326,23 +376,23 @@ def test_filter_preserves_low_frequency():
     t   = np.arange(NT, dtype=float)
 
     # ── Slow mode (passband) ─────────────────────────────────────────────
-    IW_SLOW = 7                          # period ≈ 17 months
+    IW_SLOW = 7                          # full period = 34 months
     y_slow  = A * np.sin(IW_SLOW * t * np.pi / NM1)
     stb     = passa_baixa(10.0, 9.0, y_slow)
     ratio   = np.sqrt(np.mean(stb ** 2)) / np.sqrt(np.mean(y_slow ** 2))
-    print(f"\n  17-month amplitude ratio = {ratio:.6f}  (threshold > 0.90)")
+    print(f"\n  34-month amplitude ratio = {ratio:.6f}  (threshold > 0.90)")
     assert ratio > 0.9, (
-        f"17-month mode suppressed (ratio={ratio:.4f}, expected > 0.9)"
+        f"34-month mode suppressed (ratio={ratio:.4f}, expected > 0.9)"
     )
 
     # ── Fast mode (stopband) ─────────────────────────────────────────────
-    IW_FAST = 40                         # period ≈ 3 months
+    IW_FAST = 40                         # full period ≈ 6 months
     y_fast  = A * np.sin(IW_FAST * t * np.pi / NM1)
     stb     = passa_baixa(10.0, 9.0, y_fast)
     ratio   = np.sqrt(np.mean(stb ** 2)) / np.sqrt(np.mean(y_fast ** 2))
-    print(f"  3-month  amplitude ratio = {ratio:.6f}  (threshold < 0.10)")
+    print(f"  6-month amplitude ratio = {ratio:.6f}  (threshold < 0.10)")
     assert ratio < 0.1, (
-        f"3-month mode leaked (ratio={ratio:.6f}, expected < 0.1)"
+        f"6-month mode leaked (ratio={ratio:.6f}, expected < 0.1)"
     )
 
 
@@ -363,17 +413,16 @@ def test_deri_fourier_derivative_accuracy():
 
     so deri_fourier produces on the fine grid (s = 0..NTDM1):
 
-        VST(s) = A · (IW₀·π/NT) · cos(IW₀·s·π/NTDM1)
+        VST(s) = A · (IW₀·π/NM1) · cos(IW₀·s·π/NTDM1)
 
     The analytical derivative of y w.r.t. the original monthly index t,
     evaluated at t = s·(NM1/NTDM1) = s/NDOTS (since NTDM1 = NM1·NDOTS):
 
         dT/dt(s) = A · (IW₀·π/NM1) · cos(IW₀·s·π/NTDM1)
 
-    The ratio VST/dT/dt = NM1/NT = (NT−1)/NT ≈ 0.9917 for NT=120, giving
-    a systematic discrepancy of 0.83 % — faithful to the Fortran (which
-    also uses NT, not NM1, in the denominator).  The test checks that this
-    residual stays below the 1 % threshold.
+    The corrected Python routine uses the true NM1-month span and therefore
+    matches the analytical derivative to floating-point precision. The legacy
+    Fortran's NT denominator underestimated this derivative.
 
     For this exact mode, FIRST = STA[0] = 0 and HLAST = STA[NT−1] = 0
     (integer IW₀ → zero endpoints), so the trend-restoration term
@@ -405,8 +454,7 @@ def test_deri_fourier_derivative_accuracy():
     amp      = float(np.abs(analytical[interior]).max())
     rel_err  = float(err.max()) / amp
 
-    print(f"\n  Max relative derivative error = {rel_err:.4%}  (threshold 1.00%)")
-    assert rel_err < 0.01, (
-        f"Derivative error {rel_err:.4%} exceeds 1 % "
-        f"(expected ≈ 0.83 % from the NT vs NM1 factor in the denominator)"
+    print(f"\n  Max relative derivative error = {rel_err:.3e}")
+    assert rel_err < 1e-10, (
+        f"Derivative error {rel_err:.3e} exceeds numerical tolerance"
     )

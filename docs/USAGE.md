@@ -152,14 +152,14 @@ four interpolated sub-points between consecutive monthly observations. For a
 
 ### What HN1 and HN2 mean physically
 
-- **HN1 = 10.0 months**: the low-frequency (long-period) edge of the transition
-  band. Signals with period > 10 months pass with gain ≈ 1. This retains ENSO
-  variability (2–7 year periods) and the annual cycle (12 months).
-- **HN2 = 9.0 months**: the high-frequency (short-period) edge. Signals with
-  period < 9 months are suppressed. Weather noise, the semi-annual harmonic,
-  and intra-seasonal variability are removed.
-- The **transition band** is narrow (9–10 months) and smooth. Any signal near
-  9.5 months receives approximately half gain.
+- **HN1 = 10.0 months** is a half-period parameter corresponding to a
+  20-month full-period pass edge. Longer full periods pass with gain ≈ 1.
+- **HN2 = 9.0 months** is a half-period parameter corresponding to an
+  18-month full-period stop edge. Shorter full periods are suppressed.
+- The **full-period transition band** is 18–20 months and smooth. A signal
+  near a 19-month full period receives approximately half gain. The factor
+  of two comes from the half-range sine basis `sin(IW·t·π/NM1)`.
+
 
 ### What `deri_fourier` produces
 
@@ -215,8 +215,8 @@ from el_nino.pipeline import run_sst
 result = run_sst(
     local_file="data/input/sst1950_1981.txt",
     ano_inicio=1975,      # first year to use from the local file
-    HN1=10.0,             # low-pass filter long-period edge (months)
-    HN2=9.0,              # low-pass filter short-period edge (months)
+    HN1=10.0,             # half-period parameter → 20-month pass edge
+    HN2=9.0,              # half-period parameter → 18-month stop edge
     NDOTS=5,              # interpolation sub-points per month
     output_file="data/output/sst_filtered.dat",
 )
@@ -385,8 +385,8 @@ The full pipeline reads all parameters from `config.yaml`:
 
 ```yaml
 filter:
-  HN1: 10.0   # low cutoff period (months) — long periods pass through
-  HN2: 9.0    # high cutoff period (months) — short periods are removed
+  HN1: 10.0   # half-period parameter → 20-month full-period pass edge
+  HN2: 9.0    # half-period parameter → 18-month full-period stop edge
   NDOTS: 5    # interpolation sub-points per monthly interval
 
 sst:
@@ -428,14 +428,15 @@ Edit `HN1` and `HN2` in config.yaml. To investigate ENSO on longer timescales:
 
 ```yaml
 filter:
-  HN1: 18.0   # pass periods longer than 18 months
-  HN2: 15.0   # suppress periods shorter than 15 months
+  HN1: 18.0   # pass full periods longer than 36 months
+  HN2: 15.0   # suppress full periods shorter than 30 months
   NDOTS: 5
 ```
 
 Re-run `run_all` and the output filenames will include the new cutoffs. Note
-that decreasing HN1 below 12 months will start to suppress the annual cycle,
-which is normally kept in the passband.
+that filtering is applied to deseasonalized anomalies. The monthly climatology
+is re-added afterwards, so changing these parameters does not attenuate the
+seasonal cycle in the displayed absolute series.
 
 ### How to change the start year
 
@@ -564,16 +565,17 @@ source venv/bin/activate
 python -m pytest tests/test_filter_vs_fortran.py -v -s
 ```
 
-**What the three tests check:**
+**What the numerical tests check:**
 
 | Test | What it verifies | Pass condition |
 |------|-----------------|----------------|
-| `test_python_matches_fortran` | End-to-end: compile Fortran, run both programs on identical 5-year synthetic input, compare output column by column | max\|ΔT\| < 0.01°C, max\|ΔdT\| < 0.01°C/month |
-| `test_filter_preserves_low_frequency` | 17-month mode (passband) amplitude ratio and 3-month mode (stopband) ratio | ratio > 0.9 and ratio < 0.1 respectively |
-| `test_deri_fourier_derivative_accuracy` | VST from `deri_fourier` matches the analytical derivative of an exact Fourier mode at interior grid points | relative error < 1% |
+| `test_vectorized_filter_matches_literal_fortran_loops` | Always-running comparison against a literal loop oracle | floating-point agreement |
+| `test_python_matches_fortran` | Optional compiled Fortran comparison of reconstructed values | max\|ΔT\| < 0.01°C |
+| `test_filter_preserves_low_frequency` | 34-month passband and 6-month stopband modes | ratio > 0.9 and ratio < 0.1 |
+| `test_deri_fourier_derivative_accuracy` | Corrected derivative versus an exact Fourier mode | relative error < 1e-10 |
 
-The Fortran test is automatically skipped if gfortran is not installed. Install
-it with `brew install gcc` (macOS) or `apt install gfortran` (Ubuntu/Debian).
+The compiler comparison is enabled by setting `EL_NINO_FORTRAN_SRC` to the
+reference source path and is skipped if gfortran is unavailable.
 
 **What the 0.005°C tolerance means:**
 The Fortran output is written in F7.2 format (2 decimal places), which rounds
@@ -599,8 +601,8 @@ rounding it before writing.
 | `AST` | Second derivative d²T/dt² (not written to output) | °C/month² | `deri_fourier` |
 | `SIGMA30` | RMS(SST3 − SST0): filter residual | °C or mm | `compute_sigma` |
 | `SIGMA04` | RMS(SST0 − SST4[::NDOTS]): interpolation residual at monthly pts | °C or mm | `compute_sigma` |
-| `HN1` | Low-pass filter long-period edge | months | `config.yaml` |
-| `HN2` | Low-pass filter short-period edge | months | `config.yaml` |
+| `HN1` | Long-period half-period parameter | months | `config.yaml` |
+| `HN2` | Short-period half-period parameter | months | `config.yaml` |
 | `NDOTS` | Sub-divisions per monthly interval | — | `config.yaml` |
 | `NT` | Number of monthly input points | — | computed from data length |
 | `NM1` | NT − 1 (number of intervals) | — | `filter.py` |

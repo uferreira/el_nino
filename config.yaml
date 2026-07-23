@@ -1,7 +1,7 @@
 # Filter parameters (same as Fortran)
 filter:
-  HN1: 10.0   # low cutoff period (months)
-  HN2: 9.0    # high cutoff period (months)
+  HN1: 10.0   # half-period parameter: 20-month full-period pass edge
+  HN2: 9.0    # half-period parameter: 18-month full-period stop edge
   NDOTS: 5    # interpolation points per month
 
 # SST data source

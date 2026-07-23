@@ -4,7 +4,7 @@ This package reconstructs the low-dimensional attractor of the El Niño–Southe
 Oscillation (ENSO) from two complementary ocean observables: sea surface
 temperature (SST) in the NINO1+2 region and tide-gauge sea level at five
 Pacific stations. A Fourier low-pass filter isolates variability on interannual
-timescales (periods longer than ~9 months), and the filtered signal is
+timescales (full periods longer than roughly 18–20 months), and the signal is
 interpolated onto a fine grid so that the derivative dT/dt can be computed
 analytically. The resulting phase-space trajectory (T vs dT/dt) traces the
 ENSO attractor — the recurring loop that the coupled ocean–atmosphere system
@@ -47,19 +47,20 @@ wind-driven ocean circulation — making it a sensitive, physics-rich ENSO proxy
   level responds in the opposite sense to the eastern Pacific — it falls during
   El Niño as surface warm water sloshes eastward and rises during La Niña.
 - **Talara, Peru (UHSLC 092):** Eastern Pacific coastal record north of
-  Callao. UHSLC currently provides observations only through August 2025, so
-  the website marks this station as stale rather than implying it is current.
+  Callao. Sparse observations extend into August 2025, but July and August do
+  not pass the 50% monthly coverage check. The usable monthly product ends in
+  June 2025 and is marked stale.
 - **La Libertad, Ecuador (UHSLC 091):** Eastern equatorial Pacific station with
   a long record that complements Callao and captures coastal ENSO sea-level
   variability close to the equator.
 
 **The Fourier low-pass filter**
-The filter (`passa_baixa`) removes all variability with periods shorter than
-approximately 9 months. Intra-seasonal noise (weather, tides, the Madden–Julian
-Oscillation) is discarded; the ENSO signal (2–7 year periods) passes through
-unchanged. The transition band between 9 and 10 months uses a sigmoid window to
-avoid Gibbs ringing. The filtered series is then interpolated to 5 sub-points
-per month (`deri_fourier`) so the phase-space trajectory is smooth enough to
+The filter (`passa_baixa`) suppresses full periods shorter than approximately
+18 months. Its HN1=10 and HN2=9 parameters are half-periods because the method
+uses a half-range sine expansion; the full-period transition is 18–20 months.
+Intra-seasonal variability is discarded while the ENSO band passes through.
+The sigmoid transition avoids Gibbs ringing. The series is then interpolated
+to 5 sub-points per month (`deri_fourier`) so the phase-space trajectory is
 reveal the attractor structure.
 
 **The phase diagram T vs dT/dt**
@@ -72,11 +73,11 @@ dynamics. El Niño events appear as large excursions into the upper-right quadra
 (T high and rising); La Niña events appear in the lower-left.
 
 **Seasonal cycle removal**
-The annual cycle (12-month period) lies inside the filter passband (12 > HN1 =
-10 months). To prevent the dominant seasonal harmonic from contaminating the ENSO
-modes, the climatological monthly mean is subtracted before filtering and
-re-added afterwards. This ensures the filter operates cleanly on anomalies while
-the output retains absolute physical units.
+The annual cycle is below the 18–20-month full-period transition and would be
+attenuated by the low-pass filter. The climatological monthly mean is therefore
+subtracted before filtering and re-added afterwards. The filter acts only on
+interannual anomalies while the output retains the observed seasonal shape and
+absolute physical units.
 
 ---
 
@@ -86,10 +87,20 @@ the output retains absolute physical units.
 |---------|--------|-----------------|--------|---------------------|
 | NINO1+2 SST | [NOAA CPC](https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices) | 0–10°S, 90–80°W | 1950–present | Monthly |
 | Callao sea level | [UHSLC station 093](https://uhslc.soest.hawaii.edu) | Callao, Peru | 1970–present | Hourly → monthly |
-| Talara sea level | [UHSLC station 092](https://uhslc.soest.hawaii.edu) | Talara, Peru | 1970–Aug 2025 | Hourly → monthly |
+| Talara sea level | [UHSLC station 092](https://uhslc.soest.hawaii.edu) | Talara, Peru | 1970–Jun 2025 usable | Hourly → monthly |
 | La Libertad sea level | [UHSLC station 091](https://uhslc.soest.hawaii.edu) | La Libertad, Ecuador | 1949–present | Hourly → monthly |
 | Honolulu sea level | [UHSLC station 057](https://uhslc.soest.hawaii.edu) | Honolulu, Hawaii | 1905–present | Hourly → monthly |
 | Palau sea level | [UHSLC station 007](https://uhslc.soest.hawaii.edu) | Malakal, Palau | 1969–present | Hourly → monthly |
+
+### Sea-level monthly quality control
+
+Historical SSH months require at least 50% of their possible hourly values. The
+current UTC month may be included as preliminary after seven valid days. The
+pipeline keeps a complete monthly calendar: internal missing or rejected months
+are reconstructed by interpolating anomalies about the station's monthly
+climatology, while leading and trailing gaps are never extrapolated. Combined
+input files mark reconstructed rows with `gap_filled=1`; long gaps are also
+reported visibly on the website.
 
 The NOAA SST record before 1982 is supplemented by a local historical file
 (`data/input/sst1950_1981.txt`) in the same 10-column format. The two segments
@@ -123,15 +134,16 @@ Parameters in `config.yaml`:
 
 ```yaml
 filter:
-  HN1: 10.0   # pass edge (months) — periods longer than this pass through
-  HN2: 9.0    # stop edge (months) — periods shorter than this are suppressed
+  HN1: 10.0   # half-period parameter → 20-month full-period pass edge
+  HN2: 9.0    # half-period parameter → 18-month full-period stop edge
   NDOTS: 5    # sub-points per monthly interval for interpolation
 ```
 
 **Why Fourier instead of Butterworth?**
-The Fourier approach is a faithful translation of the reference Fortran 77 code
-and produces exactly the same output — verified to within 0.005°C. It also
-introduces zero phase distortion: each spectral mode is independently scaled,
+The Fourier reconstruction follows the reference Fortran 77 code and matches
+its reconstructed values within the 0.01 output precision. The derivative uses
+the corrected monthly scale described below. The method introduces zero phase
+distortion: each spectral mode is independently scaled,
 so the reconstructed trajectory preserves the timing of ENSO events exactly.
 
 **`deri_fourier` — interpolation and derivative**
@@ -143,15 +155,13 @@ For NDOTS = 5 and a 600-month record, NTD = 2996 points (spacing ≈ 6 days).
 
 ## Validation
 
-The Python implementation is a direct translation of the Fortran 77 reference
-program `filterfouriergr197501_202502.f`. Numerical equivalence is verified by
-`tests/test_filter_vs_fortran.py`, which compiles the Fortran with gfortran,
-runs both programs on identical 5-year synthetic input, and compares output
-column by column. Maximum difference in the T column: **0.005°C**; maximum
-difference in the dT/dt column: **0.005°C/month** — both within the rounding
-precision of the Fortran F7.2 output format. The 17-month passband mode
-survives with amplitude ratio 0.9998; the 3-month stopband mode is suppressed
-to amplitude ratio < 10⁻⁶.
+The Python implementation follows the Fortran 77 reference program
+`filterfouriergr197501_202502.f`. An always-running literal loop oracle checks
+the vectorized filter; an optional gfortran test compares reconstructed values.
+The derivative is checked against an exact analytical sine mode because Python
+corrects the Fortran's `NT` denominator to the true `NT−1` monthly span. The
+34-month passband mode survives with amplitude ratio 0.9998; the 6-month
+stopband mode is suppressed to amplitude ratio < 10⁻⁶.
 
 ---
 

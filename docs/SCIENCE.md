@@ -150,10 +150,13 @@ FACTOR(IW) = 1 / (1 + exp((IW − W₀) / DW₂))
 ```
 
 With HN1 = 10, HN2 = 9, and NM1 = 599 (600-month record):
-- W₁ = 59.9  (modes below this are in the passband)
-- W₂ = 66.6  (modes above this are in the stopband)
+- W₁ = 59.9  (20-month full-period pass edge)
+- W₂ = 66.6  (18-month full-period stop edge)
 - W₀ = 63.2  (centre, FACTOR = 0.5)
 - DW₂ = 3.35 (transition half-width in mode-number units)
+
+Thus HN1 and HN2 are **half-period parameters**, not full-period cutoffs. The
+factor of two follows directly from the half-range sine basis described above.
 
 The sigmoid suppresses Gibbs ringing by ensuring FACTOR is infinitely
 differentiable — there is no discontinuity in the gain function or any of its
@@ -213,29 +216,24 @@ This maps s ∈ [0, NTDM1] to the same half-period argument range as the
 original [0, NM1] mapping. The endpoints match: at s = 0 → argument = 0; at
 s = NTDM1 → argument = IW × π.
 
-The first derivative formula:
+Writing the monthly coordinate as t = s/NDOTS, the first derivative is:
 
 ```
-d/ds [FOURIER[IW] × sin(IW × s × π / NTDM1)] = FOURIER[IW] × (IW × π / NTDM1) × cos(...)
+d/dt [FOURIER[IW] × sin(IW × t × π / NM1)] = FOURIER[IW] × (IW × π / NM1) × cos(...)
 ```
 
-However, the Fortran (and the Python translation) uses NT rather than NTDM1
-in the denominator:
+The Python implementation therefore uses:
 
 ```
-VST[s] = Σ_IW FOURIER[IW] × (IW × π / NT) × cos(IW × s × π / NTDM1)
+VST[s] = Σ_IW FOURIER[IW] × (IW × π / NM1) × cos(IW × s × π / NTDM1)
 ```
 
-### Why VST uses NT not NM1 in the denominator
+### Correction to the legacy Fortran derivative scale
 
-The derivative coefficient `IW × π / NT` rather than `IW × π / NM1` introduces
-a small systematic scale factor of NM1/NT = (NT−1)/NT ≈ 0.9917 for NT = 120,
-or 0.9983 for NT = 600. This is faithfully reproduced from the Fortran.
-The physical interpretation is that the denominator sets the time unit:
-using NT gives dT/dt in units of *observable per original time step (1 month)*,
-consistent across records of different length. The 0.83% systematic discrepancy
-from the exact analytical derivative is verified by `test_deri_fourier_derivative_accuracy`
-and confirmed to remain below 1%.
+The Fortran uses `IW × π / NT`, which underestimates the spectral part of the
+first derivative by NM1/NT and the second derivative by (NM1/NT)². Python uses
+the true NM1-month span. Exact sine-basis regression tests verify both
+derivatives to floating-point precision.
 
 ---
 

@@ -289,10 +289,18 @@ def _stale_notes(state: dict) -> list[str]:
             if month:
                 notes.append(
                     f"{name} sea level data as of {month} "
-                    "(no recent UHSLC observations)"
+                    "(no later month passes coverage checks)"
                 )
             else:
-                notes.append(f"{name} sea level data (no recent UHSLC observations)")
+                notes.append(f"{name} sea level data (no recent month passes coverage checks)")
+        filled = int(entry.get("interpolated_months", 0) or 0)
+        longest = int(entry.get("longest_gap_months", 0) or 0)
+        if filled and longest >= 6:
+            notes.append(
+                f"{name} sea level includes {filled} reconstructed missing months "
+                f"(longest gap: {longest} months)"
+            )
+
     return notes
 
 
@@ -502,6 +510,10 @@ def main() -> None:
                     "as_of": f"{yr1}-{m1:02d}",
                     "ok": True,
                     "stale": lag_months > STALE_AFTER_MONTHS,
+                    "interpolated_months": result.get("interpolated_months", 0),
+                    "low_coverage_months": result.get("low_coverage_months", 0),
+                    "longest_gap_months": result.get("longest_gap_months", 0),
+                    "preliminary_month": result.get("preliminary_month", False),
                 }
                 if key == "callao":
                     cal_data  = loaded_data[js_var]
@@ -528,6 +540,10 @@ def main() -> None:
                     "as_of": prev.get("as_of"),
                     "ok": False,
                     "stale": True,
+                    "interpolated_months": prev.get("interpolated_months", 0),
+                    "low_coverage_months": prev.get("low_coverage_months", 0),
+                    "longest_gap_months": prev.get("longest_gap_months", 0),
+                    "preliminary_month": prev.get("preliminary_month", False),
                 }
                 continue
 

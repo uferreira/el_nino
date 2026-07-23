@@ -60,6 +60,12 @@ def _align_fourier_window(
         raise ValueError("at least two monthly observations are required")
     if np.any((MES < 1) | (MES > 12)):
         raise ValueError("MES values must be calendar months in 1..12")
+    serial_month = IYR.astype(np.int64) * 12 + MES.astype(np.int64)
+    if np.any(np.diff(serial_month) != 1):
+        raise ValueError(
+            "IYR and MES must form a continuous monthly calendar; "
+            "missing months must be reconstructed before Fourier analysis"
+        )
 
     terminal_month = int(MES[-1])
     start = int(np.flatnonzero(MES == terminal_month)[0])
@@ -80,6 +86,21 @@ def _compute_climatology(MES: np.ndarray, data: np.ndarray) -> np.ndarray:
     clim : float64 array of shape (12,), indexed 0..11
         clim[0] = mean over all January values, clim[1] = February, …
     """
+    MES = np.asarray(MES)
+    data = np.asarray(data, dtype=np.float64)
+    if MES.ndim != 1 or data.ndim != 1 or len(MES) != len(data):
+        raise ValueError("MES and data must be one-dimensional arrays of equal length")
+    if not np.isfinite(data).all():
+        raise ValueError("climatology data must contain only finite values")
+    if np.any((MES < 1) | (MES > 12)):
+        raise ValueError("MES values must be calendar months in 1..12")
+    present = set(np.unique(MES).tolist())
+    missing = sorted(set(range(1, 13)) - present)
+    if missing:
+        raise ValueError(
+            f"climatology requires all 12 calendar months; missing {missing}"
+        )
+
     # Vectorised groupby-mean is more readable and faster than a loop,
     # and avoids a dependency on pandas here in the filter layer.
     return np.array([data[MES == m].mean() for m in range(1, 13)])
@@ -111,8 +132,8 @@ def _run_pipeline_steps(
     ----------
     raw   : float64 array (NT,) — raw monthly observations
     MES   : int32 array (NT,)   — month indices 1..12
-    HN1   : float — low-frequency filter cutoff (months)
-    HN2   : float — high-frequency filter cutoff (months)
+    HN1   : float — long-period half-period parameter (months)
+    HN2   : float — short-period half-period parameter (months)
     NDOTS : int   — sub-divisions per monthly interval
 
     Returns
@@ -131,14 +152,15 @@ def _run_pipeline_steps(
     clim_monthly = clim[MES - 1]
 
     # Remove the seasonal cycle so the filter operates on anomalies.
-    # Reason: the 12-month harmonic, if left in, would dominate the Fourier
-    # spectrum and cause spectral leakage from the seasonal band into the
-    # ENSO band even though 12 months lies within the passband (> HN1=10).
-    # Removing the sample mean per month also correctly handles non-sinusoidal
+    # Reason: HN1/HN2 are half-period parameters, so the full-period
+    # transition is 18–20 months and would attenuate the 12-month harmonic.
+    # Removing and then re-adding climatology preserves the observed seasonal
+    # shape exactly while the filter acts only on interannual anomalies.
+    # A monthly climatology also handles non-sinusoidal
     # seasonal shapes (e.g. asymmetric warming/cooling cycles).
     anomaly = raw - clim_monthly
 
-    # Low-pass filter on the anomaly (removes variability faster than ~HN2).
+    # Low-pass filter on the anomaly (suppresses full periods below ~2×HN2).
     filtered_anomaly = passa_baixa(HN1, HN2, anomaly)
 
     # Re-add the seasonal cycle so the output represents absolute values.
@@ -243,10 +265,10 @@ def run_sst(
     before filtering and re-adds it afterwards.  The reason is that the
     Fourier filter operates most cleanly on anomalies:
 
-    * Even though the 12-month annual harmonic is in the passband
-      (12 months > HN1 = 10 months), leaving it in creates a dominant
-      spectral peak that can leak into adjacent low-frequency modes via
-      the finite-sample Fourier expansion.
+    * HN1 and HN2 are half-period parameters, so values 10 and 9 define
+      full-period edges of 20 and 18 months. The 12-month annual harmonic
+      would therefore be attenuated if it were filtered together with the
+      interannual anomaly.
     * The climatological subtraction also handles non-sinusoidal seasonal
       patterns (the tropical SST cycle is not a pure sine) without
       assumptions about its shape.
@@ -258,8 +280,8 @@ def run_sst(
     ----------
     local_file  : str   — path to local historical SST file (1950–1981)
     ano_inicio  : int   — first year to use from the local file
-    HN1         : float — long-period edge of the filter transition band (months)
-    HN2         : float — short-period edge of the filter transition band (months)
+    HN1         : float — long-period half-period parameter (months)
+    HN2         : float — short-period half-period parameter (months)
     NDOTS       : int   — interpolation sub-points per monthly interval
     output_file : str   — path for the output .dat file
 
@@ -331,7 +353,7 @@ def run_sst_index(
     index_key   : str  — one of "nino12", "nino3", "nino4", "nino34"
     local_file  : str  — path to local historical SST file
     ano_inicio  : int  — first year to use
-    HN1, HN2    : float — filter band edges (months)
+    HN1, HN2    : float — filter half-period parameters (months)
     NDOTS       : int  — interpolation sub-points per monthly interval
     output_file : str  — path for the output .dat file
 
@@ -409,8 +431,8 @@ def run_sea_level(
     station_id   : str   — UHSLC 3-digit station ID (e.g. "093")
     station_name : str   — human-readable station name (e.g. "Callao")
     start_date   : str   — ISO 8601 date string for start of download window
-    HN1          : float — long-period filter edge (months)
-    HN2          : float — short-period filter edge (months)
+    HN1          : float — long-period half-period parameter (months)
+    HN2          : float — short-period half-period parameter (months)
     NDOTS        : int   — interpolation sub-points per monthly interval
     output_file  : str   — path for the output .dat file
 
@@ -463,6 +485,10 @@ def run_sea_level(
         "sigma30":     sigma30,
         "sigma04":     sigma04,
         "output_file": output_file,
+        "interpolated_months": raw_data.get("interpolated_months", 0),
+        "low_coverage_months": raw_data.get("low_coverage_months", 0),
+        "longest_gap_months": raw_data.get("longest_gap_months", 0),
+        "preliminary_month": raw_data.get("preliminary_month", False),
     }
 
 
@@ -588,8 +614,8 @@ def accel_from_raw(
     ----------
     raw   : float64 array (NT,)  — raw monthly observations
     MES   : int32 array (NT,)    — month indices 1..12
-    HN1   : float — long-period filter edge (months)
-    HN2   : float — short-period filter edge (months)
+    HN1   : float — long-period half-period parameter (months)
+    HN2   : float — short-period half-period parameter (months)
     NDOTS : int   — sub-divisions per monthly interval
 
     Returns
@@ -643,8 +669,8 @@ def load_with_accel(
     output_file : str — path to a .dat file from run_sst or run_sea_level
     raw  : float64 array (NT,) or None — raw monthly observations
     MES  : int32 array (NT,) or None   — month indices 1..12
-    HN1  : float — long-period filter cutoff (months); used only with raw
-    HN2  : float — short-period filter cutoff (months); used only with raw
+    HN1  : float — long-period half-period parameter; used only with raw
+    HN2  : float — short-period half-period parameter; used only with raw
     NDOTS: int   — sub-divisions per month; used only with raw
 
     Returns
@@ -738,7 +764,7 @@ def _self_test() -> None:
 
     Signal: SST(t) = 25 + 2·sin(2π t/12) + 0.5·sin(2π t/36)
         seasonal component (12-month):   removed by climatology subtraction
-        ENSO-like component (36-month):  passes the filter (36 > HN1=10)
+        ENSO-like component (36-month): passes (36 > 2×HN1=20)
 
     Because the seasonal and ENSO components are both either perfectly
     captured by the climatology or in the passband, sigma30 arises only

@@ -52,6 +52,24 @@ def test_compare_history_has_readable_contrast():
     assert float(history.group(2)) >= 2.0
 
 
+def test_phase_diagrams_use_a_fixed_twelve_month_recent_window():
+    """Every observed phase diagram must distinguish the rolling last year."""
+    phase_html = PHASE_PAGE.read_text(encoding="utf-8")
+    compare_html = COMPARE_PAGE.read_text(encoding="utf-8")
+
+    assert "const RECENT_WINDOW_MONTHS=12;" in phase_html
+    assert "function recentWindowStartYM(currentYM)" in phase_html
+    assert "tail[0].ym < firstRecentYM" in phase_html
+    assert "point.irest === 0" in phase_html
+    assert "CURRENT_POINT_RADIUS" in phase_html
+    assert "const CMP_RECENT_WINDOW_MONTHS = 12;" in compare_html
+    assert "function cmpRecentWindowStartYM(currentYM)" in compare_html
+    assert "tail[0].ym < firstRecentYM" in compare_html
+    assert "point.irest === 0" in compare_html
+    assert "CMP_CURRENT_POINT_RADIUS" in compare_html
+    assert 'id="cmp-sl-tail"' not in compare_html
+
+
 def test_update_script_covers_current_data_pages():
     uw = _load_update_website()
     names = {path.name for path in uw.HTML_FILES}
@@ -78,7 +96,7 @@ def test_successful_but_old_station_data_is_reported():
 
     assert notes == [
         "Talara sea level data as of August 2025 "
-        "(no recent UHSLC observations)"
+        "(no later month passes coverage checks)"
     ]
 
 
@@ -86,3 +104,27 @@ def test_workflow_stages_every_generated_document():
     workflow = UPDATE_WORKFLOW.read_text(encoding="utf-8")
 
     assert re.search(r"git add\s+docs(?:/|\s)", workflow)
+
+
+def test_long_reconstructed_station_gap_is_reported():
+    uw = _load_update_website()
+    state = {
+        "stations": {
+            "talara": {
+                "name": "Talara",
+                "as_of": "2025-08",
+                "ok": True,
+                "stale": True,
+                "interpolated_months": 68,
+                "longest_gap_months": 26,
+            }
+        }
+    }
+
+    notes = uw._stale_notes(state)
+
+    assert any(
+        "68 reconstructed missing months" in note
+        and "longest gap: 26 months" in note
+        for note in notes
+    )

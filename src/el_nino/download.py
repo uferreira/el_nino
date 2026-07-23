@@ -34,6 +34,11 @@ ERDDAP_BASE = (
 
 # UHSLC encodes missing observations as -32767 (short int sentinel, not NaN).
 FILL_VALUE = -32767
+# A historical monthly mean must represent at least half of its hourly slots.
+# The current month is explicitly preliminary and may be used after one week;
+# this keeps the monitoring product timely without admitting one-hour means.
+MIN_HISTORICAL_MONTH_COVERAGE = 0.50
+MIN_PRELIMINARY_MONTH_HOURS = 7 * 24
 
 REQUEST_TIMEOUT = 60   # seconds; ERDDAP for long series can be slow
 
@@ -43,17 +48,12 @@ REQUEST_TIMEOUT = 60   # seconds; ERDDAP for long series can be slow
 # (e.g. HTTP 404) are never retried.
 RETRY_BACKOFFS = (2, 5, 10)   # seconds to wait before attempts 2, 3, 4
 
-# RAPID near-real-time URLs tried in order; {id} tozero-padded station_id.
+# RAPID near-real-time URLs compared by their last valid timestamp.
 # URL 1: FD hourly CSV (same data as ERDDAP FD, different transport).
 # URL 2: Station RAPID stream (StationZero datum, GMT).
-# URL 3: ERDDAP Research Quality Data Set (RQDS) endpoint.
 _RAPID_URL_TEMPLATES = [
     "https://uhslc.soest.hawaii.edu/data/csv/fast/hourly/h{id}.csv",
     "http://uhslc.soest.hawaii.edu/stations/RAPID/{id}_mm_StationZero_GMT.csv",
-    (
-        "https://uhslc.soest.hawaii.edu/erddap/tabledap/global_hourly_rqds.csv"
-        "?sea_level%2Ctime&uhslc_id={id}"
-    ),
 ]
 
 # Column order shared by both the local historical file and the NOAA online file.
@@ -251,10 +251,10 @@ def _load_rapid(station_id: str) -> pd.DataFrame:
     """
     Attempt to download near-real-time sea level from UHSLC RAPID sources.
 
-    Tries each URL in ``_RAPID_URL_TEMPLATES`` in order, stopping at the
-    first that returns usable data.  All failures are silently swallowed so
-    that a RAPID outage never aborts the main pipeline; the caller checks
-    whether the returned DataFrame is empty.
+    Tries every URL and returns the usable candidate with the latest final
+    timestamp. All failures are isolated so that a RAPID outage never aborts
+    the main pipeline; the caller checks whether the returned DataFrame is
+    empty.
 
     Parameters
     ----------
@@ -268,6 +268,9 @@ def _load_rapid(station_id: str) -> pd.DataFrame:
         Empty DataFrame if all URLs fail.
     """
     _empty = pd.DataFrame(columns=["time_utc", "sl_mm"])
+    best = _empty
+    best_text: str | None = None
+    best_url: str | None = None
 
     for template in _RAPID_URL_TEMPLATES:
         url = template.format(id=station_id)
@@ -293,18 +296,24 @@ def _load_rapid(station_id: str) -> pd.DataFrame:
             if df.empty:
                 continue
 
-            _save_raw(f"data/input/rapid_{station_id}_raw.csv", resp.text)
-            print(
-                f"  RAPID: {len(df):,} records  "
-                f"({df['time_utc'].iloc[0]} to{df['time_utc'].iloc[-1]})"
-            )
-            return df
+            if best.empty or df["time_utc"].max() > best["time_utc"].max():
+                best = df
+                best_text = resp.text
+                best_url = url
 
         except Exception:
             continue
 
-    print(f"  RAPID: all URLs failed, using FD only")
-    return _empty
+    if best.empty:
+        print("  RAPID: all URLs failed, using FD only")
+        return _empty
+
+    _save_raw(f"data/input/rapid_{station_id}_raw.csv", best_text or "")
+    print(
+        f"  RAPID: {len(best):,} records from {best_url}  "
+        f"({best['time_utc'].iloc[0]} to{best['time_utc'].iloc[-1]})"
+    )
+    return best
 
 
 def _merge_fd_rapid(
@@ -530,6 +539,107 @@ def load_sst(
     }
 
 
+def _aggregate_monthly_sea_level(
+    observations: pd.DataFrame,
+) -> tuple[pd.DataFrame, dict]:
+    """Create a calendar-complete, coverage-controlled monthly SSH series.
+
+    Fourier modes assume equally spaced samples. Dropping a missing month
+    silently shortens the time axis and changes every subsequent frequency
+    and date. This helper therefore keeps the true monthly calendar, rejects
+    unrepresentative monthly means, and reconstructs internal gaps.
+
+    Historical months require at least 50% of their possible hourly values.
+    The current UTC month is allowed after seven valid days and is labelled
+    preliminary. Leading/trailing gaps are trimmed, never extrapolated.
+    Internal gaps are filled by linearly interpolating anomalies about the
+    observed monthly climatology; direct linear interpolation is used only
+    where a calendar month has no climatology estimate.
+    """
+    required = {"time_utc", "sl_mm"}
+    if not required.issubset(observations.columns):
+        raise ValueError(f"observations must contain columns {sorted(required)}")
+
+    work = observations.loc[:, ["time_utc", "sl_mm"]].copy()
+    work["time_utc"] = pd.to_datetime(work["time_utc"], utc=True, errors="coerce")
+    work["sl_mm"] = pd.to_numeric(work["sl_mm"], errors="coerce")
+    work = (
+        work.dropna()
+        .sort_values("time_utc")
+        .drop_duplicates(subset=["time_utc"], keep="last")
+        .set_index("time_utc")
+    )
+    if work.empty:
+        raise RuntimeError("No valid hourly sea-level observations to aggregate.")
+
+    monthly_mean = work["sl_mm"].resample("MS").mean()
+    monthly_count = work["sl_mm"].resample("MS").count()
+    expected_hours = monthly_mean.index.days_in_month * 24
+    accepted = monthly_count >= expected_hours * MIN_HISTORICAL_MONTH_COVERAGE
+
+    now_month = pd.Period(datetime.now(timezone.utc).strftime("%Y-%m"), freq="M")
+    periods = monthly_mean.index.tz_localize(None).to_period("M")
+    current = periods == now_month
+    preliminary_exemption = current & ~accepted & (
+        monthly_count.to_numpy() >= MIN_PRELIMINARY_MONTH_HOURS
+    )
+    accepted = accepted | preliminary_exemption
+    current_month_included = current & accepted
+
+    observed = monthly_mean.where(accepted)
+    valid_positions = np.flatnonzero(observed.notna().to_numpy())
+    if len(valid_positions) < 2:
+        raise RuntimeError(
+            "Fewer than two monthly sea-level means passed coverage checks."
+        )
+
+    # Do not invent values before the first or after the last accepted month.
+    first, last = int(valid_positions[0]), int(valid_positions[-1])
+    observed = observed.iloc[first:last + 1]
+    monthly_count = monthly_count.iloc[first:last + 1]
+    current_month_included = current_month_included[first:last + 1]
+
+    gap_mask = observed.isna()
+    low_coverage = gap_mask & monthly_count.gt(0)
+
+    # Preserve the seasonal cycle across gaps by interpolating anomalies,
+    # rather than interpolating absolute sea level directly.
+    climatology = observed.groupby(observed.index.month).mean()
+    seasonal = pd.Series(
+        [climatology.get(month, np.nan) for month in observed.index.month],
+        index=observed.index,
+        dtype=float,
+    )
+    anomaly = observed - seasonal
+    filled = seasonal + anomaly.interpolate(method="linear", limit_area="inside")
+    filled = filled.fillna(
+        observed.interpolate(method="linear", limit_area="inside")
+    )
+    if filled.isna().any():
+        raise RuntimeError("Could not reconstruct all internal sea-level gaps.")
+
+    longest_gap = 0
+    run = 0
+    for missing in gap_mask.to_numpy():
+        run = run + 1 if missing else 0
+        longest_gap = max(longest_gap, run)
+
+    monthly = pd.DataFrame({
+        "time_utc": filled.index,
+        "sl_mm": filled.to_numpy(dtype=np.float64),
+        "gap_filled": gap_mask.to_numpy(dtype=bool),
+    })
+    monthly["YR"] = monthly["time_utc"].dt.year.astype(np.int32)
+    monthly["MON"] = monthly["time_utc"].dt.month.astype(np.int32)
+    quality = {
+        "interpolated_months": int(gap_mask.sum()),
+        "low_coverage_months": int(low_coverage.sum()),
+        "longest_gap_months": int(longest_gap),
+        "preliminary_month": bool(np.asarray(current_month_included).any()),
+    }
+    return monthly, quality
+
+
 def _load_sea_level_erddap(
     station_id: str,
     station_name: str,
@@ -589,30 +699,30 @@ def _load_sea_level_erddap(
             df = _merge_fd_rapid(df, rapid_tail)
             print(f"  Extended record with RAPID: {n_ext:,} additional hours")
 
-    df = df.set_index("time_utc")
-    monthly = (
-        df["sl_mm"]
-          .resample("MS")
-          .mean()
-          .dropna()
-          .reset_index()
-    )
-    monthly["YR"]  = monthly["time_utc"].dt.year.astype(np.int32)
-    monthly["MON"] = monthly["time_utc"].dt.month.astype(np.int32)
+    monthly, quality = _aggregate_monthly_sea_level(df)
 
     print(
         f"  {station_name}: {len(monthly)} monthly means  "
         f"({monthly['YR'].iloc[0]}/{monthly['MON'].iloc[0]:02d} to"
         f"{monthly['YR'].iloc[-1]}/{monthly['MON'].iloc[-1]:02d})"
     )
+    if quality["interpolated_months"]:
+        print(
+            f"  {station_name}: reconstructed "
+            f"{quality['interpolated_months']} internal missing/sparse months "
+            f"(longest gap {quality['longest_gap_months']} months)"
+        )
 
     _ym = datetime.now(timezone.utc).strftime("%Y-%m")
     _sl_lines = [
         f"# SSH combined monthly means station {station_id} generated {_ym}\n",
-        "year  month  sea_level_mm\n",
+        "year  month  sea_level_mm  gap_filled\n",
     ]
     for _r in monthly.itertuples(index=False):
-        _sl_lines.append(f"{_r.YR:4d}  {_r.MON:5d}  {_r.sl_mm:.2f}\n")
+        _sl_lines.append(
+            f"{_r.YR:4d}  {_r.MON:5d}  {_r.sl_mm:.2f}  "
+            f"{int(_r.gap_filled):10d}\n"
+        )
     _save_raw(
         f"data/input/ssh_combined_{station_id}_{_ym}.txt",
         "".join(_sl_lines),
@@ -622,6 +732,7 @@ def _load_sea_level_erddap(
         "IYR": monthly["YR"].to_numpy(dtype=np.int32),
         "MES": monthly["MON"].to_numpy(dtype=np.int32),
         "SL0": monthly["sl_mm"].to_numpy(dtype=np.float64),
+        **quality,
     }
 
 
@@ -681,14 +792,8 @@ def load_sea_level_rqd(url: str, station_name: str) -> dict:
         {"year": df["year"], "month": df["month"], "day": df["day"], "hour": df["hour"]},
         utc=True, errors="coerce",
     )
-    df = df.dropna(subset=["time_utc"]).set_index("time_utc")
-
-    # 50 % valid-hour threshold per month.
-    monthly_count = df["sl_mm"].resample("MS").count()
-    monthly_mean  = df["sl_mm"].resample("MS").mean()
-    days_in_month = monthly_mean.index.days_in_month
-    monthly_mean  = monthly_mean[monthly_count >= days_in_month * 24 * 0.5]
-    monthly_mean  = monthly_mean.dropna().reset_index()
+    df = df.dropna(subset=["time_utc"])[["time_utc", "sl_mm"]]
+    monthly_mean, quality = _aggregate_monthly_sea_level(df)
 
     if monthly_mean.empty:
         raise RuntimeError(f"RQD data for {station_name}: no months passed 50% valid threshold.")
@@ -705,6 +810,7 @@ def load_sea_level_rqd(url: str, station_name: str) -> dict:
         "IYR": monthly_mean["YR"].to_numpy(dtype=np.int32),
         "MES": monthly_mean["MON"].to_numpy(dtype=np.int32),
         "SL0": monthly_mean["sl_mm"].to_numpy(dtype=np.float64),
+        **quality,
     }
 
 

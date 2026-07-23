@@ -4,9 +4,9 @@ el_nino.plots
 Phase-diagram visualisations: static figures, time-series, and animations.
 
 Each animation frame shows three layers:
-  - Gray line : full trajectory from the start up to the current frame
-  - Red line  : tail of the last ``tail_months * NDOTS`` frames
-  - Blue dot  : current position in phase space
+  - Gray line : historical trajectory before the rolling latest year
+  - Red line  : rolling latest 12 calendar months, with monthly markers
+  - Gold dot  : current position in phase space
 
 The time label in the top-left corner shows "YYYY MM" so the viewer can
 read El Niño events as the trajectory evolves.
@@ -23,11 +23,11 @@ import matplotlib
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.collections import LineCollection
-from matplotlib.colors import LinearSegmentedColormap, Normalize
 
 from el_nino import pipeline
 
+
+RECENT_WINDOW_MONTHS = 12
 
 # ---------------------------------------------------------------------------
 # Private helpers
@@ -46,6 +46,23 @@ def _prepare_xy(data: dict, remove_mean: bool) -> tuple[np.ndarray, np.ndarray]:
         x -= float(np.nanmean(x))
     y = data["dT"].copy()
     return x, y
+
+
+def _recent_window_start_index(
+    year: np.ndarray,
+    month: np.ndarray,
+    window_months: int = RECENT_WINDOW_MONTHS,
+) -> int:
+    """Return the first sample in the rolling calendar-month window."""
+    if window_months < 1:
+        raise ValueError("window_months must be at least 1")
+    if len(year) == 0 or len(year) != len(month):
+        raise ValueError("year and month must be non-empty arrays of equal length")
+    ym = np.asarray(year, dtype=np.int64) * 12 + np.asarray(month, dtype=np.int64)
+    if np.any(np.diff(ym) < 0):
+        raise ValueError("phase-diagram dates must be chronological")
+    first_recent = int(ym[-1]) - (window_months - 1)
+    return int(np.searchsorted(ym, first_recent, side="left"))
 
 
 def _setup_axes(
@@ -82,13 +99,8 @@ def plot_phase_diagram(
     remove_mean: bool = False,
 ) -> matplotlib.figure.Figure:
     """
-    Static phase diagram: full T vs dT/dt trajectory with a blue-to-red
-    color gradient that encodes the direction of time.
-
-    The gradient is implemented via a ``LineCollection`` of N-1 tiny
-    segments, each coloured by its position in the time series.  This
-    avoids multiple overlapping ``ax.plot`` calls and gives a perceptually
-    uniform time-encoding without a separate legend.
+    Static phase diagram with subdued history, the rolling latest 12
+    calendar months in red, monthly markers, and a larger gold endpoint.
 
     Parameters
     ----------
@@ -105,30 +117,55 @@ def plot_phase_diagram(
     matplotlib.figure.Figure
     """
     x, y = _prepare_xy(data, remove_mean)
-    N = len(x)
+    year = np.asarray(data["year"])
+    month = np.asarray(data["month"])
+    irest = np.asarray(data["irest"])
+    recent_start = _recent_window_start_index(year, month)
 
     fig, ax = plt.subplots(figsize=(8, 6))
     _setup_axes(ax, title, xlabel, xlim, ylim)
 
-    # Build one segment per pair of consecutive points so each segment
-    # can receive an independent colour from the time-ordered colormap.
-    points   = np.column_stack([x, y]).reshape(-1, 1, 2)
-    segments = np.concatenate([points[:-1], points[1:]], axis=1)
-
-    # Blue (t=0) → red (t=N-2): LinearSegmentedColormap gives a smooth
-    # two-colour ramp without the perceptual discontinuities of 'jet'.
-    cmap = LinearSegmentedColormap.from_list("blue_red", ["blue", "red"])
-    lc   = LineCollection(
-        segments,
-        cmap=cmap,
-        norm=Normalize(0, N - 2),
-        linewidth=1.5,
-        alpha=0.9,
+    if recent_start > 0:
+        ax.plot(
+            x[: recent_start + 1],
+            y[: recent_start + 1],
+            color="#777777",
+            linewidth=1.2,
+            alpha=0.75,
+            label="Historical",
+        )
+    ax.plot(
+        x[recent_start:],
+        y[recent_start:],
+        color="#dc2626",
+        linewidth=2.2,
+        alpha=0.95,
+        label="Latest 12 months",
     )
-    lc.set_array(np.arange(N - 1, dtype=float))
-    ax.add_collection(lc)
-
-    fig.colorbar(lc, ax=ax, label="Time (earlier → later)")
+    monthly = np.arange(len(x))[(np.arange(len(x)) >= recent_start) & (irest == 0)]
+    ax.scatter(
+        x[monthly],
+        y[monthly],
+        s=20,
+        color="#dc2626",
+        edgecolor="white",
+        linewidth=0.7,
+        zorder=4,
+    )
+    ax.plot(
+        [x[-1]],
+        [y[-1]],
+        marker="o",
+        linestyle="none",
+        markersize=9,
+        markerfacecolor="#ffbf00",
+        markeredgecolor="#7a4f00",
+        markeredgewidth=1.1,
+        color="#ffbf00",
+        label="Current",
+        zorder=5,
+    )
+    ax.legend(loc="best")
     fig.tight_layout()
 
     if save_path is not None:
@@ -158,12 +195,10 @@ def animate_phase_diagram(
     Animated phase diagram: the rotating-attractor animation.
 
     Three overlaid layers update every frame:
-    - Gray line  : full trajectory from frame 0 to current
-    - Red line   : tail of the last ``tail_months * NDOTS`` frames
-    - Blue dot   : current position
-
-    NDOTS is inferred from ``max(data["irest"]) + 1`` so the caller does
-    not need to pass filter parameters explicitly.
+    - Gray line  : historical trajectory before the rolling window
+    - Red line   : rolling latest ``tail_months`` calendar months
+    - Red dots   : monthly samples inside that window
+    - Gold dot   : current position
 
     Parameters
     ----------
@@ -172,8 +207,7 @@ def animate_phase_diagram(
     xlabel      : str — x-axis label
     xlim        : list [xmin, xmax]
     ylim        : list [ymin, ymax]
-    tail_months : int — months of history shown in the red tail; tail
-                  length in frames = tail_months * NDOTS (default 12)
+    tail_months : int — calendar months shown in red (default 12)
     save_path   : str or None — if given, save as .mp4 via ffmpeg
     fps         : int — frames per second (default 15)
     dpi         : int — resolution (default 150)
@@ -184,15 +218,14 @@ def animate_phase_diagram(
     matplotlib.animation.FuncAnimation
     """
     x, y  = _prepare_xy(data, remove_mean)
-    year  = data["year"]
-    month = data["month"]
-    irest = data["irest"]
+    year = np.asarray(data["year"])
+    month = np.asarray(data["month"])
+    irest = np.asarray(data["irest"])
 
-    # Infer NDOTS so the tail length is always correct regardless of the
-    # filter parameters used to produce the file.  irest runs 0..NDOTS-1,
-    # so max(irest)+1 == NDOTS for any NDOTS ≥ 1.
-    NDOTS       = int(irest.max()) + 1
-    tail_frames = tail_months * NDOTS
+    if tail_months < 1:
+        raise ValueError("tail_months must be at least 1")
+    ym = np.asarray(year, dtype=np.int64) * 12 + np.asarray(month, dtype=np.int64)
+    _recent_window_start_index(year, month, tail_months)
 
     sample_path = np.column_stack([x, y])
     N = len(x)
@@ -200,10 +233,17 @@ def animate_phase_diagram(
     fig, ax = plt.subplots(figsize=(8, 6))
     _setup_axes(ax, title, xlabel, xlim, ylim)
 
-    # Three artists declared here so the closure captures them.
-    line_full, = ax.plot([], [], color="gray", linewidth=1.2, alpha=0.8)
-    line_tail, = ax.plot([], [], "r-", linewidth=1.8)
-    dot_curr,  = ax.plot([], [], "bo", markersize=6)
+    # Artists declared here so the closure captures every visual layer.
+    line_full, = ax.plot([], [], color="#777777", linewidth=1.2, alpha=0.75)
+    line_tail, = ax.plot([], [], color="#dc2626", linewidth=2.2, alpha=0.95)
+    dots_monthly, = ax.plot(
+        [], [], "o", markersize=3.5, color="#dc2626",
+        markeredgecolor="white", markeredgewidth=0.6,
+    )
+    dot_curr, = ax.plot(
+        [], [], "o", markersize=9, color="#ffbf00",
+        markeredgecolor="#7a4f00", markeredgewidth=1.1,
+    )
 
     # Time label in axes coordinates so it never clips against data limits.
     time_text = ax.text(
@@ -215,15 +255,17 @@ def animate_phase_diagram(
     def _init():
         line_full.set_data([], [])
         line_tail.set_data([], [])
+        dots_monthly.set_data([], [])
         dot_curr.set_data([], [])
         time_text.set_text("")
-        return line_full, line_tail, dot_curr, time_text
+        return line_full, line_tail, dots_monthly, dot_curr, time_text
 
     def _update(num: int):
-        start = max(num - tail_frames, 0)
+        first_recent_ym = int(ym[num]) - (tail_months - 1)
+        start = int(np.searchsorted(ym[: num + 1], first_recent_ym, side="left"))
 
-        # Gray: grows from frame 0 to current.
-        line_full.set_data(x[: num + 1], y[: num + 1])
+        # History stops where the red rolling-year trajectory begins.
+        line_full.set_data(x[: start + 1], y[: start + 1])
 
         # Red tail: slides a fixed-length window behind the current point.
         line_tail.set_data(
@@ -231,13 +273,16 @@ def animate_phase_diagram(
             sample_path[start : num + 1, 1],
         )
 
-        # Blue dot at current position.
+        monthly = np.arange(start, num + 1)[irest[start : num + 1] == 0]
+        dots_monthly.set_data(x[monthly], y[monthly])
+
+        # Gold dot at current position.
         dot_curr.set_data([x[num]], [y[num]])
 
         # "YYYY MM" label matches the notebook convention.
         time_text.set_text(f"{int(year[num]):04d} {int(month[num]):02d}")
 
-        return line_full, line_tail, dot_curr, time_text
+        return line_full, line_tail, dots_monthly, dot_curr, time_text
 
     ani = animation.FuncAnimation(
         fig,

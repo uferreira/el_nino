@@ -4,8 +4,9 @@ el_nino.filter
 Core mathematical functions: Fourier low-pass filter and Fourier
 interpolation/differentiation.
 
-Direct translation of SUBROUTINE PASSA_BAIXA and SUBROUTINE DERI_FOURIER
-from the reference Fortran 77 implementation:
+Based on SUBROUTINE PASSA_BAIXA and SUBROUTINE DERI_FOURIER from the reference
+Fortran 77 implementation, with the derivative time-scale correction documented
+below:
     filterfouriergr197501_202502.f
 
 Corresponds to the vectorised Python in cell 3 of:
@@ -16,21 +17,41 @@ NOT the loop version in cell 53, which has a known off-by-one bug
 
 import numpy as np
 
+def _validated_series(ST0: np.ndarray) -> np.ndarray:
+    """Return a finite one-dimensional float copy suitable for Fourier work."""
+    series = np.asarray(ST0, dtype=np.float64)
+    if series.ndim != 1:
+        raise ValueError("ST0 must be a one-dimensional series")
+    if series.size < 3:
+        raise ValueError("ST0 must contain at least three observations")
+    if not np.isfinite(series).all():
+        raise ValueError("ST0 must contain only finite values")
+    return series.copy()
+
+
+def _validate_cutoffs(HN1: float, HN2: float) -> None:
+    if not np.isfinite(HN1) or not np.isfinite(HN2):
+        raise ValueError("HN1 and HN2 must be finite")
+    if not HN1 > HN2 > 0:
+        raise ValueError("low-pass cutoffs must satisfy HN1 > HN2 > 0")
+
+
 
 def passa_baixa(HN1: float, HN2: float, ST0: np.ndarray) -> np.ndarray:
     """
     Fourier low-pass filter — direct translation of SUBROUTINE PASSA_BAIXA.
 
     Removes high-frequency variability from a monthly time series while
-    preserving El Niño–related oscillations at periods longer than
-    roughly HN1–HN2 months. The transition from pass to stop is
-    sigmoid-shaped, so there is no Gibbs ringing.
+    preserving El Niño–related oscillations at periods longer than roughly
+    2×HN1–2×HN2 months. HN1 and HN2 are half-period parameters because this
+    is a half-range sine expansion. The transition is sigmoid-shaped, so
+    there is no Gibbs ringing.
 
     Physical motivation
     -------------------
     ENSO operates on interannual timescales (2–7 years). Intra-seasonal
     variability (3–6 months) is noise for ENSO analysis. With HN1=10 and
-    HN2=9 the filter's −3 dB point is near 9.5 months, cleanly separating
+    HN2=9 the filter's −3 dB point is near a 19-month full period, separating
     seasonal from ENSO-scale signals.
 
     Why Fourier instead of Butterworth?
@@ -59,12 +80,12 @@ def passa_baixa(HN1: float, HN2: float, ST0: np.ndarray) -> np.ndarray:
     Parameters
     ----------
     HN1 : float
-        Low-frequency (long-period) edge of the transition band in months.
-        Typically 10.0. Modes with period > HN1 are passed with FACTOR ≈ 1.
+        Long-period half-period parameter in months. Typically 10.0,
+        corresponding to a 20-month full-period pass edge.
     HN2 : float
-        High-frequency (short-period) edge of the transition band in months.
-        Typically 9.0. Must satisfy HN2 < HN1 for a low-pass filter.
-        Modes with period < HN2 are suppressed with FACTOR ≈ 0.
+        Short-period half-period parameter in months. Typically 9.0,
+        corresponding to an 18-month full-period stop edge. Must satisfy
+        HN2 < HN1 for a low-pass filter.
     ST0 : ndarray of shape (NT,)
         Input monthly time series. Should be anomalies (annual cycle
         removed before calling) to prevent leakage from the 12-month
@@ -81,6 +102,8 @@ def passa_baixa(HN1: float, HN2: float, ST0: np.ndarray) -> np.ndarray:
     Corresponds to SUBROUTINE PASSA_BAIXA(HN1, HN2, STB, ST0, NT) in
     filterfouriergr197501_202502.f.
     """
+    ST0 = _validated_series(ST0)
+    _validate_cutoffs(HN1, HN2)
     NT  = len(ST0)
     NM1 = NT - 1
     PI  = np.pi
@@ -139,8 +162,8 @@ def deri_fourier(
     NDOTS: int, ST0: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Fourier interpolation and differentiation — direct translation of
-    SUBROUTINE DERI_FOURIER.
+    Fourier interpolation and differentiation based on SUBROUTINE
+    DERI_FOURIER, with its derivative time scale corrected.
 
     Interpolates a filtered monthly series onto a finer grid of NDOTS
     sub-points per monthly interval, simultaneously computing the first
@@ -165,11 +188,11 @@ def deri_fourier(
     attractors in (T, dT/dt) space characterise the low-dimensional
     dynamics of the coupled ocean–atmosphere system.
 
-    The denominator in the derivative formula uses NT (the number of
-    original monthly points), not NTDM1 (the number of interpolated
-    points minus one). This is faithful to the Fortran and gives VST in
-    natural units of [observable unit] per original monthly step, making
-    it directly comparable across different series lengths.
+    Derivative factors use NM1 = NT−1, the true number of monthly intervals.
+    The legacy Fortran used NT here, underestimating first derivatives by
+    (NT−1)/NT and second derivatives by its square.  The corrected scale gives
+    VST in natural units of [observable unit] per month and is independent of
+    record length.
 
     Parameters
     ----------
@@ -195,6 +218,11 @@ def deri_fourier(
     Corresponds to SUBROUTINE DERI_FOURIER(AST, VST, SST, NDOTS, ST0, NT)
     in filterfouriergr197501_202502.f.
     """
+    ST0 = _validated_series(ST0)
+    if isinstance(NDOTS, (bool, np.bool_)) or not isinstance(NDOTS, (int, np.integer)):
+        raise ValueError("NDOTS must be a positive integer")
+    if NDOTS <= 0:
+        raise ValueError("NDOTS must be a positive integer")
     NT    = len(ST0)
     NM1   = NT - 1
     PI    = np.pi
@@ -239,13 +267,13 @@ def deri_fourier(
     # Interpolated series: Fourier modes summed on the fine grid, no weighting.
     SST = F_coefs @ SIN_ARG
 
-    # First derivative: d/dt[F*sin(IW*t*π/NTDM1)] = F*(IW*π/NT)*cos(...)
-    # Faithful to Fortran: denominator is NT (not NTDM1). This gives VST in
-    # units of °C or mm per original monthly time step.
-    VST = (F_coefs * (IW_f * PI / NT)) @ COS_ARG
+    # First derivative with respect to the original monthly coordinate.
+    # NM1 is the true duration of the input record in monthly intervals.
+    # (The legacy Fortran used NT and introduced a small length-dependent bias.)
+    VST = (F_coefs * (IW_f * PI / NM1)) @ COS_ARG
 
-    # Second derivative: −F*(IW*π/NT)² * sin(...)
-    AST = -(F_coefs * (IW_f * PI / NT) ** 2) @ SIN_ARG
+    # Second derivative: −F*(IW*π/NM1)² * sin(...)
+    AST = -(F_coefs * (IW_f * PI / NM1) ** 2) @ SIN_ARG
 
     # Restore mean and linear trend.
     # SST: re-add full trend using NTDM1 so endpoints match the input series.
@@ -329,14 +357,14 @@ def _self_test() -> None:
     Uses exact Fourier modes so the amplitude ratios are analytically
     predictable (no spectral leakage, no edge-effect ambiguity):
 
-      Mode IW=7  with NT=120: period = NM1/7 = 119/7 ≈ 17 months
+      Mode IW=7  with NT=120: full period = 2×NM1/7 = 34 months
                                → well inside passband (>10 months)
-      Mode IW=40 with NT=120: period = NM1/40 = 119/40 ≈ 3 months
+      Mode IW=40 with NT=120: full period = 2×NM1/40 ≈ 6 months
                                → well inside stopband (<9 months)
 
     Tests:
-      1. 17-month component survives  (amplitude ratio > 0.9)
-      2.  3-month component suppressed (amplitude ratio < 0.1)
+      1. 34-month component survives  (amplitude ratio > 0.9)
+      2.  6-month component suppressed (amplitude ratio < 0.1)
       3. deri_fourier output length == (NT-1)*NDOTS + 1
       4. VST[0] > 0 when input is rising at t=0
       5. compute_sigma returns finite values
@@ -351,28 +379,28 @@ def _self_test() -> None:
 
     # Exact half-period sine modes: sin(IW0 * t * π/NM1).
     # For integer IW0, both endpoints are exactly zero → no detrending effect.
-    IW_SLOW = 7     # period ≈ 17 months — passband
-    IW_FAST = 40    # period ≈  3 months — stopband
+    IW_SLOW = 7     # full period = 34 months — passband
+    IW_FAST = 40    # full period ≈ 6 months — stopband
     A = 2.0
 
     y_slow = A * np.sin(IW_SLOW * t * np.pi / NM1)
     y_fast = A * np.sin(IW_FAST * t * np.pi / NM1)
 
-    # --- 1. Slow component (≈17 months) must survive the filter ---
+    # --- 1. Slow component (34 months) must survive the filter ---
     stb_slow = passa_baixa(10.0, 9.0, y_slow)
     ratio_slow = np.sqrt(np.mean(stb_slow ** 2)) / np.sqrt(np.mean(y_slow ** 2))
     assert ratio_slow > 0.9, (
-        f"FAIL test 1: 17-month component suppressed — ratio = {ratio_slow:.4f}"
+        f"FAIL test 1: 34-month component suppressed — ratio = {ratio_slow:.4f}"
     )
-    print(f"  PASS 1: 17-month component preserved  (amplitude ratio = {ratio_slow:.4f})")
+    print(f"  PASS 1: 34-month component preserved  (amplitude ratio = {ratio_slow:.4f})")
 
-    # --- 2. Fast component (≈3 months) must be blocked ---
+    # --- 2. Fast component (≈6 months) must be blocked ---
     stb_fast = passa_baixa(10.0, 9.0, y_fast)
     ratio_fast = np.sqrt(np.mean(stb_fast ** 2)) / np.sqrt(np.mean(y_fast ** 2))
     assert ratio_fast < 0.1, (
-        f"FAIL test 2: 3-month component leaked — ratio = {ratio_fast:.6f}"
+        f"FAIL test 2: 6-month component leaked — ratio = {ratio_fast:.6f}"
     )
-    print(f"  PASS 2: 3-month component suppressed  (amplitude ratio = {ratio_fast:.6f})")
+    print(f"  PASS 2: 6-month component suppressed  (amplitude ratio = {ratio_fast:.6f})")
 
     # --- 3. deri_fourier output length ---
     # Input to deri_fourier is the filtered series (annual cycle re-added;
