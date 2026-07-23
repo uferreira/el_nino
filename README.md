@@ -2,7 +2,7 @@
 
 This package reconstructs the low-dimensional attractor of the El Niño–Southern
 Oscillation (ENSO) from two complementary ocean observables: sea surface
-temperature (SST) in the NINO1+2 region and tide-gauge sea level at three
+temperature (SST) in the NINO1+2 region and tide-gauge sea level at five
 Pacific stations. A Fourier low-pass filter isolates variability on interannual
 timescales (periods longer than ~9 months), and the filtered signal is
 interpolated onto a fine grid so that the derivative dT/dt can be computed
@@ -32,7 +32,7 @@ during major events like 1982–83 and 1997–98. The NOAA CPC NINO1+2 index is 
 monthly area-average SST derived from the Optimum Interpolation SST (OISST)
 analysis, providing a continuous record from 1950 to the present.
 
-**Why these three sea level stations?**
+**Why these five sea level stations?**
 Sea level integrates both the thermal expansion of seawater (steric effect) and
 wind-driven ocean circulation — making it a sensitive, physics-rich ENSO proxy.
 
@@ -46,6 +46,12 @@ wind-driven ocean circulation — making it a sensitive, physics-rich ENSO proxy
 - **Palau, western Pacific (UHSLC 007):** In the western Pacific warm pool, sea
   level responds in the opposite sense to the eastern Pacific — it falls during
   El Niño as surface warm water sloshes eastward and rises during La Niña.
+- **Talara, Peru (UHSLC 092):** Eastern Pacific coastal record north of
+  Callao. UHSLC currently provides observations only through August 2025, so
+  the website marks this station as stale rather than implying it is current.
+- **La Libertad, Ecuador (UHSLC 091):** Eastern equatorial Pacific station with
+  a long record that complements Callao and captures coastal ENSO sea-level
+  variability close to the equator.
 
 **The Fourier low-pass filter**
 The filter (`passa_baixa`) removes all variability with periods shorter than
@@ -79,7 +85,9 @@ the output retains absolute physical units.
 | Dataset | Source | Station / Region | Period | Temporal resolution |
 |---------|--------|-----------------|--------|---------------------|
 | NINO1+2 SST | [NOAA CPC](https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices) | 0–10°S, 90–80°W | 1950–present | Monthly |
-| Callao sea level | [UHSLC station 093](https://uhslc.soest.hawaii.edu) | Callao, Peru | 1905–present | Hourly → monthly |
+| Callao sea level | [UHSLC station 093](https://uhslc.soest.hawaii.edu) | Callao, Peru | 1970–present | Hourly → monthly |
+| Talara sea level | [UHSLC station 092](https://uhslc.soest.hawaii.edu) | Talara, Peru | 1970–Aug 2025 | Hourly → monthly |
+| La Libertad sea level | [UHSLC station 091](https://uhslc.soest.hawaii.edu) | La Libertad, Ecuador | 1949–present | Hourly → monthly |
 | Honolulu sea level | [UHSLC station 057](https://uhslc.soest.hawaii.edu) | Honolulu, Hawaii | 1905–present | Hourly → monthly |
 | Palau sea level | [UHSLC station 007](https://uhslc.soest.hawaii.edu) | Malakal, Palau | 1969–present | Hourly → monthly |
 
@@ -90,6 +98,13 @@ are joined at January 1982 with no overlap.
 ---
 
 ## The Filter
+
+Before either Fourier stage, the pipeline aligns the analysis window so its
+first and last observations are from the same calendar month. As the live
+record advances, only the leading partial seasonal cycle is discarded (for
+example, January–July becomes July–July). This preserves every recent
+observation and avoids injecting an artificial seasonal jump into the endpoint
+correction.
 
 **`passa_baixa` — Fourier low-pass filter**
 Computes sine Fourier coefficients for modes IW = 1 to NM1/2 (where NM1 = NT−1),
@@ -227,7 +242,7 @@ ani = animate_phase_diagram(
 )
 ```
 
-**3. Run all four datasets at once from config.yaml**
+**3. Run all configured datasets at once from config.yaml**
 
 ```python
 from el_nino.pipeline import run_all
@@ -248,10 +263,10 @@ animate_all_from_config("config.yaml")   # reads .dat files, saves four .mp4 ani
 | `el_nino.filter` | `compute_sigma(ST0, ST_filtered, ST_interp, NDOTS)` | RMS filter residual (SIGMA30) and interpolation residual (SIGMA04) |
 | `el_nino.download` | `load_sst(local_file, ano_inicio)` | Load NINO1+2 SST from local file + NOAA CPC download |
 | `el_nino.download` | `load_sea_level(station_id, station_name, start_date)` | Download hourly UHSLC sea level, aggregate to monthly |
-| `el_nino.download` | `load_from_config(config_path)` | Load all four datasets from config.yaml |
+| `el_nino.download` | `load_from_config(config_path)` | Load all configured datasets from config.yaml |
 | `el_nino.pipeline` | `run_sst(...)` | Full SST pipeline: download → filter → write .dat |
 | `el_nino.pipeline` | `run_sea_level(...)` | Full sea level pipeline for one station |
-| `el_nino.pipeline` | `run_all(config_path)` | Run all four pipelines from config.yaml |
+| `el_nino.pipeline` | `run_all(config_path)` | Run every configured SST and sea-level pipeline |
 | `el_nino.pipeline` | `load_output(output_file)` | Parse a .dat output file into NumPy arrays |
 | `el_nino.plots` | `plot_phase_diagram(data, ...)` | Static T vs dT/dt figure with blue→red time gradient |
 | `el_nino.plots` | `animate_phase_diagram(data, ...)` | Animated attractor: gray trail, red tail, blue dot |

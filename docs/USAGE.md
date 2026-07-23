@@ -128,24 +128,27 @@ four interpolated sub-points between consecutive monthly observations. For a
 
 ### What `passa_baixa` does step by step
 
-1. **Remove the mean** from the input series ST0 → STA.
-2. **Remove a linear trend** (connect the first and last values with a
+1. **Align the endpoint months** in the production pipeline. The analysis
+   starts at the earliest observation from the same calendar month as the
+   latest observation, discarding only the leading partial seasonal cycle.
+2. **Remove the mean** from the input series ST0 → STA.
+3. **Remove a linear trend** (connect the first and last values with a
    straight line and subtract it). This enforces Dirichlet boundary conditions
    (STA = 0 at both endpoints), suppressing spectral leakage from the endpoints
    into the interior.
-3. **Compute sine Fourier coefficients** for modes IW = 1 to NM1//2
+4. **Compute sine Fourier coefficients** for modes IW = 1 to NM1//2
    (NM1 = NT − 1):
    ```
    FOURIER[IW] = (2/NM1) × Σ_{IT=1}^{NM1} STA[IT] × sin(IW × IT × π / NM1)
    ```
-4. **Apply the sigmoid window**:
+5. **Apply the sigmoid window**:
    ```
    FACTOR[IW] = 1 / (1 + exp((IW − W₀) / DW₂))
    ```
    Modes well below W₁ = NM1/HN1 receive FACTOR ≈ 1 (pass through).
    Modes well above W₂ = NM1/HN2 receive FACTOR ≈ 0 (suppressed).
-5. **Reconstruct** the filtered series in the time domain.
-6. **Restore mean and trend**.
+6. **Reconstruct** the filtered series in the time domain.
+7. **Restore mean and trend**.
 
 ### What HN1 and HN2 mean physically
 

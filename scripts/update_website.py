@@ -90,11 +90,18 @@ DATASETS: OrderedDict[str, tuple[str, str]] = OrderedDict([
 # All HTML pages to patch (skipped silently if not found)
 HTML_FILES = [
     DOCS / "index.html",
-    DOCS / "animations.html",
+    DOCS / "phase_diagrams.html",
+    DOCS / "duffing_simulation.html",
     DOCS / "familiar_attractor.html",
     DOCS / "ensemble.html",
     DOCS / "compare.html",
 ]
+
+# A Fast Delivery tide gauge normally reaches the current or immediately
+# preceding month. Allow a two-month grace period for temporary telemetry
+# and publication delays; older endpoints are visibly marked as stale even
+# when the download itself succeeds.
+STALE_AFTER_MONTHS = 2
 
 
 # ---------------------------------------------------------------------------
@@ -268,17 +275,24 @@ def _fmt_month(ym: str | None) -> str | None:
 
 
 def _stale_notes(state: dict) -> list[str]:
-    """Build subtle 'fetch pending' captions for any station not currently OK."""
+    """Build captions for failed fetches and successfully fetched stale data."""
     notes: list[str] = []
     for entry in state.get("stations", {}).values():
-        if entry.get("ok", True):
-            continue
         name = entry.get("name", "Station")
         month = _fmt_month(entry.get("as_of"))
-        if month:
-            notes.append(f"{name} sea level data as of {month} (fetch pending)")
-        else:
-            notes.append(f"{name} sea level data (fetch pending)")
+        if not entry.get("ok", True):
+            if month:
+                notes.append(f"{name} sea level data as of {month} (fetch pending)")
+            else:
+                notes.append(f"{name} sea level data (fetch pending)")
+        elif entry.get("stale", False):
+            if month:
+                notes.append(
+                    f"{name} sea level data as of {month} "
+                    "(no recent UHSLC observations)"
+                )
+            else:
+                notes.append(f"{name} sea level data (no recent UHSLC observations)")
     return notes
 
 
@@ -479,13 +493,15 @@ def main() -> None:
                 yr0 = int(result["IYR"][0]);  m0 = int(result["MES"][0])
                 yr1 = int(result["IYR"][-1]); m1 = int(result["MES"][-1])
                 print(f"  {_month_label(yr0,m0)} – {_month_label(yr1,m1)}  ({n} months)")
-                latest_ym = (yr1, m1)
+                latest_ym = max(latest_ym or (yr1, m1), (yr1, m1))
+                lag_months = (run_dt.year * 12 + run_dt.month) - (yr1 * 12 + m1)
                 # Record a fresh, successful fetch for this station.
                 freshness["stations"][key] = {
                     "name": st["name"],
                     "last_success": run_date,
                     "as_of": f"{yr1}-{m1:02d}",
                     "ok": True,
+                    "stale": lag_months > STALE_AFTER_MONTHS,
                 }
                 if key == "callao":
                     cal_data  = loaded_data[js_var]
@@ -511,6 +527,7 @@ def main() -> None:
                     "last_success": prev.get("last_success"),
                     "as_of": prev.get("as_of"),
                     "ok": False,
+                    "stale": True,
                 }
                 continue
 
@@ -545,9 +562,8 @@ def main() -> None:
                 cal_yr0, cal_m0, cal_yr1, cal_m1, cal_n,
             )
 
-        # Data-freshness footnote (index.html landing page only).
-        if html_path.name == "index.html":
-            html, _ = _patch_freshness(html, refreshed_label, stale_notes)
+        # Patch every page that opts in with DATA_FRESHNESS markers.
+        html, _ = _patch_freshness(html, refreshed_label, stale_notes)
 
         if html == original:
             print(f"  Unchanged: {html_path}")

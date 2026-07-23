@@ -87,6 +87,17 @@ phase-space area than a moderate El Niño year.
 
 ## The Fourier Filter
 
+### Calendar-aligned endpoints
+
+Before the Fourier calculation, the production pipeline selects the earliest
+observation whose calendar month matches the last observed month. Thus a live
+record ending in July is analysed from its first available July, rather than
+from a fixed January start. This discards only the leading partial seasonal
+cycle, does not fabricate an endpoint, and prevents the annual cycle itself from
+creating a large January-to-July boundary difference. The original Fortran
+input used the same-month pattern (for example February-to-February); the
+Python update must preserve it as the terminal month advances.
+
 ### The sine Fourier expansion on [0, NM1]
 
 The filter operates on a finite time series of NT monthly values (t = 0..NT−1,

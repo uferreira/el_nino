@@ -37,7 +37,7 @@ W_ANN = 0.523599
 def rhs_java(t, X, Y, p):
     """
     The g(x,y,z,t) RHS from NL3System.java / DoubleWell.java as translated
-    to JavaScript in animations.html (rkf5Step / rhs inner function).
+    to JavaScript in duffing_simulation.html (rkf5Step / rhs inner function).
 
     dY/dt = K0 + K1·X + K2·X² + K3·X³ + K4·X⁴ + K5·X⁵
             + FA·cos(FF_rad)·cos(W·t) + FA·sin(FF_rad)·sin(W·t)

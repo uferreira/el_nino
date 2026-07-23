@@ -32,6 +32,40 @@ from el_nino.filter import compute_sigma, deri_fourier, passa_baixa
 # Private helpers shared by run_sst and run_sea_level
 # ---------------------------------------------------------------------------
 
+def _align_fourier_window(
+    IYR: np.ndarray,
+    MES: np.ndarray,
+    data: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Start the Fourier window in the same calendar month in which it ends.
+
+    The sine-series detrending in the translated Fortran algorithm uses the
+    first and last values as its boundary.  Keeping a fixed January start as
+    new observations advance through the year therefore joins different
+    phases of the seasonal cycle (for example January to July).  The original
+    Fortran input avoided that jump by using matching endpoint months.
+
+    Select the earliest observation whose calendar month matches the latest
+    observation and discard only the leading partial seasonal cycle (at most
+    eleven observations for a continuous monthly record).  No synthetic value
+    is introduced and the most recent observation is always retained.
+    """
+    IYR = np.asarray(IYR)
+    MES = np.asarray(MES)
+    data = np.asarray(data)
+
+    if not (len(IYR) == len(MES) == len(data)):
+        raise ValueError("IYR, MES, and data must have the same length")
+    if len(MES) < 2:
+        raise ValueError("at least two monthly observations are required")
+    if np.any((MES < 1) | (MES > 12)):
+        raise ValueError("MES values must be calendar months in 1..12")
+
+    terminal_month = int(MES[-1])
+    start = int(np.flatnonzero(MES == terminal_month)[0])
+    return IYR[start:], MES[start:], data[start:]
+
+
 def _compute_climatology(MES: np.ndarray, data: np.ndarray) -> np.ndarray:
     """
     Compute the mean value for each calendar month.
@@ -247,6 +281,7 @@ def run_sst(
     IYR  = raw_data["IYR"]
     MES  = raw_data["MES"]
     SST0 = raw_data["SST0"]
+    IYR, MES, SST0 = _align_fourier_window(IYR, MES, SST0)
     NT   = len(SST0)
     print(f"  NT = {NT}")
 
@@ -319,6 +354,7 @@ def run_sst_index(
     IYR  = raw_data["IYR"]
     MES  = raw_data["MES"]
     anom = raw_data[anom_key]
+    IYR, MES, anom = _align_fourier_window(IYR, MES, anom)
     NT   = len(anom)
     print(f"  NT = {NT}")
 
@@ -401,6 +437,7 @@ def run_sea_level(
     IYR = raw_data["IYR"]
     MES = raw_data["MES"]
     SL0 = raw_data["SL0"]
+    IYR, MES, SL0 = _align_fourier_window(IYR, MES, SL0)
     NT  = len(SL0)
     print(f"  NT = {NT}")
 

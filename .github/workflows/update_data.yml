@@ -71,8 +71,7 @@ jobs:
           # Stage every page update_website.py can patch plus the freshness
           # tracker (force-added: data/output/ is gitignored but this file must
           # persist across the ephemeral CI checkout to remember stale stations).
-          git add docs/index.html docs/animations.html docs/familiar_attractor.html \
-                  docs/ensemble.html docs/compare.html
+          git add docs
           git add -f data/output/freshness.json
           if git diff --cached --quiet; then
             echo "No changes — site data is already up to date."

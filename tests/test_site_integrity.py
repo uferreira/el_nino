@@ -1,0 +1,88 @@
+"""Regression checks for the generated website and its update automation."""
+
+from __future__ import annotations
+
+import importlib.util
+import re
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+PHASE_PAGE = ROOT / "docs" / "phase_diagrams.html"
+COMPARE_PAGE = ROOT / "docs" / "compare.html"
+UPDATE_SCRIPT = ROOT / "scripts" / "update_website.py"
+UPDATE_WORKFLOW = ROOT / ".github" / "workflows" / "update_data.yml"
+
+
+def _load_update_website():
+    spec = importlib.util.spec_from_file_location("update_website", UPDATE_SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_phase_diagram_extra_stations_follow_calendar_time():
+    """Palau must not stop at Oct 2020 while the master clock reaches 2026."""
+    html = PHASE_PAGE.read_text(encoding="utf-8")
+
+    assert "function obs1AdvanceExtrasToDate(" in html
+    assert "function clsAdvanceExtrasToDate(" in html
+    assert re.search(
+        r"obs1AdvanceExtrasToDate\([^;]*callaoData\.year\[OBS1\.calIdx\]",
+        html,
+    )
+    assert re.search(
+        r"clsAdvanceExtrasToDate\([^;]*callaoData\.year\[CLS\.calIdx\]",
+        html,
+    )
+
+
+def test_compare_history_has_readable_contrast():
+    """Past trajectories need enough opacity and width to remain visible."""
+    html = COMPARE_PAGE.read_text(encoding="utf-8")
+    history = re.search(
+        r"cmpOffCtx\.globalAlpha\s*=\s*([0-9.]+);\s*"
+        r"cmpOffCtx\.strokeStyle\s*=\s*color;\s*"
+        r"cmpOffCtx\.lineWidth\s*=\s*([0-9.]+);",
+        html,
+    )
+    assert history is not None
+    assert float(history.group(1)) >= 0.55
+    assert float(history.group(2)) >= 2.0
+
+
+def test_update_script_covers_current_data_pages():
+    uw = _load_update_website()
+    names = {path.name for path in uw.HTML_FILES}
+
+    assert "phase_diagrams.html" in names
+    assert "duffing_simulation.html" in names
+    assert "animations.html" not in names
+
+
+def test_successful_but_old_station_data_is_reported():
+    uw = _load_update_website()
+    state = {
+        "stations": {
+            "talara": {
+                "name": "Talara",
+                "as_of": "2025-08",
+                "ok": True,
+                "stale": True,
+            }
+        }
+    }
+
+    notes = uw._stale_notes(state)
+
+    assert notes == [
+        "Talara sea level data as of August 2025 "
+        "(no recent UHSLC observations)"
+    ]
+
+
+def test_workflow_stages_every_generated_document():
+    workflow = UPDATE_WORKFLOW.read_text(encoding="utf-8")
+
+    assert re.search(r"git add\s+docs(?:/|\s)", workflow)
