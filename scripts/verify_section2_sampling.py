@@ -33,6 +33,8 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
+
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except Exception:
@@ -48,14 +50,8 @@ TARGET_DT = 0.1          # matches ATT_TARGET_DT in the page
 TWO_PI = 6.283185307179586
 
 
-def build_frames(params, x0, y0, t0, N, P, burn=0, wiki=False):
-    """Mirror attBuild() using N monthly-equivalent recorded samples.
-
-    frames[k] is a list of X values at phase k/P. Burn remains a count
-    of transient forcing cycles, while N matches the observed monthly sample
-    count. Monthly mode therefore records exactly N points in total and
-    distributes them across the 12 phase frames.
-    """
+def build_state_frames(params, x0, y0, t0, N, P, burn=0, wiki=False):
+    """Mirror attBuild() and retain both X and dX/dt in every phase frame."""
     W = params.get("W", TWO_PI / 12.0)
     L = (TWO_PI / W) if wiki else 12.0
     hsample = L / P
@@ -65,16 +61,46 @@ def build_frames(params, x0, y0, t0, N, P, burn=0, wiki=False):
     recorded_samples = max(1, math.ceil(N * P / 12))
     total_samples = burn_samples + recorded_samples
 
-    framesX = [[] for _ in range(P)]
+    frames = [[] for _ in range(P)]
     t, X, Y = t0, x0, y0
     for sample_idx in range(total_samples):
         frame_idx = sample_idx % P
         if sample_idx >= burn_samples:
-            framesX[frame_idx].append(X)
+            frames[frame_idx].append((X, Y))
         for _ in range(nsub):
             X, Y = rkf5_step(t, X, Y, params, dt_int)
             t += dt_int
-    return framesX, hsample, nsub, dt_int
+    return frames, hsample, nsub, dt_int
+
+
+def build_frames(params, x0, y0, t0, N, P, burn=0, wiki=False):
+    """Backward-compatible X-only view used by the original equality checks."""
+    state_frames, hsample, nsub, dt_int = build_state_frames(
+        params, x0, y0, t0, N, P, burn=burn, wiki=wiki
+    )
+    return (
+        [[state[0] for state in frame] for frame in state_frames],
+        hsample,
+        nsub,
+        dt_int,
+    )
+
+
+def seasonal_dispersion_ratio(frames):
+    """Median within-phase variance divided by the total phase-space variance."""
+    all_states = np.asarray([state for frame in frames for state in frame], dtype=float)
+    scaled = (all_states - all_states.mean(axis=0)) / all_states.std(axis=0)
+    total = np.mean(np.sum((scaled - scaled.mean(axis=0)) ** 2, axis=1))
+    ratios = []
+    offset = 0
+    for frame in frames:
+        count = len(frame)
+        phase = scaled[offset:offset + count]
+        offset += count
+        ratios.append(
+            np.mean(np.sum((phase - phase.mean(axis=0)) ** 2, axis=1)) / total
+        )
+    return float(np.median(ratios)), ratios
 
 
 def section1_monthly_states(params, x0, y0, t0, N, phase_month):
@@ -160,10 +186,27 @@ def main():
               f"in {dt_build*1000:.0f} ms")
     ok2 = True
 
+    # ---- Acceptance check 3: monthly phase concentration -------------------
+    print("\n[3] ALADO monthly phase concentration after transient")
+    state_frames, *_ = build_state_frames(
+        p, x0, y0, t0, N=613, P=12, burn=10
+    )
+    median_ratio, phase_ratios = seasonal_dispersion_ratio(state_frames)
+    print(
+        "    within-month / total phase-space variance: "
+        + ", ".join(f"{ratio:.3f}" for ratio in phase_ratios)
+    )
+    print(f"    median ratio = {median_ratio:.3f}  (required < 0.12)")
+    ok3 = median_ratio < 0.12
+    print(
+        f"    RESULT: {'PASS' if ok3 else 'FAIL'} "
+        "(calendar phases form localized clouds)"
+    )
+
     print("\n" + "=" * 68)
-    print(f"OVERALL: {'PASS' if (ok1 and ok2) else 'FAIL'}")
+    print(f"OVERALL: {'PASS' if (ok1 and ok2 and ok3) else 'FAIL'}")
     print("=" * 68)
-    return 0 if (ok1 and ok2) else 1
+    return 0 if (ok1 and ok2 and ok3) else 1
 
 
 if __name__ == "__main__":

@@ -72,11 +72,16 @@ select.month-sel { background:var(--surface); border:1px solid var(--border); bo
 .side-panel { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:.55rem; }
 .side-panel-title { color:var(--muted); font-size:.72rem; font-weight:600; text-align:center; text-transform:uppercase; letter-spacing:.05em; margin:0 0 .35rem; }
 .side-panel canvas { display:block; width:100%; height:auto; background:#0a0a0e; border:1px solid var(--border); border-radius:5px; }
+.attractor-observed { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1rem; }
+.observed-phase-panel { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:.65rem; min-width:0; }
+.observed-phase-title { color:var(--text); font-size:.82rem; font-weight:600; text-align:center; margin:0 0 .45rem; }
+.observed-phase-panel canvas { display:block; width:100%; height:auto; background:#0a0a0e; border:1px solid var(--border); border-radius:6px; }
+.observed-phase-note { grid-column:1/-1; color:var(--muted); font-size:.82rem; line-height:1.5; }
 .mini-readout { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; margin-top:.8rem; }
 .mini-readout div { background:var(--surface); border:1px solid var(--border); border-radius:5px; padding:.45rem .55rem; font-size:.76rem; color:var(--muted); }
 .mini-readout strong { display:block; color:var(--text); font-family:monospace; font-size:.86rem; margin-top:.1rem; }
 @media(max-width:1180px){ .attractor-layout{ grid-template-columns:240px minmax(0,1fr); } .attractor-side{ grid-column:2; grid-row:auto; grid-template-columns:repeat(3,minmax(0,1fr)); } }
-@media(max-width:760px){ .attractor-layout{ grid-template-columns:1fr; } .attractor-side{ grid-column:1; grid-template-columns:1fr; } }
+@media(max-width:760px){ .attractor-layout{ grid-template-columns:1fr; } .attractor-side{ grid-column:1; grid-template-columns:1fr; } .attractor-observed{ grid-template-columns:1fr; } }
 footer { text-align:center; padding:2rem 1rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); }
 footer a { color:var(--accent); text-decoration:none; }
 footer a:hover { text-decoration:underline; }
@@ -370,8 +375,9 @@ footer a:hover { text-decoration:underline; }
     <strong>Same equation, two coefficient sets.</strong>
     Both presets integrate the identical Duffing equation used by the simulator above —
     <span style="font-family:monospace">dY/dt = K1&middot;X + K3&middot;X&sup3; + B&middot;Y + FA&middot;cos(W&middot;t &minus; FF)</span>
-    — only the coefficients change. <strong>El&nbsp;Ni&ntilde;o (ALADO)</strong> uses the Section&nbsp;1 fit:
-    a strongly damped, annually forced regime whose attractor is a regular limit cycle.
+    — only the coefficients change. <strong>El&nbsp;Ni&ntilde;o (ALADO)</strong> uses the legacy
+    coefficients exposed by the Section&nbsp;1 controls. They were not re-estimated from the SST and SSH
+    records embedded on this page, so this preset is a hypothesis to compare with observations, not a validated fit.
     <strong>Wikipedia strange attractor</strong> switches to the classic chaotic regime
     x&Prime; + 0.02&thinsp;x&prime; &minus; x + x&sup3; = 3&thinsp;sin&thinsp;t
     (&alpha;=&minus;1, &beta;=1, &delta;=0.02, &gamma;=3, &omega;=1 &rarr;
@@ -392,7 +398,7 @@ footer a:hover { text-decoration:underline; }
       <div class="param-row">
         <label for="nb-att-samples">N — simulated monthly samples</label>
         <div class="param-inline">
-          <input type="number" id="nb-att-samples" value="624" min="1" max="60000" step="12">
+          <input type="number" id="nb-att-samples" value="613" min="1" max="60000" step="1">
         </div>
       </div>
       <div class="param-row">
@@ -406,7 +412,7 @@ footer a:hover { text-decoration:underline; }
       <div class="param-row">
         <label for="nb-att-burn">Discard first M transient years</label>
         <div class="param-inline">
-          <input type="number" id="nb-att-burn" value="0" min="0" step="1">
+          <input type="number" id="nb-att-burn" value="10" min="0" step="1">
         </div>
       </div>
       <div class="param-row">
@@ -475,15 +481,41 @@ footer a:hover { text-decoration:underline; }
       </div>
     </aside>
   </div>
+
+  <div class="attractor-observed" aria-label="Observed phase clouds synchronized with the Duffing model">
+    <div class="observed-phase-panel">
+      <div class="observed-phase-title">Observed SST — NINO1+2</div>
+      <canvas id="att-obs-sst-canvas" width="610" height="430"></canvas>
+    </div>
+    <div class="observed-phase-panel">
+      <div class="observed-phase-title">Observed SSH — Callao sea-level anomaly</div>
+      <canvas id="att-obs-ssh-canvas" width="610" height="430"></canvas>
+    </div>
+    <p class="observed-phase-note">
+      These panels use the same phase clock as the model above. Each frame selects the measured
+      SST and SSH state closest to that calendar phase in every observed year, making seasonal
+      clustering directly comparable without drawing trajectory tracks.
+    </p>
+  </div>
+
+  <div class="science-box" style="margin-top:1rem;max-width:none;">
+    <strong>About coefficient fitting.</strong>
+    Ordinary least squares on one long simulated trajectory is unreliable if the fitted regime is chaotic,
+    because nearby trajectories separate exponentially. A defensible workflow uses local ODE collocation for
+    an initial estimate, chronological train/validation splits, bounded physical coefficients, and then
+    multiple shooting or shadowing/statistical attractor objectives. Raw seasonal SST alone does not establish
+    a double-well potential or chaos; those are hypotheses that require out-of-sample diagnostics.
+  </div>
+
   <div class="science-box" style="margin-top:1rem;max-width:none;">
     <strong>What you're looking at.</strong>
     Each frame fixes one phase of the annual forcing cycle and plots one phase-space point (X,&nbsp;dX/dt)
     for every simulated year. Monthly gives 12 frames: frame&nbsp;1 holds every simulated January, on to
-    December. Because this is a deterministic simulation you can run any number of years (52 reproduces
-    1975&ndash;2026; try 1000 to fill the attractor) and sample at weekly or daily resolution. Sweeping the
-    phase makes the attractor stretch and fold &mdash; the stroboscopic view of the Duffing oscillator. With
-    the El&nbsp;Ni&ntilde;o coefficients the model settles to a limit cycle; the Wikipedia preset shows the
-    fractal strange attractor.
+    December. The default sample count follows the observed SST record, and the first 10 simulated years are
+    discarded so startup transients cannot masquerade as climate variability. Sweeping the phase makes the
+    attractor stretch and fold &mdash; the stroboscopic view of the Duffing oscillator. A fixed calendar month
+    forms a compact cloud only when the oscillator is seasonally phase-locked; a quasi-periodic or chaotic
+    response can legitimately occupy several parts of the attractor at the same forcing phase.
     The three synchronized side panels follow the current point of the latest simulated year: the conservative
     potential V(x), position through the previous three forcing cycles, and that same recent path in phase space.
     Layout inspired by Cosmia Nebula's
@@ -734,7 +766,7 @@ footer a:hover { text-decoration:underline; }
         <li><strong>FF</strong> — forcing phase: timing of the annual forcing</li>
         <li><strong>B</strong> — damping: energy dissipation (must be negative)</li>
       </ul>
-      <p>Default values are fitted to match the observed SST attractor.</p>
+      <p>The default values come from the legacy ALADO applet; they have not been calibrated against the current embedded observations.</p>
       <p><strong>Steps/frame</strong>: integration steps per animation frame — higher = faster.<br>
       <strong>Frame delay</strong>: ms between frames — higher = slower, easier to watch.</p>
     </div>
@@ -1431,9 +1463,19 @@ const ATT_AXIS_STYLE={
   formatX:v => Number(v.toFixed(2)).toString(),
   formatY:v => Number(v.toFixed(2)).toString(),
 };
+const ATT_DEFAULT_SAMPLES=observedData.irest.filter(v=>v===0).length;
+const ATT_OBS_CW=610, ATT_OBS_CH=430;
+const ATT_OBS_PLT={l:62,r:594,t:42,b:382};
+const ATT_OBS_AXIS_STYLE={
+  tickColor:'#b8b8c8', labelColor:'#e8e8f0',
+  tickFont:'11px monospace', labelFont:'bold 13px sans-serif',
+  tickOffset:16, xLabelY:424, yLabelX:14,
+  formatX:v=>Number(v.toFixed(1)).toString(),
+  formatY:v=>Number(v.toFixed(1)).toString(),
+};
 
 const ATT={
-  frames:[], orbit:[], P:12, resLabel:'monthly', N:624, burn:0, recordedYears:52, preset:'elnino',
+  frames:[], orbit:[], observedPanels:[], P:12, resLabel:'monthly', N:ATT_DEFAULT_SAMPLES, burn:10, recordedYears:52, preset:'elnino',
   params:null, L:12, fitDom:null,
   zoom:1, pointSize:4, delay:120, colorByYear:true, trails:false,
   frameIndex:0, running:false, paused:false, timerId:null,
@@ -1466,10 +1508,10 @@ function attReadControls(){
   const res=attResMode();
   ATT.P=res.P; ATT.resLabel=res.label;
   let N=parseInt(document.getElementById('nb-att-samples').value);
-  ATT.N=Number.isFinite(N) ? Math.max(1,Math.min(60000,N)) : 624;
+  ATT.N=Number.isFinite(N) ? Math.max(1,Math.min(60000,N)) : ATT_DEFAULT_SAMPLES;
   document.getElementById('nb-att-samples').value=ATT.N;
   let M=parseInt(document.getElementById('nb-att-burn').value);
-  ATT.burn=Number.isFinite(M) ? Math.max(0,Math.min(5000,M)) : 0;
+  ATT.burn=Number.isFinite(M) ? Math.max(0,Math.min(5000,M)) : 10;
   document.getElementById('nb-att-burn').value=ATT.burn;
   ATT.delay=Math.max(30,parseInt(document.getElementById('nb-att-delay').value)||120);
   ATT.pointSize=Math.max(1,parseFloat(document.getElementById('nb-att-point').value)||4);
@@ -1546,6 +1588,7 @@ function attBuild(){
   if(!isFinite(ymin)||ymax-ymin<1e-6){ymin=-3;ymax=3;}
   const mgx=Math.max(0.3,(xmax-xmin)*0.08), mgy=Math.max(0.3,(ymax-ymin)*0.08);
   ATT.fitDom={xmin:xmin-mgx, xmax:xmax+mgx, ymin:ymin-mgy, ymax:ymax+mgy};
+  ATT.observedPanels=attBuildObservedPanels(P);
 
   ATT.frameIndex=0;
   if(ATT.trailCtx) ATT.trailCtx.clearRect(0,0,ATT_CW,ATT_CH);
@@ -1593,6 +1636,86 @@ function attNiceTickValues(min,max,target=7){
 }
 function attViewTicks(dom){
   return {x:attNiceTickValues(dom.xmin,dom.xmax), y:attNiceTickValues(dom.ymin,dom.ymax)};
+}
+
+function attBuildObservedFrames(data,mean,P){
+  const frames=Array.from({length:P},()=>[]);
+  if(!data||!data.x||!data.x.length) return {frames:frames,years:0};
+  const ndots=Math.max(1,...data.irest.map(v=>Number(v)+1));
+  const byYear=new Map();
+  for(let i=0;i<data.x.length;i++){
+    const year=Number(data.year[i]), month=Number(data.month[i]), sub=Number(data.irest[i]);
+    const x=Number(data.x[i])-mean, y=Number(data.y[i]);
+    if(!Number.isFinite(year)||!Number.isFinite(month)||!Number.isFinite(sub)||
+       !Number.isFinite(x)||!Number.isFinite(y)) continue;
+    if(!byYear.has(year)) byYear.set(year,[]);
+    byYear.get(year).push({x:x,y:y,phase:(month-1+sub/ndots)/12});
+  }
+  const years=[...byYear.keys()].sort((a,b)=>a-b);
+  years.forEach((year,yearIdx)=>{
+    const points=byYear.get(year);
+    for(let k=0;k<P;k++){
+      const target=k/P;
+      let best=null, bestDistance=Infinity;
+      for(const point of points){
+        const direct=Math.abs(point.phase-target);
+        const distance=Math.min(direct,1-direct);
+        if(distance<bestDistance){best=point;bestDistance=distance;}
+      }
+      if(best) frames[k].push({x:best.x,y:best.y,year:yearIdx,t:year+target});
+    }
+  });
+  return {frames:frames,years:years.length};
+}
+
+function attBuildObservedPanels(P){
+  const sst=attBuildObservedFrames(observedData,0,P);
+  const ssh=attBuildObservedFrames(callaoData,callaoMean,P);
+  return [
+    {
+      canvasId:'att-obs-sst-canvas', frames:sst.frames, years:sst.years,
+      dom:phaseAutoDomain(observedData,0,{xmin:17.5,xmax:32.5,ymin:-2.5,ymax:2.5}),
+      labels:{x:'SST (°C)',y:'dT/dt'}, baseColor:'120,190,255',
+    },
+    {
+      canvasId:'att-obs-ssh-canvas', frames:ssh.frames, years:ssh.years,
+      dom:phaseAutoDomain(callaoData,callaoMean,{xmin:-300,xmax:300,ymin:-60,ymax:60}),
+      labels:{x:'SSH anomaly (mm)',y:'dSSH/dt'}, baseColor:'68,204,136',
+    },
+  ];
+}
+
+function attDrawObservedPanel(panel){
+  const canvas=document.getElementById(panel.canvasId);
+  if(!canvas) return;
+  const ctx=canvas.getContext('2d'), frame=panel.frames[ATT.frameIndex]||[];
+  const ticks=phaseAutoTicks(panel.dom), map=attMap(ATT_OBS_PLT,panel.dom);
+  drawBg(ctx,ATT_OBS_CW,ATT_OBS_CH,ATT_OBS_PLT,panel.dom,panel.labels,ticks,ATT_OBS_AXIS_STYLE);
+  const radius=Math.max(2,Math.min(6,ATT.pointSize*.85));
+  const span=Math.max(1,panel.years-1);
+  for(const point of frame){
+    const px=map.x(point.x), py=map.y(point.y);
+    if(px<ATT_OBS_PLT.l-4||px>ATT_OBS_PLT.r+4||py<ATT_OBS_PLT.t-4||py>ATT_OBS_PLT.b+4) continue;
+    ctx.beginPath();ctx.arc(px,py,radius,0,2*Math.PI);
+    if(ATT.colorByYear){
+      const f=point.year/span;
+      ctx.fillStyle='hsla('+Math.round(205-165*f)+',86%,64%,.92)';
+    } else {
+      ctx.fillStyle='rgba('+panel.baseColor+',.92)';
+    }
+    ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.42)';ctx.lineWidth=.7;ctx.stroke();
+  }
+  ctx.fillStyle='rgba(10,10,20,.78)';ctx.beginPath();
+  ctx.roundRect(ATT_OBS_PLT.l+8,ATT_OBS_PLT.t+8,245,45,5);ctx.fill();
+  ctx.fillStyle='#e8e8f0';ctx.font='bold 12px monospace';ctx.textAlign='left';
+  ctx.fillText('phase '+(ATT.frameIndex+1)+'/'+ATT.P+'  ('+attFrameLabel(ATT.frameIndex)+')',ATT_OBS_PLT.l+18,ATT_OBS_PLT.t+27);
+  ctx.fillStyle='#888899';ctx.font='11px monospace';
+  ctx.fillText(frame.length+' measured years',ATT_OBS_PLT.l+18,ATT_OBS_PLT.t+45);
+}
+
+function attDrawObservedPanels(){
+  for(const panel of ATT.observedPanels) attDrawObservedPanel(panel);
 }
 
 function attFrameLabel(k){
@@ -1812,6 +1935,7 @@ function attDrawFrame(){
   }
 
   attDrawSidePanels();
+  attDrawObservedPanels();
 }
 
 function attLoop(){
@@ -2675,7 +2799,7 @@ function resetParams() {
   const d=[['nb-K1',.121847],['nb-K3',-.03046],['nb-FA',.4873],['nb-FF',-60],
            ['nb-B',-.35465],['nb-W',0.523599],['nb-tend',600],['nb-spf',1],['nb-delay',30],
            ['nb-styear',1975],['nb-X0',0],['nb-Y0',0],['nb-tstart',0.5],
-           ['nb-att-samples',624],['nb-att-burn',0],['nb-att-delay',120],['nb-att-point',4],['nb-att-zoom',1]];
+           ['nb-att-samples',ATT_DEFAULT_SAMPLES],['nb-att-burn',10],['nb-att-delay',120],['nb-att-point',4],['nb-att-zoom',1]];
   d.forEach(([id,val])=>{ document.getElementById(id).value=val; });
   linkSlider('sl-K1','nb-K1','lbl-K1',f4); linkSlider('sl-K3','nb-K3','lbl-K3',f4);
   linkSlider('sl-FA','nb-FA','lbl-FA',f4); linkSlider('sl-FF','nb-FF','lbl-FF',fDeg);

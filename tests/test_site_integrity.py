@@ -167,13 +167,37 @@ def test_duffing_sample_count_matches_monthly_observations():
 
     assert "N — simulated monthly samples" in html
     assert re.search(
-        r'id="nb-att-samples"\s+value="624"\s+min="1"\s+max="60000"',
+        r'id="nb-att-samples"\s+value="613"\s+min="1"\s+max="60000"',
         html,
     )
     assert "const recordedSamples=Math.max(1,Math.ceil(ATT.N*P/12));" in html
     assert "const burnSamples=ATT.burn*P;" in html
     assert "for(let sampleIdx=0; sampleIdx<totalSamples; sampleIdx++){" in html
     assert "const k=sampleIdx%P;" in html
+
+
+def test_duffing_attractor_defaults_to_observed_record_after_transient():
+    """The ALADO cloud must compare like-for-like with the observed SST record."""
+    html = DUFFING_PAGE.read_text(encoding="utf-8")
+
+    assert "const ATT_DEFAULT_SAMPLES=observedData.irest.filter(v=>v===0).length;" in html
+    assert re.search(r'id="nb-att-burn"\s+value="10"', html)
+    assert "N:ATT_DEFAULT_SAMPLES, burn:10" in html
+    assert "['nb-att-samples',ATT_DEFAULT_SAMPLES]" in html
+
+
+def test_duffing_attractor_has_synchronized_observed_monthly_clouds():
+    """SST and SSH phase clouds must animate on the model's selected phase."""
+    html = DUFFING_PAGE.read_text(encoding="utf-8")
+
+    for canvas_id in ("att-obs-sst-canvas", "att-obs-ssh-canvas"):
+        assert f'id="{canvas_id}"' in html
+    assert "function attBuildObservedFrames(" in html
+    assert "function attDrawObservedPanel(" in html
+    assert "function attDrawObservedPanels(" in html
+    assert "attDrawObservedPanels();" in html
+    assert "observedData" in html
+    assert "callaoData" in html
 
 
 def test_phase_plot_axes_are_derived_from_every_embedded_series():
