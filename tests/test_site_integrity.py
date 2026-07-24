@@ -148,6 +148,34 @@ def test_duffing_attractor_has_synchronized_side_panels():
     assert "File%3ADuffing_oscillator.webm" in html
 
 
+def test_duffing_motion_tracks_are_opt_in():
+    """Monthly phase clouds must be visible before optional tracks are enabled."""
+    html = DUFFING_PAGE.read_text(encoding="utf-8")
+
+    trail_control = re.search(
+        r'<input\s+type="checkbox"\s+id="att-trails"([^>]*)>',
+        html,
+    )
+    assert trail_control is not None
+    assert "checked" not in trail_control.group(1)
+    assert re.search(r"trails\s*:\s*false", html)
+
+
+def test_duffing_sample_count_matches_monthly_observations():
+    """N is a monthly sample count, not a multiplier of every phase frame."""
+    html = DUFFING_PAGE.read_text(encoding="utf-8")
+
+    assert "N — simulated monthly samples" in html
+    assert re.search(
+        r'id="nb-att-samples"\s+value="624"\s+min="1"\s+max="60000"',
+        html,
+    )
+    assert "const recordedSamples=Math.max(1,Math.ceil(ATT.N*P/12));" in html
+    assert "const burnSamples=ATT.burn*P;" in html
+    assert "for(let sampleIdx=0; sampleIdx<totalSamples; sampleIdx++){" in html
+    assert "const k=sampleIdx%P;" in html
+
+
 def test_phase_plot_axes_are_derived_from_every_embedded_series():
     """Updated observations must never outgrow hard-coded phase-plot axes."""
     phase_html = PHASE_PAGE.read_text(encoding="utf-8")

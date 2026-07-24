@@ -357,11 +357,12 @@ footer a:hover { text-decoration:underline; }
 <div class="container">
   <h2>Duffing Attractor Sampling</h2>
   <p class="section-desc">
-    Run the Duffing model continuously for <em>N</em> simulated years (one &ldquo;year&rdquo; = one annual
-    forcing period, L&nbsp;=&nbsp;2&pi;/W). Pick a phase resolution <em>P</em> (frames per year); frame
-    <em>k</em> fixes phase &phi;<sub>k</sub>&nbsp;=&nbsp;k/P of the cycle and plots one phase-space point
-    (X,&nbsp;dX/dt) for <em>every</em> simulated year — so each frame carries <em>N</em> dots. Playing the
-    frames in order sweeps the phase and makes the attractor stretch and fold: the stroboscopic view of the
+    Run the Duffing model continuously for <em>N</em> monthly samples, matching the sample-count convention
+    used by the observed records in Section&nbsp;1. Pick a phase resolution <em>P</em> (frames per year);
+    frame <em>k</em> fixes phase &phi;<sub>k</sub>&nbsp;=&nbsp;k/P of the annual cycle and plots one
+    phase-space point (X,&nbsp;dX/dt) per simulated year at that phase. Monthly mode therefore distributes
+    the <em>N</em> samples across 12 frames (about <em>N</em>/12 dots per frame). Playing the frames in
+    order sweeps the phase and makes the attractor stretch and fold: the stroboscopic view of the
     <a href="https://en.wikipedia.org/wiki/Duffing_equation" target="_blank" rel="noopener">Duffing oscillator</a>.
     It reuses the <em>same</em> integrator and coefficients as the simulator above.
   </p>
@@ -389,9 +390,9 @@ footer a:hover { text-decoration:underline; }
         </select>
       </div>
       <div class="param-row">
-        <label for="nb-att-years">N — simulated years</label>
+        <label for="nb-att-samples">N — simulated monthly samples</label>
         <div class="param-inline">
-          <input type="number" id="nb-att-years" value="52" min="1" max="5000" step="1">
+          <input type="number" id="nb-att-samples" value="624" min="1" max="60000" step="12">
         </div>
       </div>
       <div class="param-row">
@@ -434,7 +435,7 @@ footer a:hover { text-decoration:underline; }
         <span>Color dots by simulated year</span>
       </label>
       <label class="check-row" for="att-trails">
-        <input type="checkbox" id="att-trails" checked>
+        <input type="checkbox" id="att-trails">
         <span>Grey motion tracks (behind particles)</span>
       </label>
       <div class="btn-row">
@@ -1432,9 +1433,9 @@ const ATT_AXIS_STYLE={
 };
 
 const ATT={
-  frames:[], orbit:[], P:12, resLabel:'monthly', N:52, burn:0, preset:'elnino',
+  frames:[], orbit:[], P:12, resLabel:'monthly', N:624, burn:0, recordedYears:52, preset:'elnino',
   params:null, L:12, fitDom:null,
-  zoom:1, pointSize:4, delay:120, colorByYear:true, trails:true,
+  zoom:1, pointSize:4, delay:120, colorByYear:true, trails:false,
   frameIndex:0, running:false, paused:false, timerId:null,
   canvas:null, ctx:null, trail:null, trailCtx:null,
   potCanvas:null, timeCanvas:null, phaseCanvas:null,
@@ -1464,11 +1465,11 @@ function attReadControls(){
   ATT.preset=presetEl ? presetEl.value : 'elnino';
   const res=attResMode();
   ATT.P=res.P; ATT.resLabel=res.label;
-  let N=parseInt(document.getElementById('nb-att-years').value);
-  ATT.N=Number.isFinite(N) ? Math.max(1,Math.min(5000,N)) : 52;
-  document.getElementById('nb-att-years').value=ATT.N;
+  let N=parseInt(document.getElementById('nb-att-samples').value);
+  ATT.N=Number.isFinite(N) ? Math.max(1,Math.min(60000,N)) : 624;
+  document.getElementById('nb-att-samples').value=ATT.N;
   let M=parseInt(document.getElementById('nb-att-burn').value);
-  ATT.burn=Number.isFinite(M) ? Math.max(0,Math.min(ATT.N-1,M)) : 0;
+  ATT.burn=Number.isFinite(M) ? Math.max(0,Math.min(5000,M)) : 0;
   document.getElementById('nb-att-burn').value=ATT.burn;
   ATT.delay=Math.max(30,parseInt(document.getElementById('nb-att-delay').value)||120);
   ATT.pointSize=Math.max(1,parseFloat(document.getElementById('nb-att-point').value)||4);
@@ -1477,8 +1478,9 @@ function attReadControls(){
   const tEl=document.getElementById('att-trails');     if(tEl) ATT.trails=tEl.checked;
 }
 
-// Integrate ONE continuous trajectory of (burn+N) years and record, for each
-// phase-frame k, the state (X,dX/dt) at phase k/P of every recorded year.
+// Integrate ONE continuous trajectory after the requested burn-in and record
+// N monthly-equivalent samples. Phase frame k receives the states at k/P of
+// each recorded annual cycle, matching the observed monthly-data convention.
 // dt is chosen so an integer number of RKF5 sub-steps (each <= 0.1 mo) lands
 // exactly on every phase sample; monthly therefore integrates at dt = 0.1,
 // identical to the Section-1 simulator.
@@ -1505,15 +1507,19 @@ function attBuild(){
   const hSample=L/P;                         // time between phase samples
   const nsub=Math.max(1,Math.round(hSample/ATT_TARGET_DT));
   const dtInt=hSample/nsub;                  // integration sub-step
-  const totalYears=ATT.burn+ATT.N;
+  // N is a total monthly sample count, not a count repeated in every frame.
+  const burnSamples=ATT.burn*P;
+  const recordedSamples=Math.max(1,Math.ceil(ATT.N*P/12));
+  const totalSamples=burnSamples+recordedSamples;
+  ATT.recordedYears=Math.max(1,Math.ceil(recordedSamples/P));
 
   ATT.frames=Array.from({length:P},()=>[]);
   ATT.orbit=[];
-  // Retain a dense representative orbit only for the latest displayed year and
-  // enough preceding cycles to feed the synchronized diagnostic panels.
-  const orbitStartYear=Math.max(0,totalYears-(ATT_SIDE_TRAIL_CYCLES+1));
-  const recordOrbit=(yr,time,x,y)=>{
-    if(yr<orbitStartYear) return;
+  // Retain a dense representative orbit only for the latest displayed cycles
+  // and enough preceding cycles to feed the synchronized diagnostic panels.
+  const orbitStartSample=Math.max(0,totalSamples-(ATT_SIDE_TRAIL_CYCLES+1)*P);
+  const recordOrbit=(sampleIdx,time,x,y)=>{
+    if(sampleIdx<orbitStartSample) return;
     const last=ATT.orbit[ATT.orbit.length-1];
     if(!last || Math.abs(last.t-time)>1e-10){
       ATT.orbit.push({t:time,x:x,y:y});
@@ -1521,21 +1527,19 @@ function attBuild(){
   };
   let t=t0, X=X0, Y=Y0, blew=false;
   let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
-  for(let yr=0; yr<totalYears; yr++){
-    for(let k=0; k<P; k++){
-      recordOrbit(yr,t,X,Y);
-      if(yr>=ATT.burn){
-        const yearIdx=yr-ATT.burn;           // 0 .. N-1
-        ATT.frames[k].push({x:X, y:Y, year:yearIdx, t:t});
-        if(X<xmin)xmin=X; if(X>xmax)xmax=X; if(Y<ymin)ymin=Y; if(Y>ymax)ymax=Y;
-      }
-      for(let j=0; j<nsub; j++){
-        const s=rkf5Step(t,X,Y,p,dtInt); X=s.X; Y=s.Y; t+=dtInt;
-        recordOrbit(yr,t,X,Y);
-      }
-      if(!isFinite(X)||!isFinite(Y)||Math.abs(X)>1e4){blew=true;break;}
+  for(let sampleIdx=0; sampleIdx<totalSamples; sampleIdx++){
+    const k=sampleIdx%P;
+    recordOrbit(sampleIdx,t,X,Y);
+    if(sampleIdx>=burnSamples){
+      const yearIdx=Math.floor((sampleIdx-burnSamples)/P);
+      ATT.frames[k].push({x:X, y:Y, year:yearIdx, t:t});
+      if(X<xmin)xmin=X; if(X>xmax)xmax=X; if(Y<ymin)ymin=Y; if(Y>ymax)ymax=Y;
     }
-    if(blew)break;
+    for(let j=0; j<nsub; j++){
+      const s=rkf5Step(t,X,Y,p,dtInt); X=s.X; Y=s.Y; t+=dtInt;
+      recordOrbit(sampleIdx,t,X,Y);
+    }
+    if(!isFinite(X)||!isFinite(Y)||Math.abs(X)>1e4){blew=true;break;}
   }
 
   if(!isFinite(xmin)||xmax-xmin<1e-6){xmin=-3;xmax=3;}
@@ -1549,7 +1553,11 @@ function attBuild(){
   const frameEl=document.getElementById('att-frame-readout');
   if(frameEl) frameEl.textContent=P+' '+ATT.resLabel;
   const countEl=document.getElementById('att-count-readout');
-  if(countEl) countEl.textContent=ATT.N.toLocaleString()+(ATT.N===1?' year':' years');
+  if(countEl){
+    const years=ATT.N/12;
+    const yearsLabel=Number.isInteger(years)?years.toString():years.toFixed(1);
+    countEl.textContent=ATT.N.toLocaleString()+' months (~'+yearsLabel+' years)';
+  }
 }
 
 function attViewDom(){
@@ -1568,7 +1576,7 @@ function attMap(PLT,DOM){
 
 function attDotColor(yearIdx,alpha){
   if(!ATT.colorByYear) return `rgba(120,190,255,${alpha})`;
-  const span=Math.max(1,ATT.N-1), f=yearIdx/span;
+  const span=Math.max(1,ATT.recordedYears-1), f=yearIdx/span;
   return `hsla(${Math.round(205-165*f)},86%,64%,${alpha})`;
 }
 
@@ -1793,14 +1801,14 @@ function attDrawFrame(){
   ATT.ctx.fillStyle='#888899'; ATT.ctx.font='12px monospace';
   ATT.ctx.fillText(`${frame.length.toLocaleString()} dots — one per simulated year`, ATT_PLT.l+20, ATT_PLT.t+47);
 
-  if(ATT.colorByYear && ATT.N>1){
+  if(ATT.colorByYear && ATT.recordedYears>1){
     const lx=ATT_PLT.r-175, ly=ATT_PLT.t+24, lw=145;
     const grad=ATT.ctx.createLinearGradient(lx,0,lx+lw,0);
-    grad.addColorStop(0,attDotColor(0,1)); grad.addColorStop(1,attDotColor(ATT.N-1,1));
+    grad.addColorStop(0,attDotColor(0,1)); grad.addColorStop(1,attDotColor(ATT.recordedYears-1,1));
     ATT.ctx.fillStyle=grad; ATT.ctx.fillRect(lx,ly,lw,5);
     ATT.ctx.fillStyle='#888899'; ATT.ctx.font='10px monospace'; ATT.ctx.textAlign='left';
     ATT.ctx.fillText('year 1',lx,ly+18);
-    ATT.ctx.textAlign='right'; ATT.ctx.fillText('year '+ATT.N,lx+lw,ly+18);
+    ATT.ctx.textAlign='right'; ATT.ctx.fillText('year '+ATT.recordedYears,lx+lw,ly+18);
   }
 
   attDrawSidePanels();
@@ -2627,7 +2635,7 @@ document.getElementById('att-preset').addEventListener('change',attReset);
 document.getElementById('att-color-year').addEventListener('change',updateAttSpeed);
 document.getElementById('att-trails').addEventListener('change',updateAttSpeed);
 let attYearInputTimer=null;
-['nb-att-years','nb-att-burn'].forEach(id => {
+['nb-att-samples','nb-att-burn'].forEach(id => {
   const input=document.getElementById(id);
   if(!input) return;
   input.addEventListener('input', () => {
@@ -2667,7 +2675,7 @@ function resetParams() {
   const d=[['nb-K1',.121847],['nb-K3',-.03046],['nb-FA',.4873],['nb-FF',-60],
            ['nb-B',-.35465],['nb-W',0.523599],['nb-tend',600],['nb-spf',1],['nb-delay',30],
            ['nb-styear',1975],['nb-X0',0],['nb-Y0',0],['nb-tstart',0.5],
-           ['nb-att-years',52],['nb-att-burn',0],['nb-att-delay',120],['nb-att-point',4],['nb-att-zoom',1]];
+           ['nb-att-samples',624],['nb-att-burn',0],['nb-att-delay',120],['nb-att-point',4],['nb-att-zoom',1]];
   d.forEach(([id,val])=>{ document.getElementById(id).value=val; });
   linkSlider('sl-K1','nb-K1','lbl-K1',f4); linkSlider('sl-K3','nb-K3','lbl-K3',f4);
   linkSlider('sl-FA','nb-FA','lbl-FA',f4); linkSlider('sl-FF','nb-FF','lbl-FF',fDeg);
@@ -2682,7 +2690,7 @@ function resetParams() {
   document.getElementById('att-resolution').value='monthly';
   document.getElementById('att-preset').value='elnino';
   document.getElementById('att-color-year').checked=true;
-  document.getElementById('att-trails').checked=true;
+  document.getElementById('att-trails').checked=false;
   s2Reset(); attReset(); cmpReset();
 }
 

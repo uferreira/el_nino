@@ -6,11 +6,12 @@ docs/duffing_simulation.html.
 
 It mirrors, exactly, the JavaScript ``attBuild()`` sampler:
 
-  * one continuous Duffing trajectory of (M_burn + N) "years", where a year is
-    one forcing period  L = 2*pi/W ;
+  * one continuous Duffing trajectory after M_burn transient years ;
+  * N is the total number of monthly-equivalent recorded samples, matching
+    the observed-data convention used by the page ;
   * phase resolution P frames/year (Monthly=12, Weekly=52, Daily=365) ;
   * frame k holds the state (X, dX/dt) at phase k/P of every recorded year,
-    so each frame carries N dots ;
+    so Monthly mode carries approximately N/12 dots per frame ;
   * integration sub-step dt = (L/P)/nsub with nsub = max(1, round((L/P)/0.1)),
     so Monthly integrates at exactly dt = 0.1 — identical to the Section-1
     simulator (rkf5Step / NL3System.increment).
@@ -19,14 +20,15 @@ The same fixed-step RKF5 update used everywhere on the page is imported from
 verify_duffing.py, so this is the *same physics*, not a fork.
 
 Acceptance checks (printed):
-  1. Monthly, N=52: frame-1 (January) dot X-values equal the January states of
-     the 52 simulated years obtained by running the Section-1 integrator
-     continuously; frame-12 = December. Numeric check for 3 sample years.
-  2. N=1000 builds quickly; Weekly=52 and Daily=365 frame counts are correct.
+  1. Monthly, N=624 monthly samples: frame-1 (January) dot X-values equal the
+     January states of the 52 simulated years obtained by running the
+     Section-1 integrator continuously; frame-12 = December.
+  2. N=12000 months builds quickly; Weekly=52 and Daily=365 frame counts are correct.
 """
 
 from __future__ import annotations
 
+import math
 import sys
 import time
 from pathlib import Path
@@ -47,29 +49,31 @@ TWO_PI = 6.283185307179586
 
 
 def build_frames(params, x0, y0, t0, N, P, burn=0, wiki=False):
-    """Exact port of attBuild(): returns (frames, hsample, nsub, dt_int).
+    """Mirror attBuild() using N monthly-equivalent recorded samples.
 
-    frames[k] is a list of X (we only need X for the checks) for every recorded
-    year at phase k/P.  "One year" is 12 months for the calendar / El Niño
-    modes and the forcing period 2*pi/W for the Wikipedia preset — matching the
-    JavaScript.
+    frames[k] is a list of X values at phase k/P. Burn remains a count
+    of transient forcing cycles, while N matches the observed monthly sample
+    count. Monthly mode therefore records exactly N points in total and
+    distributes them across the 12 phase frames.
     """
     W = params.get("W", TWO_PI / 12.0)
     L = (TWO_PI / W) if wiki else 12.0
     hsample = L / P
     nsub = max(1, round(hsample / TARGET_DT))
     dt_int = hsample / nsub
-    total_years = burn + N
+    burn_samples = burn * P
+    recorded_samples = max(1, math.ceil(N * P / 12))
+    total_samples = burn_samples + recorded_samples
 
     framesX = [[] for _ in range(P)]
     t, X, Y = t0, x0, y0
-    for yr in range(total_years):
-        for k in range(P):
-            if yr >= burn:
-                framesX[k].append(X)
-            for _ in range(nsub):
-                X, Y = rkf5_step(t, X, Y, params, dt_int)
-                t += dt_int
+    for sample_idx in range(total_samples):
+        frame_idx = sample_idx % P
+        if sample_idx >= burn_samples:
+            framesX[frame_idx].append(X)
+        for _ in range(nsub):
+            X, Y = rkf5_step(t, X, Y, params, dt_int)
+            t += dt_int
     return framesX, hsample, nsub, dt_int
 
 
@@ -110,21 +114,20 @@ def main():
           f"B={p['B']}, W={p['W']}")
     print(f"  t0={t0}, X0={x0}, Y0={y0}")
 
-    # ---- Acceptance check 1: Monthly N=52 -----------------------------------
-    N = 52
+    # ---- Acceptance check 1: 624 months = 52 years ---------------------------
+    N = 624
     framesX, hs, nsub, dti = build_frames(p, x0, y0, t0, N=N, P=12, burn=0)
-    print("\n[1] Monthly, N=52  (P=12, "
+    print("\n[1] Monthly, N=624 months (52 years; P=12, "
           f"hsample={hs:.4f} mo, nsub={nsub}, dt_int={dti:.4f} mo)")
 
-    jan_truth = section1_monthly_states(p, x0, y0, t0, N, phase_month=0)   # January
-    dec_truth = section1_monthly_states(p, x0, y0, t0, N, phase_month=11)  # December
+    jan_truth = section1_monthly_states(p, x0, y0, t0, 52, phase_month=0)   # January
+    dec_truth = section1_monthly_states(p, x0, y0, t0, 52, phase_month=11)  # December
 
     frame1 = framesX[0]     # January
     frame12 = framesX[11]   # December
 
-    import math
-    max_jan = max(abs(frame1[y] - jan_truth[y]) for y in range(N))
-    max_dec = max(abs(frame12[y] - dec_truth[y]) for y in range(N))
+    max_jan = max(abs(frame1[y] - jan_truth[y]) for y in range(len(frame1)))
+    max_dec = max(abs(frame12[y] - dec_truth[y]) for y in range(len(frame12)))
 
     print("    sample-year check (frame values vs Section-1 continuous run):")
     for y in (0, 25, 51):
@@ -143,12 +146,17 @@ def main():
         assert len(build_frames(p, x0, y0, t0, N=1, P=P)[0]) == P
         print(f"    {label:<8}: {P} frames/year  OK")
 
+    frames_552, *_ = build_frames(p, x0, y0, t0, N=552, P=12)
+    counts_552 = {len(frame) for frame in frames_552}
+    assert counts_552 == {46}
+    print("    N=552 months Monthly : 12 frames x 46 dots  OK")
+
     for P, tag in ((12, "Monthly"), (365, "Daily")):
         t = time.perf_counter()
-        fr, *_ = build_frames(p, x0, y0, t0, N=1000, P=P)
+        fr, *_ = build_frames(p, x0, y0, t0, N=12000, P=P)
         dt_build = time.perf_counter() - t
         dots = len(fr[0])
-        print(f"    N=1000 {tag:<8}: built {P} frames x {dots} dots "
+        print(f"    N=12000 months {tag:<8}: built {P} frames x {dots} dots "
               f"in {dt_build*1000:.0f} ms")
     ok2 = True
 
