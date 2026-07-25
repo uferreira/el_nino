@@ -25,8 +25,9 @@ h1{font-size:clamp(1.8rem,5vw,3rem);background:linear-gradient(135deg,#3388ff,va
 .tabs{display:flex;gap:.65rem;flex-wrap:wrap;margin-bottom:1rem}
 .tab{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:.55rem 1rem;font-weight:600;cursor:pointer}
 .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
-.frame-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.75rem;overflow:auto}
-iframe{display:block;width:100%;min-width:640px;height:960px;border:0;border-radius:5px;background:#000}
+.frame-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.75rem;overflow:hidden}
+.frame-stage{position:relative;width:100%;max-width:620px;margin:0 auto;overflow:hidden}
+iframe{display:block;width:620px;height:940px;border:0;border-radius:5px;background:#000;transform-origin:top left}
 footer{text-align:center;padding:2rem 1rem;color:var(--muted);font-size:.82rem;border-top:1px solid var(--border)}
 footer a{color:var(--accent);text-decoration:none}
 @media(max-width:700px){.frame-card{padding:.35rem}.site-nav{gap:.35rem}.site-nav .nav-link{font-size:.8rem;padding:.3rem .5rem}}
@@ -57,13 +58,25 @@ footer a{color:var(--accent);text-decoration:none}
     <button class="tab" type="button" role="tab" aria-selected="false" data-src="java/observations-2013/index.html">Observations — Jan 2013</button>
   </div>
   <div class="frame-card">
-    <iframe id="java-frame" title="Original Java simulation" src="java/double-well/index.html" loading="eager"></iframe>
+    <div class="frame-stage" id="java-stage">
+      <iframe id="java-frame" title="Original Java simulation" src="java/double-well/index.html" loading="eager"></iframe>
+    </div>
   </div>
 </main>
 
 <footer><p><a href="https://github.com/uferreira/el_nino" target="_blank" rel="noopener">GitHub repository and Java source</a></p></footer>
 <script>
 const frame=document.getElementById('java-frame');
+const stage=document.getElementById('java-stage');
+const frameWidth=620;
+const frameHeight=940;
+function resizeFrame(){
+  const scale=Math.min(1,stage.clientWidth/frameWidth);
+  frame.style.transform=`scale(${scale})`;
+  stage.style.height=`${Math.ceil(frameHeight*scale)}px`;
+}
+new ResizeObserver(resizeFrame).observe(stage);
+resizeFrame();
 document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>{
   document.querySelectorAll('.tab').forEach(item=>{item.classList.remove('active');item.setAttribute('aria-selected','false')});
   button.classList.add('active');button.setAttribute('aria-selected','true');
