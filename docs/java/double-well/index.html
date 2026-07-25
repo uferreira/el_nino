@@ -6,14 +6,15 @@
 <title>Original Double Well Java Applet</title>
 <script src="https://cjrtnc.leaningtech.com/4.3/loader.js"></script>
 <style>
-html,body{margin:0;min-height:100%;background:#000;color:#fff;font-family:system-ui,sans-serif}
-.applet-wrap{width:600px;margin:0 auto}.loading{padding:.6rem;text-align:center;color:#aaa;font-size:.85rem}
+html,body{margin:0;min-height:100%;background:#000;color:#fff;font-family:system-ui,sans-serif;overflow-x:hidden}
+.loading{padding:.6rem;text-align:center;color:#aaa;font-size:.85rem}.applet-stage{position:relative;width:100%;max-width:600px;height:950px;margin:0 auto}.applet-wrap{width:600px;height:950px;transform-origin:top left}
 </style>
 </head>
 <body>
-<div class="applet-wrap">
-  <div class="loading">Loading the original Java applet…</div>
-  <cheerpj-applet archive="double-well.jar" code="DoubleWellApplet" width="600" height="850">
+<div class="loading">Loading the original Java applet…</div>
+<div class="applet-stage" id="applet-stage">
+<div class="applet-wrap" id="applet-wrap">
+  <cheerpj-applet archive="double-well.jar?v=20260725b" code="DoubleWellApplet" width="600" height="950">
     <param name="initial_position" value="0.0">
     <param name="initial_velocity" value="0.0">
     <param name="forcing_amplitude" value="0.4873">
@@ -41,6 +42,20 @@ html,body{margin:0;min-height:100%;background:#000;color:#fff;font-family:system
     <param name="fileToRead" value="test.txt">
   </cheerpj-applet>
 </div>
+</div>
+<script>
+const appletStage=document.getElementById('applet-stage');
+const appletWrap=document.getElementById('applet-wrap');
+const appletWidth=600;
+const appletHeight=950;
+function resizeApplet(){
+  const scale=Math.min(1,appletStage.clientWidth/appletWidth);
+  appletWrap.style.transform=`scale(${scale})`;
+  appletStage.style.height=`${Math.ceil(appletHeight*scale)}px`;
+}
+new ResizeObserver(resizeApplet).observe(appletStage);
+resizeApplet();
+</script>
 <script type="module">await cheerpjInit({version:8,status:'splash'});</script>
 </body>
 </html>
