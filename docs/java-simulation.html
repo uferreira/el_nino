@@ -23,14 +23,14 @@ h1{font-size:clamp(1.8rem,5vw,3rem);background:linear-gradient(135deg,#3388ff,va
 .notice{background:var(--surface);border-left:3px solid var(--accent);border-radius:0 6px 6px 0;padding:1rem 1.2rem;margin-bottom:1.4rem;color:var(--muted);max-width:900px}
 .notice strong{color:var(--text)}
 .tabs{display:flex;gap:.65rem;flex-wrap:wrap;margin-bottom:1rem}
-.tab{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:.55rem 1rem;font-weight:600;cursor:pointer}
+.tab{display:inline-block;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:.55rem 1rem;font-weight:600;cursor:pointer;text-decoration:none}
 .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
-.frame-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.75rem;overflow:hidden}
-.frame-stage{position:relative;width:100%;max-width:620px;margin:0 auto;overflow:hidden}
-iframe{display:block;width:620px;height:940px;border:0;border-radius:5px;background:#000;transform-origin:top left}
+.frame-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.75rem;overflow:auto}
+.frame-stage{width:720px;height:1080px;margin:0 auto}
+iframe{display:block;width:720px;height:1080px;border:0;border-radius:5px;background:#000}
 footer{text-align:center;padding:2rem 1rem;color:var(--muted);font-size:.82rem;border-top:1px solid var(--border)}
 footer a{color:var(--accent);text-decoration:none}
-@media(max-width:700px){.frame-card{padding:.35rem}.site-nav{gap:.35rem}.site-nav .nav-link{font-size:.8rem;padding:.3rem .5rem}}
+@media(max-width:760px){.frame-card{padding:.35rem}.frame-stage{margin:0}.site-nav{gap:.35rem}.site-nav .nav-link{font-size:.8rem;padding:.3rem .5rem}}
 </style>
 </head>
 <body>
@@ -53,13 +53,14 @@ footer a{color:var(--accent);text-decoration:none}
   <h1>Original Java Simulations</h1>
   <p class="intro">The original AWT programs are preserved and executed directly in your browser. Choose the theoretical double-well model or the January 2013 observational animation.</p>
   <div class="notice"><strong>First load:</strong> the Java-compatible browser runtime is downloaded on demand and can take several seconds. It is cached for later visits. No Java installation or browser plugin is required.</div>
+  <p class="intro"><strong>Small screens:</strong> use the horizontal scroll inside the simulation panel to see the complete original 600 px Java interface.</p>
   <div class="tabs" role="tablist" aria-label="Java simulation">
-    <button class="tab active" type="button" role="tab" aria-selected="true" data-src="java/double-well/index.html">Double Well model</button>
-    <button class="tab" type="button" role="tab" aria-selected="false" data-src="java/observations-2013/index.html">Observations — Jan 2013</button>
+    <a class="tab" role="tab" aria-selected="false" data-simulation="double-well" href="?simulation=double-well">Double Well model</a>
+    <a class="tab" role="tab" aria-selected="false" data-simulation="observations-2013" href="?simulation=observations-2013">Observations — Jan 2013</a>
   </div>
   <div class="frame-card">
     <div class="frame-stage" id="java-stage">
-      <iframe id="java-frame" title="Original Java simulation" src="java/double-well/index.html" loading="eager"></iframe>
+      <iframe id="java-frame" title="Original Java simulation" loading="eager"></iframe>
     </div>
   </div>
 </main>
@@ -67,21 +68,18 @@ footer a{color:var(--accent);text-decoration:none}
 <footer><p><a href="https://github.com/uferreira/el_nino" target="_blank" rel="noopener">GitHub repository and Java source</a></p></footer>
 <script>
 const frame=document.getElementById('java-frame');
-const stage=document.getElementById('java-stage');
-const frameWidth=620;
-const frameHeight=940;
-function resizeFrame(){
-  const scale=Math.min(1,stage.clientWidth/frameWidth);
-  frame.style.transform=`scale(${scale})`;
-  stage.style.height=`${Math.ceil(frameHeight*scale)}px`;
-}
-new ResizeObserver(resizeFrame).observe(stage);
-resizeFrame();
-document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>{
-  document.querySelectorAll('.tab').forEach(item=>{item.classList.remove('active');item.setAttribute('aria-selected','false')});
-  button.classList.add('active');button.setAttribute('aria-selected','true');
-  if(!frame.src.endsWith(button.dataset.src)) frame.src=button.dataset.src;
-}));
+const requested=new URLSearchParams(location.search).get('simulation');
+const selected=requested==='observations-2013'?'observations-2013':'double-well';
+const sources={
+  'double-well':'java/double-well/index.html',
+  'observations-2013':'java/observations-2013/index.html'
+};
+document.querySelectorAll('.tab').forEach(tab=>{
+  const active=tab.dataset.simulation===selected;
+  tab.classList.toggle('active',active);
+  tab.setAttribute('aria-selected',String(active));
+});
+frame.src=sources[selected];
 </script>
 </body>
 </html>
