@@ -2714,7 +2714,10 @@ function linkSlider(slId, nbId, lblId, fmt) {
   function upd(v) { sl.value=v; nb.value=v; lb.textContent=fmt(parseFloat(v)); updateEffSpeed(); updateAttSpeed(); }
   sl.addEventListener('input',  ()=>upd(sl.value));
   nb.addEventListener('change', ()=>upd(nb.value));
-  upd(sl.value);
+  // The number input holds the exact Java coefficient. Range inputs quantize
+  // their value to their UI step (for example 0.523599 became 0.52), which
+  // accumulated a phase drift when sampling the same month over many years.
+  upd(nb.value);
 }
 function updateEffSpeed() {
   const spf   = parseInt(document.getElementById('nb-spf').value)||1;
