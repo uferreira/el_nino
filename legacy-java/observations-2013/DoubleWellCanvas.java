@@ -8,6 +8,10 @@
 import java.awt.*;
 
 public class DoubleWellCanvas extends Canvas {
+  private static final int TIMELINE_START_YEAR = 1950;
+  private static final int TIMELINE_END_YEAR = 2030;
+  private static final int TIMELINE_WIDTH = 600;
+
   //===================================================================
   // Variables
   //
@@ -16,7 +20,7 @@ public class DoubleWellCanvas extends Canvas {
   private double domainxMax, domainxMin, domainyMax, domainyMin, domaintMin, porraw
   , oldWindowtPos, windowtPos, cocoy, MES;
   private int windowxPos, windowyPos;
-  private int oldWindowxPos, oldWindowyPos, antes, depois, icont;
+  private int oldWindowxPos, oldWindowyPos, antes, depois;
   private Image offScreenImage, XiXiImage;
   private Graphics offScreenGraphics, XiXiGraphics;
   private double meuPasso;
@@ -196,36 +200,23 @@ public class DoubleWellCanvas extends Canvas {
     g.drawLine(mapxPoint(0.0)-5, mapyPoint(0.0)-0, mapxPoint(0.0)+5,  mapyPoint(0.0)-0);     //  .    -    .
     g.drawLine(mapxPoint(0.0)-0,  mapyPoint(0.0)-5, mapxPoint(0.0)-0,  mapyPoint(0.0)+5);    //  .    |    .
     g.setColor(Color.green);
-    g.drawLine(0,45, 600,  45); // Traça linha verde superior do gráfico da série temporal
-    g.setColor(Color.black);
-    icont = 0;
-	double rcont = 0.;
-    while ( icont <= 600)
-      {
-      g.drawLine(icont, 40, icont,  50); // Traços verticais por década na linha verde superior
-	  rcont = rcont + (600./7.);
-      icont = (int)(rcont);
-      }
-	g.setColor(Color.gray);  
-	g.drawString( "1950",   0, 20 );
-	g.setColor(Color.white); 
-    g.drawString( "1960",  85, 20 );
-	g.setColor(Color.yellow); 
-    g.drawString( "1970", 171, 20 );
-	g.setColor(Color.green); 
-    g.drawString( "1980", 257, 20 );
-	g.setColor(Color.red); 
-    g.drawString( "1990", 343, 20 );
-	g.setColor(Color.blue); 
-    g.drawString( "2000", 429, 20 );
-	g.setColor(Color.black); 
-	g.drawString( "2010", 514, 20 );
-	  
-	  
+    g.drawLine(0,45, TIMELINE_WIDTH, 45); // Linha superior da serie temporal
+    for (int year = TIMELINE_START_YEAR;
+         year <= TIMELINE_END_YEAR;
+         year += 10) {
+      int tickTime = (year - TIMELINE_START_YEAR) * 12 * 5;
+      int tickX = mapTimelinePoint(tickTime);
+      int labelX = Math.min(tickX, TIMELINE_WIDTH - 28);
+      g.setColor(timelineColor(year));
+      g.drawLine(tickX, 40, tickX, 50);
+      g.drawString(Integer.toString(year), labelX, 20);
+    }
+
     g.setColor(Color.red);
     if ( oldWindowtPos > windowtPos ) {oldWindowtPos = windowtPos;}
 	// Série temporal vermelha superior:
-    g.drawLine((int)(oldWindowtPos/7.), 75-(int)(oldWindowxPos/10.), (int)(windowtPos/7.), 75-(int)(oldWindowxPos/10.));
+    g.drawLine(mapTimelinePoint(oldWindowtPos), 75-(int)(oldWindowxPos/10.),
+               mapTimelinePoint(windowtPos), 75-(int)(oldWindowxPos/10.));
 
                                  g.setColor(Color.gray);   // 1950_
     if ( windowtPos > 10*12*5 )  g.setColor(Color.white);  // 1960_
@@ -233,7 +224,8 @@ public class DoubleWellCanvas extends Canvas {
     if ( windowtPos > 30*12*5 )  g.setColor(Color.green);  // 1980_
     if ( windowtPos > 40*12*5 )  g.setColor(Color.red);    // 1990_
     if ( windowtPos > 50*12*5 )  g.setColor(Color.blue);   // 2000_
-	if ( windowtPos > 60*12*5 )  g.setColor(Color.black);  // 2010_
+	if ( windowtPos > 60*12*5 )  g.setColor(Color.black);   // 2010_
+    if ( windowtPos > 70*12*5 )  g.setColor(Color.magenta); // 2020_
     if ( oldWindowxPos >= 990 || windowxPos >= 990 ) g.setColor(Color.black);   // PORRA!
 
     g.drawLine(oldWindowxPos, oldWindowyPos, windowxPos, windowyPos); // Traca a linha do grafico de fase
@@ -276,6 +268,22 @@ public class DoubleWellCanvas extends Canvas {
   //
   // Map a point in phase space onto the window.
   //===================================================================
+  private int mapTimelinePoint(double time) {
+    double totalTime = (TIMELINE_END_YEAR - TIMELINE_START_YEAR) * 12.0 * 5.0;
+    return((int)Math.round(time / totalTime * TIMELINE_WIDTH));
+  }
+
+  private Color timelineColor(int year) {
+    if (year < 1960) return Color.gray;
+    if (year < 1970) return Color.white;
+    if (year < 1980) return Color.yellow;
+    if (year < 1990) return Color.green;
+    if (year < 2000) return Color.red;
+    if (year < 2010) return Color.blue;
+    if (year < 2020) return Color.black;
+    return Color.magenta;
+  }
+
   private int mapxPoint(double x) {
     return((int)((x-domainxMin)
            /(domainxMax-domainxMin)*(double)size().width));

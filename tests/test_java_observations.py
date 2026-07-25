@@ -21,6 +21,9 @@ CURRENT = (
 )
 JAVA_PAGE = ROOT / "docs" / "java" / "observations-2013" / "index.html"
 WRAPPER_PAGE = ROOT / "docs" / "java-simulation.html"
+JAVA_CANVAS = (
+    ROOT / "legacy-java" / "observations-2013" / "DoubleWellCanvas.java"
+)
 
 
 def _fields(line: bytes) -> tuple[float, float, int, int, int]:
@@ -54,5 +57,33 @@ def test_java_pages_select_the_updated_data_and_offer_a_standalone_view():
     assert '<param name="final_year" value="2026.0">' in java_html
     assert '<param name="Final_Month" value="6.0">' in java_html
     assert 'value="sva.2_filter_10_9_1950.1_2026.06.dat"' in java_html
+    assert 'archive="observations-2013.jar?v=20260725b"' in java_html
     assert 'data-simulation="observations-2026"' in wrapper_html
     assert 'id="standalone-link"' in wrapper_html
+
+
+def test_java_wrapper_scales_the_complete_cheerpj_surface_on_narrow_screens():
+    """Responsive scaling must preserve all four edges of the Java surface."""
+    wrapper_html = WRAPPER_PAGE.read_text(encoding="utf-8")
+
+    assert "const frameWidth=720;" in wrapper_html
+    assert "const frameHeight=1080;" in wrapper_html
+    assert "stage.clientWidth/frameWidth" in wrapper_html
+    assert "frame.style.transform=`scale(${scale})`" in wrapper_html
+    assert "frameHeight*scale" in wrapper_html
+    assert "horizontal scroll" not in wrapper_html
+
+
+def test_java_observation_timeline_maps_1950_through_2030_to_the_canvas():
+    """June 2026 must remain visible and 2030 must land at x=600."""
+    source = JAVA_CANVAS.read_text(encoding="iso-8859-1")
+    java_html = JAVA_PAGE.read_text(encoding="utf-8")
+
+    assert "TIMELINE_START_YEAR = 1950" in source
+    assert "TIMELINE_END_YEAR = 2030" in source
+    assert "mapTimelinePoint" in source
+    assert "year <= TIMELINE_END_YEAR" in source
+    assert "Integer.toString(year)" in source
+    assert "oldWindowtPos/7." not in source
+    assert "windowtPos/7." not in source
+    assert "2020s" in java_html

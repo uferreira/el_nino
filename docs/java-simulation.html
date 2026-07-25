@@ -27,12 +27,12 @@ h1{font-size:clamp(1.8rem,5vw,3rem);background:linear-gradient(135deg,#3388ff,va
 .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .standalone{display:inline-block;color:var(--accent);margin:0 0 1rem;text-decoration:none;font-weight:600}
 .standalone:hover{text-decoration:underline}
-.frame-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.75rem;overflow:auto}
-.frame-stage{width:720px;height:1080px;margin:0 auto}
-iframe{display:block;width:720px;height:1080px;border:0;border-radius:5px;background:#000}
+.frame-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.75rem;overflow:hidden}
+.frame-stage{position:relative;width:100%;max-width:720px;height:1080px;margin:0 auto}
+iframe{display:block;width:720px;height:1080px;border:0;border-radius:5px;background:#000;transform-origin:top left}
 footer{text-align:center;padding:2rem 1rem;color:var(--muted);font-size:.82rem;border-top:1px solid var(--border)}
 footer a{color:var(--accent);text-decoration:none}
-@media(max-width:760px){.frame-card{padding:.35rem}.frame-stage{margin:0}.site-nav{gap:.35rem}.site-nav .nav-link{font-size:.8rem;padding:.3rem .5rem}}
+@media(max-width:760px){.frame-card{padding:.35rem}.site-nav{gap:.35rem}.site-nav .nav-link{font-size:.8rem;padding:.3rem .5rem}}
 </style>
 </head>
 <body>
@@ -55,7 +55,7 @@ footer a{color:var(--accent);text-decoration:none}
   <h1>Original Java Simulations</h1>
   <p class="intro">The original AWT programs are preserved and executed directly in your browser. Choose the theoretical double-well model or the observational animation updated through June 2026.</p>
   <div class="notice"><strong>First load:</strong> the Java-compatible browser runtime is downloaded on demand and can take several seconds. It is cached for later visits. No Java installation or browser plugin is required.</div>
-  <p class="intro"><strong>If the edges look cropped:</strong> set browser zoom to 100%, reload this page, or open the selected simulation in its own full page. On small screens, use the horizontal scroll inside the simulation panel.</p>
+  <p class="intro"><strong>Responsive view:</strong> the complete Java surface is scaled automatically to fit the panel. On short screens, scroll the page vertically, or open the selected simulation in its own full page.</p>
   <div class="tabs" role="tablist" aria-label="Java simulation">
     <a class="tab" role="tab" aria-selected="false" data-simulation="double-well" href="?simulation=double-well">Double Well model</a>
     <a class="tab" role="tab" aria-selected="false" data-simulation="observations-2026" href="?simulation=observations-2026">Observations — Jun 2026</a>
@@ -71,11 +71,21 @@ footer a{color:var(--accent);text-decoration:none}
 <footer><p><a href="https://github.com/uferreira/el_nino" target="_blank" rel="noopener">GitHub repository and Java source</a></p></footer>
 <script>
 const frame=document.getElementById('java-frame');
+const stage=document.getElementById('java-stage');
+const frameWidth=720;
+const frameHeight=1080;
+function resizeFrame(){
+  const scale=Math.min(1,stage.clientWidth/frameWidth);
+  frame.style.transform=`scale(${scale})`;
+  stage.style.height=`${Math.ceil(frameHeight*scale)}px`;
+}
+new ResizeObserver(resizeFrame).observe(stage);
+resizeFrame();
 const requested=new URLSearchParams(location.search).get('simulation');
 const selected=requested==='observations-2013'||requested==='observations-2026'?'observations-2026':'double-well';
 const sources={
   'double-well':'java/double-well/index.html?v=20260725',
-  'observations-2026':'java/observations-2013/index.html?v=20260725'
+  'observations-2026':'java/observations-2013/index.html?v=20260725b'
 };
 document.querySelectorAll('.tab').forEach(tab=>{
   const active=tab.dataset.simulation===selected;
