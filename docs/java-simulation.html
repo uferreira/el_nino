@@ -25,6 +25,8 @@ h1{font-size:clamp(1.8rem,5vw,3rem);background:linear-gradient(135deg,#3388ff,va
 .tabs{display:flex;gap:.65rem;flex-wrap:wrap;margin-bottom:1rem}
 .tab{display:inline-block;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:.55rem 1rem;font-weight:600;cursor:pointer;text-decoration:none}
 .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.standalone{display:inline-block;color:var(--accent);margin:0 0 1rem;text-decoration:none;font-weight:600}
+.standalone:hover{text-decoration:underline}
 .frame-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.75rem;overflow:auto}
 .frame-stage{width:720px;height:1080px;margin:0 auto}
 iframe{display:block;width:720px;height:1080px;border:0;border-radius:5px;background:#000}
@@ -51,13 +53,14 @@ footer a{color:var(--accent);text-decoration:none}
 
 <main class="container">
   <h1>Original Java Simulations</h1>
-  <p class="intro">The original AWT programs are preserved and executed directly in your browser. Choose the theoretical double-well model or the January 2013 observational animation.</p>
+  <p class="intro">The original AWT programs are preserved and executed directly in your browser. Choose the theoretical double-well model or the observational animation updated through June 2026.</p>
   <div class="notice"><strong>First load:</strong> the Java-compatible browser runtime is downloaded on demand and can take several seconds. It is cached for later visits. No Java installation or browser plugin is required.</div>
-  <p class="intro"><strong>Small screens:</strong> use the horizontal scroll inside the simulation panel to see the complete original 600 px Java interface.</p>
+  <p class="intro"><strong>If the edges look cropped:</strong> set browser zoom to 100%, reload this page, or open the selected simulation in its own full page. On small screens, use the horizontal scroll inside the simulation panel.</p>
   <div class="tabs" role="tablist" aria-label="Java simulation">
     <a class="tab" role="tab" aria-selected="false" data-simulation="double-well" href="?simulation=double-well">Double Well model</a>
-    <a class="tab" role="tab" aria-selected="false" data-simulation="observations-2013" href="?simulation=observations-2013">Observations — Jan 2013</a>
+    <a class="tab" role="tab" aria-selected="false" data-simulation="observations-2026" href="?simulation=observations-2026">Observations — Jun 2026</a>
   </div>
+  <a class="standalone" id="standalone-link" href="java/double-well/index.html" target="_blank" rel="noopener">Open selected simulation in a full page ↗</a>
   <div class="frame-card">
     <div class="frame-stage" id="java-stage">
       <iframe id="java-frame" title="Original Java simulation" loading="eager"></iframe>
@@ -69,10 +72,10 @@ footer a{color:var(--accent);text-decoration:none}
 <script>
 const frame=document.getElementById('java-frame');
 const requested=new URLSearchParams(location.search).get('simulation');
-const selected=requested==='observations-2013'?'observations-2013':'double-well';
+const selected=requested==='observations-2013'||requested==='observations-2026'?'observations-2026':'double-well';
 const sources={
-  'double-well':'java/double-well/index.html',
-  'observations-2013':'java/observations-2013/index.html'
+  'double-well':'java/double-well/index.html?v=20260725',
+  'observations-2026':'java/observations-2013/index.html?v=20260725'
 };
 document.querySelectorAll('.tab').forEach(tab=>{
   const active=tab.dataset.simulation===selected;
@@ -80,6 +83,7 @@ document.querySelectorAll('.tab').forEach(tab=>{
   tab.setAttribute('aria-selected',String(active));
 });
 frame.src=sources[selected];
+document.getElementById('standalone-link').href=sources[selected];
 </script>
 </body>
 </html>
