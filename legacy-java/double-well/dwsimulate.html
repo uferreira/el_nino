@@ -1,0 +1,112 @@
+<html>
+<head>
+<title>Java Simulation of Double Well Oscillator</title>
+</head>
+
+<body text="FFFFFF" bgcolor="000000" vlink="C0C0C0"
+link="10AADD"  LANG=en.us>
+
+<center><h1>Java Simulation</h1></center>
+<p>
+
+<center>
+<table border=8>
+<tr align=center>
+
+<td>
+<!applet  code="DoubleWellApplet.class" Width=600 Height=500>
+<!applet  code="DoubleWellApplet.class" Width=600 Height=1000>
+<applet  code="DoubleWellApplet.class" Width=600 Height=850>
+
+<param name=initial_position value=0.0>
+<param name=initial_velocity value=0.0>
+
+<param name=forcing_amplitude value=+0.4873>
+<param name=forcing_fase value=-60.>
+
+<param name=aparting_k1 value=+0.121847>
+<param name=restoring_k3 value=-0.03046>
+
+<param name=forcing_amplitude2 value=0.0>
+<param name=forcing_fase2 value=0.0>
+
+<param name=dampening_constant value=-0.35465>
+<param name=forcing_frequency value=0.523599>
+
+<param name=initial_month value=1>
+<param name=coef_K2 value=0.0>
+
+<param name=coef_K0 value=0.0>
+<param name=coef_K4 value=0.0>
+
+<param name=coef_K5 value=0.0>
+<param name=time_step value=0.1>
+
+<param name=strange_month value=1>
+<param name=param_18 value=0.0>
+
+<param name=param_19 value=0.0>
+<param name=param_20 value=0.0>
+
+
+
+
+<param name=interface_on value=true>
+<param name=minimum_x value=-3.>
+<param name=maximum_x value=+3.>
+<param name=minimum_y value=-1.5>
+<param name=maximum_y value=+1.5>
+<param name=minimum_t value=0.>
+<param name=maximum_t value=+60.>
+
+<param name="fileToRead" value="test.txt"> 
+
+</applet></td>
+
+</tr>
+</table>
+</center>
+<p><hr>
+
+<P>
+<H1>Grafico de Fase: </H1> No eixo X e' apresentada a coordenada relevante 
+do problema enquanto no eixo Y esta' a sua derivada temporal (DX/DT).<P>
+
+X e' a temperatura da agua do mar na costa do Peru em graus Celsius.<BR>
+Deve haver uma relacao simples entre essa temperatura e a posicao da piscina de agua quente que vagueia pelo Pacifico Equatorial. Hoje isso ja nao e' mais uma hipotese uma vez que passamos a calcular as coordenadas do centro de massa dessa piscina diretamente com base nos dados de satelite divulgados pelo NOAA (National Oceanic and Atmospheric Administration).<P>
+
+Clicando na barra de controle em baixo reinicia-se o calculo, eventualmente com novos valores.
+Clicando na area do grafico apaga-se o desenho ja' tracado.
+Os programas estao Java e sao modificacoes de um programa baixados da internet.<P>
+
+As simulacoes aqui apresentadas, http://dage11.on.br:1080/DOUBLE_WELL.21/dwsimulate.html 
+representam  simples osciladores do tipo:<P>
+
+X'' = k0 + k1*X + k2*X^2 + k3*X^3 + k4*X^4 + k5*X^5 + (p/ representar qq potencial)<BR>
+      FA*cos(W*t - FF) + (forcas c/ periodo anual como os Ventos Alisios)<BR>
+      FA2*cos(2W*t -FF2) + (forcas c/ periodo semestral como os Ventos Alisios)<BR>
+      +B*X' (forcas dissipativas, B e' negativo)<P>
+
+X0 e' a posicao X inicial.<BR>
+V0 e' X' inicial.<BR>
+M0 especifica o instante inicial t0.<BR>
+Stp da' o passo de integracao Runge Kutta.<BR>
+SMo especifica em que fase as cruzes pretas serao impressas p/ referencia.<BR>
+MAX e' so' um fator de escala geral do grafico.<BR>
+TI e TF dao os instantes iniciais e finais da coordenada t no eixo horizontal do grafico da serie temporal para a variavel X plotada no eixo vertical.<P>
+
+A linha preta representa o potencial.<BR>
+As tres cruzes servem de referencia e indicam os pontos (-1,0) (0,0) e (1,0).<P>
+
+Clicando na barra de controle em baixo reinicia-se o calculo, eventualmente com novos valores.
+Clicando na area do grafico apaga-se o desenho ja' tracado.<P>
+
+A pagina que apresenta os dados observacionais do El Nino e':<p>
+<A HREF=http://dage11.on.br:1080/NINO_FASE.4/>http://dage11.on.br:1080/NINO_FASE.4/</A><p>
+
+
+
+<hr>
+
+</body>
+</html>

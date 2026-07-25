@@ -8,6 +8,8 @@ data/output/
 *.csv
 *.mp4
 *.mkv
+!legacy-java/**/*.dat
+!docs/java/**/*.dat
 
 # Jupyter
 .ipynb_checkpoints/

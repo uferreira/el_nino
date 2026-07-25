@@ -1,0 +1,116 @@
+<html>
+<head>
+<title>Java Southern Oscillation</title>
+</head>
+ 
+<body text="FFFFFF" bgcolor="555555" vlink="C0C0C0"
+link="10AADD"  LANG=en.us>
+ 
+<center><h1>Java Southern Oscillation</h1>
+<p>
+<font color="gray" size="7">   1950_ </font>
+<font color="white" size="7">  1960_ </font>
+<font color="yellow" size="7"> 1970_ </font>
+<font color="green" size="7">  1980_ </font>
+<font color="red" size="7">    1990_ </font>
+<font color="blue" size="7">   2000_ </font>
+<font color="black" size="7">  2010_ </font>
+ 
+</center>
+<center>
+<table border=8>
+<tr align=center>
+ 
+<td>
+<!applet  code="DoubleWellApplet.class" Width=600 Height=500>
+<applet  code="DoubleWellApplet.class" Width=600 Height=850>
+ 
+<!param name=final_year value=2010.>
+<!param name=final_year value=2011.>
+<param name=final_year value=2013.>
+ 
+ 
+<!param name=Final_Month value=11.>
+<!param name=Final_Month value=12.>
+<!param name=Final_Month value=01.>
+<!param name=Final_Month value=02.>
+<!param name=Final_Month value=07.>
+<!param name=Final_Month value=10.>
+<param name=Final_Month value=01.>
+ 
+<!param name="fileToRead" value="sva.2_filter_10_9_1950.1_2010.10.dat"> 
+<!param name="fileToRead" value="sva.2_filter_10_9_1950.1_2010.11.dat">
+<!param name="fileToRead" value="sva.2_filter_10_9_1950.1_2010.12.dat">
+<!param name="fileToRead" value="sva.2_filter_10_9_1950.1_2011.01.dat">
+<!param name="fileToRead" value="sva.2_filter_10_9_1950.1_2011.02.dat">
+<!param name="fileToRead" value="sva.2_filter_10_9_1950.1_2011.07.dat">
+<!param name="fileToRead" value="sva.2_filter_10_9_1950.1_2011.10.dat">
+<param name="fileToRead" value="sva.2_filter_10_9_1950.1_2013.01.dat">
+ 
+ 
+ 
+ 
+<param name=initial_position value=999>
+<param name=Initial_Month value=1.>
+ 
+<!param name=forcing_frequency value=1>
+ 
+<param name=initial_year value=1950.>
+<param name=strange_month value=1>
+<param name=time_step value=1.>
+<!param name=time_step value=.5>
+<!param name=time_step value=0.05>
+<!!param name=time_step value=0.025>
+<param name=interface_on value=true>
+<param name=minimum_x value=-3.0>
+<param name=maximum_x value=3.0>
+<param name=minimum_y value=-1.5>
+<param name=maximum_y value=1.5>
+ 
+ 
+<!param name="fileToRead" value="test.txt"> 
+</applet></td>
+ 
+</tr>
+</table>
+</center>
+<p><hr>
+<P>
+<H1>Grafico de Fase: </H1> No eixo X e' apresentada a coordenada relevante 
+do problema enquanto no eixo Y esta' a sua derivada temporal (DX/DT).<P>
+ 
+Em mecanica a coordenada X e' a posicao de uma particula. Aqui, X e' a temperatura da agua do mar na costa do Peru em graus Celsius.
+Acreditavamos na epoca que deveria haver uma relacao simples entre essa temperatura e a posicao da tal piscina de agua quente que vagueia pelo Pacifico Equatorial. Atualmente, ja nao e' mais uma hipotese uma vez que passamos a calcular as coordenadas do c
+entro de massa dessa piscina diretamente com base nos dados de satelite divulgados pelo NOAA (National Oceanic and Atmospheric Administration) e que podem ser obtidos por FTP em: <P>
+<A HREF=ftp://ftp.ncep.noaa.gov/pub/cpc/wd52dg/data/indices/sstoi.indices> ftp://ftp.ncep.noaa.gov/pub/cpc/wd52dg/data/indices/sstoi.indices</A> <P>
+Esses mesmos dados, alem de outros estimadores e graficos, tambem podem ser encontrados em: <P>
+<A HREF=http://www.cpc.ncep.noaa.gov/data/indices/>
+http://www.cpc.ncep.noaa.gov/data/indices/</A> <P>
+ 
+Clicando na barra de controle em baixo reinicia-se o grafico, eventualmente com novos valores.<BR>
+Clicando na area do grafico apaga-se o desenho ja' tracado.<BR>
+Os programas estao Java e sao modificacoes de um programa baixado da internet.<P>
+ 
+ 
+ 
+Nesse grafico, em  http://dage11.on.br:1080/NINO_FASE.4/ <BR>
+as tres cruzes representam os pontos com coordenadas (19,0) (22,0) e (25,0). <BR>
+O grafico da serie temporal para a variavel X e' plotada no eixo vertical do grafico superior.<BR>
+As marcas na linha horizontal verde correspondem as decadas.<P>
+ 
+ 
+Clicando na barra de controle em baixo reinicia-se o calculo, eventualmente com novos valores.
+Pode-se pausar, apagar e continuar a animação clicando na tela em <span style="text-decoration: underline;">Pausar</span></div>, <span style="text-decoration: underline;">Apagar</span></div> e <span style="text-decoration: underline;">Continuar</span></div>.<P>
+ 
+ 
+A pa&acute;gina que apresenta as simulacoes do modelo teorico esta' em:<P>
+<A HREF=http://dage11.on.br:1080/DOUBLE_WELL.21/dwsimulate.html>http://dage11.on.br:1080/DOUBLE_WELL.21/dwsimulate.html</A>
+<P>
+J.L. Kohl criou a animacao grafica do estranho atrator correspondente a esses dados observacionais:
+<A HREF=http://euler.on.br/~kohl/ElNino/AnimStrange.html>http://euler.on.br/~kohl/ElNino/AnimStrange.html</A>
+ 
+<hr>
+ 
+</body>
+</html>
+

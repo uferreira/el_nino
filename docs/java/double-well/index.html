@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Original Double Well Java Applet</title>
+<script src="https://cjrtnc.leaningtech.com/4.3/loader.js"></script>
+<style>
+html,body{margin:0;min-height:100%;background:#000;color:#fff;font-family:system-ui,sans-serif}
+.applet-wrap{width:600px;margin:0 auto}.loading{padding:.6rem;text-align:center;color:#aaa;font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="applet-wrap">
+  <div class="loading">Loading the original Java applet…</div>
+  <cheerpj-applet archive="double-well.jar" code="DoubleWellApplet" width="600" height="850">
+    <param name="initial_position" value="0.0">
+    <param name="initial_velocity" value="0.0">
+    <param name="forcing_amplitude" value="0.4873">
+    <param name="forcing_fase" value="-60.0">
+    <param name="aparting_k1" value="0.121847">
+    <param name="restoring_k3" value="-0.03046">
+    <param name="forcing_amplitude2" value="0.0">
+    <param name="forcing_fase2" value="0.0">
+    <param name="dampening_constant" value="-0.35465">
+    <param name="forcing_frequency" value="0.523599">
+    <param name="initial_month" value="1">
+    <param name="coef_K2" value="0.0">
+    <param name="coef_K0" value="0.0">
+    <param name="coef_K4" value="0.0">
+    <param name="coef_K5" value="0.0">
+    <param name="time_step" value="0.1">
+    <param name="strange_month" value="1">
+    <param name="interface_on" value="true">
+    <param name="minimum_x" value="-3.0">
+    <param name="maximum_x" value="3.0">
+    <param name="minimum_y" value="-1.5">
+    <param name="maximum_y" value="1.5">
+    <param name="minimum_t" value="0.0">
+    <param name="maximum_t" value="60.0">
+    <param name="fileToRead" value="test.txt">
+  </cheerpj-applet>
+</div>
+<script type="module">await cheerpjInit({version:8,status:'splash'});</script>
+</body>
+</html>

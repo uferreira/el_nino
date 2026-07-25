@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESRA — Original Java Simulations</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0a0a0e;--surface:#12121a;--card:#1a1a28;--border:#2a2a40;--text:#e8e8f0;--muted:#888899;--accent:#4488ff;--hot:#ff5533;--fg:#e8e8f0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:15px;line-height:1.6}
+.container{max-width:1280px;margin:0 auto;padding:0 1.2rem}
+.esra-header{text-align:center;padding:.6rem 1rem .3rem;border-bottom:1px solid var(--border);background:var(--surface)}
+.esra-full{display:block;font-size:clamp(.9rem,2vw,1.1rem);font-weight:600;letter-spacing:.04em}
+.esra-abbr{font-size:.75rem;letter-spacing:.25em;color:var(--accent);text-transform:uppercase}
+header{background:linear-gradient(180deg,#0d0d18 0%,var(--bg) 100%);border-bottom:1px solid var(--border);padding:1rem 0 1.2rem}
+.site-nav{display:flex;gap:1.2rem;justify-content:center;padding:.5rem 0 .2rem;flex-wrap:wrap}
+.site-nav .nav-link{color:var(--fg);text-decoration:none;font-size:.92rem;padding:.35rem .85rem;border-radius:5px}
+.site-nav .nav-link:hover{background:rgba(255,255,255,.1)}
+.site-nav .nav-link.active{background:var(--accent);color:#fff}
+main{padding:2.5rem 0 3rem}
+h1{font-size:clamp(1.8rem,5vw,3rem);background:linear-gradient(135deg,#3388ff,var(--hot));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1.15;margin-bottom:.6rem}
+.intro{color:var(--muted);max-width:850px;margin-bottom:1.5rem}
+.notice{background:var(--surface);border-left:3px solid var(--accent);border-radius:0 6px 6px 0;padding:1rem 1.2rem;margin-bottom:1.4rem;color:var(--muted);max-width:900px}
+.notice strong{color:var(--text)}
+.tabs{display:flex;gap:.65rem;flex-wrap:wrap;margin-bottom:1rem}
+.tab{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:.55rem 1rem;font-weight:600;cursor:pointer}
+.tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.frame-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.75rem;overflow:auto}
+iframe{display:block;width:100%;min-width:640px;height:960px;border:0;border-radius:5px;background:#000}
+footer{text-align:center;padding:2rem 1rem;color:var(--muted);font-size:.82rem;border-top:1px solid var(--border)}
+footer a{color:var(--accent);text-decoration:none}
+@media(max-width:700px){.frame-card{padding:.35rem}.site-nav{gap:.35rem}.site-nav .nav-link{font-size:.8rem;padding:.3rem .5rem}}
+</style>
+</head>
+<body>
+<div class="esra-header">
+  <span class="esra-full">Earth Science Research Alliance</span>
+  <span class="esra-abbr">ESRA</span>
+</div>
+<header><div class="container"><nav class="site-nav">
+  <a href="index.html" class="nav-link">Home</a>
+  <a href="phase_diagrams.html" class="nav-link">Phase Diagrams</a>
+  <a href="duffing_simulation.html" class="nav-link">Duffing Simulation</a>
+  <a href="familiar_attractor.html" class="nav-link">Familiar Attractor</a>
+  <a href="ensemble.html" class="nav-link">Year Ensemble</a>
+  <a href="compare.html" class="nav-link">Compare</a>
+  <a href="about.html" class="nav-link">About Us</a>
+  <a href="java-simulation.html" class="nav-link active">Java Legacy</a>
+</nav></div></header>
+
+<main class="container">
+  <h1>Original Java Simulations</h1>
+  <p class="intro">The original AWT programs are preserved and executed directly in your browser. Choose the theoretical double-well model or the January 2013 observational animation.</p>
+  <div class="notice"><strong>First load:</strong> the Java-compatible browser runtime is downloaded on demand and can take several seconds. It is cached for later visits. No Java installation or browser plugin is required.</div>
+  <div class="tabs" role="tablist" aria-label="Java simulation">
+    <button class="tab active" type="button" role="tab" aria-selected="true" data-src="java/double-well/index.html">Double Well model</button>
+    <button class="tab" type="button" role="tab" aria-selected="false" data-src="java/observations-2013/index.html">Observations — Jan 2013</button>
+  </div>
+  <div class="frame-card">
+    <iframe id="java-frame" title="Original Java simulation" src="java/double-well/index.html" loading="eager"></iframe>
+  </div>
+</main>
+
+<footer><p><a href="https://github.com/uferreira/el_nino" target="_blank" rel="noopener">GitHub repository and Java source</a></p></footer>
+<script>
+const frame=document.getElementById('java-frame');
+document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(item=>{item.classList.remove('active');item.setAttribute('aria-selected','false')});
+  button.classList.add('active');button.setAttribute('aria-selected','true');
+  if(!frame.src.endsWith(button.dataset.src)) frame.src=button.dataset.src;
+}));
+</script>
+</body>
+</html>

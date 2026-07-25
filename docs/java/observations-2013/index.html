@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Original 2013 Observations Java Applet</title>
+<script src="https://cjrtnc.leaningtech.com/4.3/loader.js"></script>
+<style>
+html,body{margin:0;min-height:100%;background:#555;color:#fff;font-family:system-ui,sans-serif}
+.legend{text-align:center;padding:.4rem;font-size:1.05rem}.applet-wrap{width:600px;margin:0 auto}.d50{color:#aaa}.d60{color:#fff}.d70{color:#ffeb3b}.d80{color:#33cc66}.d90{color:#ff5544}.d00{color:#4488ff}.d10{color:#111}
+</style>
+</head>
+<body>
+<div class="legend"><span class="d50">1950s</span> · <span class="d60">1960s</span> · <span class="d70">1970s</span> · <span class="d80">1980s</span> · <span class="d90">1990s</span> · <span class="d00">2000s</span> · <span class="d10">2010s</span></div>
+<div class="applet-wrap">
+  <cheerpj-applet archive="observations-2013.jar" code="DoubleWellApplet" width="600" height="850">
+    <param name="final_year" value="2013.0">
+    <param name="Final_Month" value="1.0">
+    <param name="fileToRead" value="sva.2_filter_10_9_1950.1_2013.01.dat">
+    <param name="initial_position" value="999">
+    <param name="Initial_Month" value="1.0">
+    <param name="initial_year" value="1950.0">
+    <param name="strange_month" value="1">
+    <param name="time_step" value="1.0">
+    <param name="interface_on" value="true">
+    <param name="minimum_x" value="-3.0">
+    <param name="maximum_x" value="3.0">
+    <param name="minimum_y" value="-1.5">
+    <param name="maximum_y" value="1.5">
+  </cheerpj-applet>
+</div>
+<script type="module">await cheerpjInit({version:8,status:'splash'});</script>
+</body>
+</html>
