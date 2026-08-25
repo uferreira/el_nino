@@ -5,6 +5,7 @@ from __future__ import annotations
 import colorsys
 import importlib.util
 import re
+import subprocess
 from pathlib import Path
 
 
@@ -12,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PHASE_PAGE = ROOT / "docs" / "phase_diagrams.html"
 COMPARE_PAGE = ROOT / "docs" / "compare.html"
 DUFFING_PAGE = ROOT / "docs" / "duffing_simulation.html"
+SHARED_PHASE_PLOT = ROOT / "docs" / "assets" / "js" / "phase-plot.js"
 UPDATE_SCRIPT = ROOT / "scripts" / "update_website.py"
 UPDATE_WORKFLOW = ROOT / ".github" / "workflows" / "update_data.yml"
 
@@ -88,7 +90,7 @@ def test_historical_palettes_reserve_red_for_the_recent_year():
         _, contrast = hue_and_white_contrast(color)
         assert contrast >= 3.0, f"history is too pale on white: {color}"
 
-    assert "const CMP_RECENT_COLOR = '#dc2626';" in compare_html
+    assert "const CMP_RECENT_COLOR = EnsoPhasePlot.CONFIG.RECENT_COLOR;" in compare_html
 
 
 def test_phase_diagrams_use_a_fixed_twelve_month_recent_window():
@@ -96,17 +98,67 @@ def test_phase_diagrams_use_a_fixed_twelve_month_recent_window():
     phase_html = PHASE_PAGE.read_text(encoding="utf-8")
     compare_html = COMPARE_PAGE.read_text(encoding="utf-8")
 
-    assert "const RECENT_WINDOW_MONTHS=12;" in phase_html
-    assert "function recentWindowStartYM(currentYM)" in phase_html
-    assert "tail[0].ym < firstRecentYM" in phase_html
-    assert "point.irest === 0" in phase_html
-    assert "CURRENT_POINT_RADIUS" in phase_html
-    assert "const CMP_RECENT_WINDOW_MONTHS = 12;" in compare_html
+    shared = SHARED_PHASE_PLOT.read_text(encoding="utf-8")
+    assert "const RECENT_WINDOW_MONTHS=EnsoPhasePlot.CONFIG.RECENT_WINDOW_MONTHS;" in phase_html
+    assert "const recentWindowStartYM = EnsoPhasePlot.recentWindowStartYM;" in phase_html
+    assert "tail[0].ym < firstRecentYM" in shared
+    assert "point.irest === 0" in shared
+    assert "CURRENT_POINT_RADIUS" in shared
+    assert "const CMP_RECENT_WINDOW_MONTHS = EnsoPhasePlot.CONFIG.RECENT_WINDOW_MONTHS;" in compare_html
     assert "function cmpRecentWindowStartYM(currentYM)" in compare_html
     assert "tail[0].ym < firstRecentYM" in compare_html
     assert "point.irest === 0" in compare_html
     assert "CMP_CURRENT_POINT_RADIUS" in compare_html
     assert 'id="cmp-sl-tail"' not in compare_html
+
+def test_same_purpose_browser_phase_plots_share_one_renderer():
+    """Observed 2-D phase plots must not drift through copied page-local code."""
+    shared_reference = '<script src="assets/js/phase-plot.js?v=1"></script>'
+
+    assert SHARED_PHASE_PLOT.is_file()
+    shared = SHARED_PHASE_PLOT.read_text(encoding="utf-8")
+    assert "RECENT_WINDOW_MONTHS: 12" in shared
+    assert "CURRENT_COLOR: '#ffbf00'" in shared
+    assert "function pushRecentPoint(" in shared
+    assert "function compositeFrame(" in shared
+
+    for page in (PHASE_PAGE, DUFFING_PAGE, COMPARE_PAGE):
+        html = page.read_text(encoding="utf-8")
+        assert shared_reference in html, f"{page.name} bypasses the shared renderer"
+        assert "EnsoPhasePlot" in html
+
+    phase_html = PHASE_PAGE.read_text(encoding="utf-8")
+    duffing_html = DUFFING_PAGE.read_text(encoding="utf-8")
+    assert "function compositeFrame(" not in phase_html
+    assert "function compositeFrame(" not in duffing_html
+    assert "function recentWindowStartYM(" not in phase_html
+    assert "function pushRecentPoint(" not in phase_html
+
+
+def test_local_javascript_referenced_by_published_pages_is_tracked():
+    """GitHub Pages must receive every local script used by published HTML."""
+    tracked = {
+        path.replace("\\", "/")
+        for path in subprocess.check_output(
+            ["git", "ls-files", "docs"],
+            cwd=ROOT,
+            text=True,
+        ).splitlines()
+    }
+
+    for page in (ROOT / "docs").glob("*.html"):
+        html = page.read_text(encoding="utf-8")
+        for src in re.findall(r'<script[^>]+src="([^\"]+)"', html):
+            if re.match(r"(?:https?:)?//", src):
+                continue
+            script_path = (page.parent / src.split("?", 1)[0]).relative_to(ROOT)
+            normalized = script_path.as_posix()
+            assert normalized in tracked, f"{page.name} references untracked {normalized}"
+
+def test_site_has_no_esra_branding():
+    """The website must use the subject name, not an invented group identity."""
+    for page in (ROOT / "docs").glob("*.html"):
+        assert "esra" not in page.read_text(encoding="utf-8").casefold(), page.name
 
 
 def test_phase_page_has_torus_diagnostics_from_monthly_samples():
@@ -129,6 +181,7 @@ def test_phase_page_has_torus_diagnostics_from_monthly_samples():
     assert "torusDiagnosticsInit();" in html
     assert "scatter reveals the chaotic nature" not in html
     assert "measures chaos directly" not in html
+
 
 def test_duffing_attractor_has_synchronized_side_panels():
     """The attractor must retain the three diagnostic views requested by users."""
