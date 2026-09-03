@@ -403,17 +403,22 @@ def animate_all_from_config(config_path: str = "config.yaml") -> None:
     out_dir = Path("data/output")
 
     # --- SST ---
-    # The SST filename includes the actual data date range, which is only
-    # known after downloading.  We glob for any file matching the filter
-    # parameters and pick the newest if multiple runs exist.
-    sst_pattern = str(out_dir / f"sva.2_filter_{HN1}_{HN2}_*_SAIDApy.dat")
-    sst_files   = glob.glob(sst_pattern)
-    if not sst_files:
-        raise FileNotFoundError(
-            f"No SST output file found matching: {sst_pattern}\n"
-            "Run pipeline.run_all() first to generate the .dat files."
-        )
-    sst_file = sorted(sst_files)[-1]
+    # Prefer the stable filename written by pipeline.run_all /
+    # update_website.py. Fall back to the legacy date-range naming from
+    # run_all.py's rename step, picking the most recently modified file
+    # (lexicographic sort mis-orders e.g. "2026.10" before "2026.4").
+    stable = out_dir / "sva.2_filter_NINO12_SAIDApy.dat"
+    if stable.exists():
+        sst_file = str(stable)
+    else:
+        sst_pattern = str(out_dir / f"sva.2_filter_{HN1}_{HN2}_*_SAIDApy.dat")
+        sst_files   = glob.glob(sst_pattern)
+        if not sst_files:
+            raise FileNotFoundError(
+                f"No SST output file found: {stable} or {sst_pattern}\n"
+                "Run pipeline.run_all() first to generate the .dat files."
+            )
+        sst_file = max(sst_files, key=lambda p: Path(p).stat().st_mtime)
     print(f"Animating SST ({Path(sst_file).name}) …")
     sst_data      = pipeline.load_output(sst_file)
     sst_anim_path = str(out_dir / f"animation_SST_filter_{HN1}_{HN2}.mp4")
@@ -438,7 +443,7 @@ def animate_all_from_config(config_path: str = "config.yaml") -> None:
         animate_phase_diagram(
             data=sl_data,
             title=f"Sea Level — {name}",
-            xlabel="Sea level anomaly (cm)",
+            xlabel="Sea level anomaly (mm)",
             xlim=st["xlim"],
             ylim=st["ylim"],
             remove_mean=True,

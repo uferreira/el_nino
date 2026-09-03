@@ -109,6 +109,7 @@ def _run_sea_level(st: dict, HN1: float, HN2: float, NDOTS: int,
         start_date=st["start_date"],
         HN1=HN1, HN2=HN2, NDOTS=NDOTS,
         output_file=str(dat),
+        rqd_url=st.get("rqd_url"),
     )
 
 
