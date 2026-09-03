@@ -1,7 +1,7 @@
 # Fabio Vieira Machado
 
 **Physical Oceanographer · Climate Variability Researcher · Environmental Data Scientist**
-Research Collaborator, Earth Science Research Alliance (ESRA), New Zealand
+Independent Research Collaborator, New Zealand
 
 Fabio Vieira Machado is a Physical Oceanographer and Climate Variability Researcher with more than 25 years of experience across environmental science, oceanography, atmospheric sciences, offshore operations, marine geophysics, and applied research. His work focuses on understanding ocean–atmosphere interactions, ENSO dynamics, and Pacific climate variability, combining analytical tools in Python and MATLAB with observational datasets from satellite, tide gauge, Argo, and AUV platforms. He is a co-author of original research on the Pacific Warm Pool as an ENSO indicator and on wavelet analysis of warm pool zonal displacement.
 
@@ -11,7 +11,7 @@ Fabio Vieira Machado is a Physical Oceanographer and Climate Variability Researc
 
 | Period | Role | Organisation |
 |--------|------|--------------|
-| 2024 – present | Research Collaborator – Climate Variability & Natural Hazards | Earth Science Research Alliance (ESRA), New Zealand |
+| 2024 – present | Research Collaborator – Climate Variability & Natural Hazards | Independent Research, New Zealand |
 | 2022 – 2026 | Science & Mathematics Teacher | Northland, New Zealand |
 | 2018 – 2021 | Oceanographic Data Analyst | Southern Ocean Research Programme |
 | 2012 – 2014 | Project Coordinator | Petrobras, Brazil |

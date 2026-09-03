@@ -1,10 +1,10 @@
 {
-  "last_refreshed": "2026-07-23",
+  "last_refreshed": "2026-08-25",
   "stations": {
     "callao": {
-      "as_of": "2026-07",
+      "as_of": "2026-08",
       "interpolated_months": 10,
-      "last_success": "2026-07-23",
+      "last_success": "2026-08-25",
       "longest_gap_months": 4,
       "low_coverage_months": 8,
       "name": "Callao",
@@ -13,9 +13,9 @@
       "stale": false
     },
     "honolulu": {
-      "as_of": "2026-07",
+      "as_of": "2026-08",
       "interpolated_months": 17,
-      "last_success": "2026-07-23",
+      "last_success": "2026-08-25",
       "longest_gap_months": 4,
       "low_coverage_months": 10,
       "name": "Honolulu",
@@ -24,9 +24,9 @@
       "stale": false
     },
     "la_libertad": {
-      "as_of": "2026-07",
+      "as_of": "2026-08",
       "interpolated_months": 25,
-      "last_success": "2026-07-23",
+      "last_success": "2026-08-25",
       "longest_gap_months": 3,
       "low_coverage_months": 15,
       "name": "La Libertad",
@@ -35,9 +35,9 @@
       "stale": false
     },
     "palau": {
-      "as_of": "2026-07",
+      "as_of": "2026-08",
       "interpolated_months": 18,
-      "last_success": "2026-07-23",
+      "last_success": "2026-08-25",
       "longest_gap_months": 5,
       "low_coverage_months": 11,
       "name": "Palau",
@@ -48,7 +48,7 @@
     "talara": {
       "as_of": "2025-06",
       "interpolated_months": 108,
-      "last_success": "2026-07-23",
+      "last_success": "2026-08-25",
       "longest_gap_months": 27,
       "low_coverage_months": 28,
       "name": "Talara",
