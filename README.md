@@ -46,10 +46,6 @@ wind-driven ocean circulation — making it a sensitive, physics-rich ENSO proxy
 - **Palau, western Pacific (UHSLC 007):** In the western Pacific warm pool, sea
   level responds in the opposite sense to the eastern Pacific — it falls during
   El Niño as surface warm water sloshes eastward and rises during La Niña.
-- **Talara, Peru (UHSLC 092):** Eastern Pacific coastal record north of
-  Callao. Sparse observations extend into August 2025, but July and August do
-  not pass the 50% monthly coverage check. The usable monthly product ends in
-  June 2025 and is marked stale.
 - **La Libertad, Ecuador (UHSLC 091):** Eastern equatorial Pacific station with
   a long record that complements Callao and captures coastal ENSO sea-level
   variability close to the equator.
@@ -87,7 +83,6 @@ absolute physical units.
 |---------|--------|-----------------|--------|---------------------|
 | NINO1+2 SST | [NOAA CPC](https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices) | 0–10°S, 90–80°W | 1950–present | Monthly |
 | Callao sea level | [UHSLC station 093](https://uhslc.soest.hawaii.edu) | Callao, Peru | 1970–present | Hourly → monthly |
-| Talara sea level | [UHSLC station 092](https://uhslc.soest.hawaii.edu) | Talara, Peru | 1970–Jun 2025 usable | Hourly → monthly |
 | La Libertad sea level | [UHSLC station 091](https://uhslc.soest.hawaii.edu) | La Libertad, Ecuador | 1949–present | Hourly → monthly |
 | Honolulu sea level | [UHSLC station 057](https://uhslc.soest.hawaii.edu) | Honolulu, Hawaii | 1905–present | Hourly → monthly |
 | Palau sea level | [UHSLC station 007](https://uhslc.soest.hawaii.edu) | Malakal, Palau | 1969–present | Hourly → monthly |
@@ -110,12 +105,22 @@ are joined at January 1982 with no overlap.
 
 ## The Filter
 
-Before either Fourier stage, the pipeline aligns the analysis window so its
-first and last observations are from the same calendar month. As the live
-record advances, only the leading partial seasonal cycle is discarded (for
-example, January–July becomes July–July). This preserves every recent
-observation and avoids injecting an artificial seasonal jump into the endpoint
-correction.
+Before either Fourier stage, the pipeline selects the analysis window. The
+default starts in the base year (1975) in the calendar month *after* the end
+month, so the window spans a whole number of 12-month seasonal cycles — a
+record ending August 2026 is analysed from September 1975. The endpoints then
+sit in the same phase of the annual cycle, so the linear endpoint correction
+never has to bridge a seasonal jump, and every calendar month is equally
+represented in the climatology.
+
+Set `filter.window` in `config.yaml` (`start`, `end` as `YYYY-MM`, or `null`
+for the defaults) to analyse a different period. The website exposes the same
+choice interactively: the pages ship the **raw monthly observations** and re-run
+the filter in the browser, so changing the dates in the "Fourier analysis
+window" selector recomputes the filter, the interpolation and the derivatives
+rather than slicing a fixed result. The browser implementation is
+`docs/assets/js/fourier-filter.js`, a port of `src/el_nino/filter.py`;
+`tests/test_fourier_window_parity.py` checks the two against each other.
 
 **`passa_baixa` — Fourier low-pass filter**
 Computes sine Fourier coefficients for modes IW = 1 to NM1/2 (where NM1 = NT−1),

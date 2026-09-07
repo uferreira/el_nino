@@ -12,9 +12,10 @@ test_fetch_*
 
 test_one_station_fails_others_patched
     ``update_website.main`` must not let a single flaky sea level station
-    (e.g. Callao when UHSLC times out) abort the whole update: the failing
-    station keeps its previous JS block, every other station is still patched,
-    and the script does not exit non-zero.
+    (e.g. Callao when UHSLC times out) abort the whole update. The page's
+    generated region is rebuilt as a whole, so the failing station has to keep
+    the raw series already published there while every other dataset is
+    refreshed, and the script must not exit non-zero.
 
 Run with:
     pytest tests/test_resilience.py -v
@@ -122,6 +123,10 @@ filter:
   HN1: 10.0
   HN2: 9.0
   NDOTS: 5
+  window:
+    start: null
+    end: null
+    base_year: 1975
 sst:
   local_file: "{local_file}"
   ano_inicio: 1975
@@ -131,7 +136,6 @@ sst_indices:
   - {{key: "nino34", label: "NINO3.4"}}
 stations:
   callao:   {{id: "093", name: "Callao",   start_date: "1905-01-01"}}
-  talara:   {{id: "092", name: "Talara",   start_date: "1942-01-01"}}
   honolulu: {{id: "057", name: "Honolulu", start_date: "1905-01-01"}}
 """
 
@@ -140,13 +144,47 @@ _FRESHNESS_MARKER = (
     '<p class="data-freshness"><!--DATA_FRESHNESS-->old<!--/DATA_FRESHNESS--></p>'
 )
 
+# Marker values that make "was this dataset rewritten?" readable in an assert.
+_OLD_VALUE = 9.99
+_NEW_VALUE = 1.11
+
+
+_YEARS = [2000] * 12 + [2001] * 12
+_MONTHS = list(range(1, 13)) * 2
+
+
+def _raw_full(value: float, drop_last: int = 0) -> dict:
+    """Pipeline-shaped raw record (what run_* returns), 24 months.
+
+    ``drop_last`` shortens the record from the end, which is how a run that
+    fell back to a stale source looks: same series, fewer recent months.
+    """
+    end = len(_YEARS) - drop_last
+    return {"values": [value] * end,
+            "IYR": _YEARS[:end], "MES": _MONTHS[:end]}
+
+
+def _raw_published(value: float) -> dict:
+    """JS-shaped raw record (what the page carries), 24 months."""
+    return {"values": [value] * 24, "year": _YEARS, "month": _MONTHS}
+
+
+def _published_values(html: str, var_name: str) -> list[float]:
+    """Read one dataset's values back out of the page's RAW_SERIES block."""
+    import re
+    m = re.search(
+        rf"{var_name}:\s*\{{[^{{}}]*?values:\[([^\]]*)\]", html, re.DOTALL
+    )
+    assert m, f"{var_name} missing from the generated region"
+    return [float(v) for v in m.group(1).split(",") if v.strip()]
+
 
 def _setup(uw, tmp_path, monkeypatch, *, callao_fails, argv_extra=None,
-           prior_freshness=None):
+           prior_freshness=None, drop_last=0):
     """
     Wire update_website's I/O to temp locations and stub the pipeline runners.
 
-    Returns (index_path, old_blocks). Callao raises RuntimeError when
+    Returns (index_path, freshness_path). Callao raises RuntimeError when
     ``callao_fails`` is True; every other station succeeds.
     """
     dummy_new = {"x": [0.0, 1.0], "y": [1.0, 2.0],
@@ -154,29 +192,32 @@ def _setup(uw, tmp_path, monkeypatch, *, callao_fails, argv_extra=None,
     monkeypatch.setattr(uw, "_load_dat", lambda p: dict(dummy_new))
     monkeypatch.setattr(uw, "_count_monthly", lambda p: 2)
 
-    sst_result = {"IYR": [2000, 2001], "MES": [1, 12]}
+    def _result():
+        return {"IYR": [2000, 2001], "MES": [1, 12],
+                "raw_full": _raw_full(_NEW_VALUE, drop_last)}
+
     monkeypatch.setattr(uw, "_run_sst_nino12",
-                        lambda *a, **k: (Path("x.dat"), dict(sst_result)))
+                        lambda *a, **k: (Path("x.dat"), _result()))
     monkeypatch.setattr(uw, "_run_sst_index",
-                        lambda *a, **k: (Path("x.dat"), {}))
+                        lambda *a, **k: (Path("x.dat"), _result()))
 
     def fake_run_sl(st, *a, **k):
         if callao_fails and st["name"] == "Callao":
             raise RuntimeError("UHSLC timeout on ERDDAP and RQD")
-        return Path("x.dat"), {"IYR": [2000, 2001], "MES": [1, 12]}
+        return Path("x.dat"), _result()
 
     monkeypatch.setattr(uw, "_run_sl", fake_run_sl)
 
-    # index.html: an old JS block for every dataset + the freshness marker.
-    old_data = {"x": [9.0], "y": [9.0], "year": [1999], "month": [1], "irest": [0]}
-    old_blocks = {
-        var: uw._build_js_block(var, lenvar, old_data)
-        for var, (fn, lenvar) in uw.DATASETS.items()
-    }
+    # index.html: an already-published region carrying every dataset, plus the
+    # freshness marker, so a rebuild has something to preserve.
+    from collections import OrderedDict
+    published = OrderedDict(
+        (var, _raw_published(_OLD_VALUE)) for var in uw.DATASETS)
     idx = tmp_path / "index.html"
     idx.write_text(
-        "<html>\n" + "\n".join(old_blocks.values())
-        + "\n" + _FRESHNESS_MARKER + "\n</html>\n",
+        "<html>\n<script>\n"
+        + uw._build_data_region(published, 10.0, 9.0, 5, 1975)
+        + "\n</script>\n" + _FRESHNESS_MARKER + "\n</html>\n",
         encoding="utf-8",
     )
 
@@ -198,23 +239,25 @@ def _setup(uw, tmp_path, monkeypatch, *, callao_fails, argv_extra=None,
     argv = ["update_website.py", "--no-push", "--config", str(cfg_path)]
     argv += argv_extra or []
     monkeypatch.setattr(uw.sys, "argv", argv)
-    return idx, old_blocks, fresh
+    return idx, fresh
 
 
 def test_one_station_fails_others_patched(tmp_path, monkeypatch, capsys):
     uw = _load_update_website()
-    idx, old_blocks, _ = _setup(uw, tmp_path, monkeypatch, callao_fails=True)
+    idx, _ = _setup(uw, tmp_path, monkeypatch, callao_fails=True)
 
     # Should complete without SystemExit despite Callao failing.
     uw.main()
 
     final = idx.read_text(encoding="utf-8")
-    # Callao failed → its old block is left untouched.
-    assert old_blocks["callaoData"] in final
-    # A healthy station (Talara) and the SST block were patched to new data.
-    assert old_blocks["talaraData"] not in final
-    assert old_blocks["observedData"] not in final
-    assert "talaraData" in final and "0.00,1.00" in final
+    # Callao failed → the region keeps the values already published.
+    assert _published_values(final, "callaoData")[0] == _OLD_VALUE
+    # A healthy station and the SST block carry the fresh values.
+    assert _published_values(final, "honoluluData")[0] == _NEW_VALUE
+    assert _published_values(final, "observedData")[0] == _NEW_VALUE
+    # The region is still well formed and still drives the browser filter.
+    assert uw.DATA_BEGIN in final and uw.DATA_END in final
+    assert "EnsoFourier.runAll(RAW_SERIES" in final
 
     err = capsys.readouterr().err
     assert "Callao" in err
@@ -229,8 +272,8 @@ def test_failed_station_marked_stale_in_freshness(tmp_path, monkeypatch):
                        "as_of": "2026-05", "ok": True},
         },
     }
-    idx, _, fresh = _setup(uw, tmp_path, monkeypatch,
-                           callao_fails=True, prior_freshness=prior)
+    idx, fresh = _setup(uw, tmp_path, monkeypatch,
+                        callao_fails=True, prior_freshness=prior)
 
     uw.main()
 
@@ -239,7 +282,7 @@ def test_failed_station_marked_stale_in_freshness(tmp_path, monkeypatch):
     assert state["stations"]["callao"]["ok"] is False
     assert state["stations"]["callao"]["as_of"] == "2026-05"
     # A healthy station recorded a fresh success.
-    assert state["stations"]["talara"]["ok"] is True
+    assert state["stations"]["honolulu"]["ok"] is True
     assert state["last_refreshed"] is not None
 
     # The index.html footnote surfaces the stale station subtly.
@@ -248,33 +291,99 @@ def test_failed_station_marked_stale_in_freshness(tmp_path, monkeypatch):
     assert "Callao sea level data as of May 2026 (fetch pending)" in final
 
 
-def test_sl_only_leaves_sst_blocks_untouched(tmp_path, monkeypatch):
+def test_sl_only_leaves_sst_series_untouched(tmp_path, monkeypatch):
     uw = _load_update_website()
 
     # --sl-only must not even call the SST runners.
     def _boom(*a, **k):
         raise AssertionError("SST pipeline ran under --sl-only")
 
-    idx, old_blocks, _ = _setup(uw, tmp_path, monkeypatch, callao_fails=False,
-                                argv_extra=["--sl-only"])
+    idx, _ = _setup(uw, tmp_path, monkeypatch, callao_fails=False,
+                    argv_extra=["--sl-only"])
     monkeypatch.setattr(uw, "_run_sst_nino12", _boom)
     monkeypatch.setattr(uw, "_run_sst_index", _boom)
 
     uw.main()
 
     final = idx.read_text(encoding="utf-8")
-    # SST/NINO blocks are left exactly as they were …
-    assert old_blocks["observedData"] in final
-    assert old_blocks["nino3Data"] in final
+    # SST/NINO series keep the published values …
+    assert _published_values(final, "observedData")[0] == _OLD_VALUE
+    assert _published_values(final, "nino3Data")[0] == _OLD_VALUE
     # … while sea level stations were refreshed.
-    assert old_blocks["talaraData"] not in final
-    assert old_blocks["callaoData"] not in final
+    assert _published_values(final, "callaoData")[0] == _NEW_VALUE
+    assert _published_values(final, "honoluluData")[0] == _NEW_VALUE
 
 
 def test_sst_only_and_sl_only_mutually_exclusive(tmp_path, monkeypatch):
     uw = _load_update_website()
-    idx, _, _ = _setup(uw, tmp_path, monkeypatch, callao_fails=False,
-                       argv_extra=["--sst-only", "--sl-only"])
+    idx, _ = _setup(uw, tmp_path, monkeypatch, callao_fails=False,
+                    argv_extra=["--sst-only", "--sl-only"])
     with pytest.raises(SystemExit) as exc:
         uw.main()
     assert exc.value.code == 1
+
+
+# ---------------------------------------------------------------------------
+# Regression guard: published data must only ever move forwards
+# ---------------------------------------------------------------------------
+
+def test_older_data_is_refused(tmp_path, monkeypatch, capsys):
+    """A run whose data ends earlier than the page must abort before writing.
+
+    This is the failure mode of an unreachable source or a stale local cache:
+    the pipeline succeeds, produces a shorter record, and would quietly
+    un-publish real observations.
+    """
+    uw = _load_update_website()
+    idx, _ = _setup(uw, tmp_path, monkeypatch, callao_fails=False, drop_last=3)
+    before = idx.read_text(encoding="utf-8")
+
+    with pytest.raises(SystemExit) as exc:
+        uw.main()
+    assert exc.value.code == 1
+
+    # Nothing was written: the page still carries the newer published data.
+    assert idx.read_text(encoding="utf-8") == before
+    assert _published_values(before, "observedData")[0] == _OLD_VALUE
+
+    err = capsys.readouterr().err
+    assert "would move back from Dec 2001 to Sep 2001" in err
+    assert "--allow-older" in err
+
+
+def test_allow_older_overrides_the_guard(tmp_path, monkeypatch, capsys):
+    """The escape hatch writes the older data, but says so on stderr."""
+    uw = _load_update_website()
+    idx, _ = _setup(uw, tmp_path, monkeypatch, callao_fails=False,
+                    drop_last=3, argv_extra=["--allow-older"])
+
+    uw.main()
+
+    final = idx.read_text(encoding="utf-8")
+    assert _published_values(final, "observedData")[0] == _NEW_VALUE
+    err = capsys.readouterr().err
+    assert "WARNING" in err and "would move back" in err
+
+
+def test_equal_or_newer_data_passes_the_guard(tmp_path, monkeypatch):
+    """The common case — same or later last month — is not obstructed."""
+    uw = _load_update_website()
+    idx, _ = _setup(uw, tmp_path, monkeypatch, callao_fails=False)
+
+    uw.main()
+
+    assert _published_values(idx.read_text(encoding="utf-8"),
+                             "observedData")[0] == _NEW_VALUE
+
+
+def test_guard_ignores_datasets_that_were_not_rerun(tmp_path, monkeypatch):
+    """--sl-only must not trip the guard on the SST series it never touched."""
+    uw = _load_update_website()
+    idx, _ = _setup(uw, tmp_path, monkeypatch, callao_fails=False,
+                    argv_extra=["--sl-only"])
+
+    uw.main()   # must not raise
+
+    final = idx.read_text(encoding="utf-8")
+    assert _published_values(final, "observedData")[0] == _OLD_VALUE
+    assert _published_values(final, "callaoData")[0] == _NEW_VALUE

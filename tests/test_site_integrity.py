@@ -254,20 +254,26 @@ def test_duffing_attractor_has_synchronized_observed_monthly_clouds():
 
 
 def test_phase_plot_axes_are_derived_from_every_embedded_series():
-    """Updated observations must never outgrow hard-coded phase-plot axes."""
+    """Updated observations must never outgrow hard-coded phase-plot axes.
+
+    The pages no longer embed pre-filtered arrays; they embed the raw monthly
+    series and filter them in the browser. A sea-level record still swings far
+    enough to escape any fixed axis, so every panel must go through
+    phaseAutoConfig / phaseAutoDomain rather than a literal range.
+    """
     phase_html = PHASE_PAGE.read_text(encoding="utf-8")
     duffing_html = DUFFING_PAGE.read_text(encoding="utf-8")
     compare_html = COMPARE_PAGE.read_text(encoding="utf-8")
-    talara_match = re.search(
-        r"const talaraData = \{\s*x:\s*\[([^\]]+)\],\s*y:\s*\[([^\]]+)\],",
-        phase_html,
+
+    # A long tide-gauge record has excursions no fixed axis would contain.
+    lalib_match = re.search(
+        r"laLibData:\s*\{[^{}]*?values:\[([^\]]*)\]", phase_html, re.DOTALL
     )
-    assert talara_match
-    talara_x = [float(value) for value in talara_match.group(1).split(",")]
-    talara_y = [float(value) for value in talara_match.group(2).split(",")]
-    talara_mean = sum(talara_x) / len(talara_x)
-    assert max(value - talara_mean for value in talara_x) > 300
-    assert min(talara_y) < -60
+    assert lalib_match, "laLibData missing from the generated region"
+    lalib = [float(v) for v in lalib_match.group(1).split(",") if v.strip()]
+    lalib_mean = sum(lalib) / len(lalib)
+    assert max(value - lalib_mean for value in lalib) > 150
+
     for html in (phase_html, duffing_html):
         assert "function phaseAutoDomain(" in html
         assert "function phaseAutoConfig(" in html
@@ -275,7 +281,6 @@ def test_phase_plot_axes_are_derived_from_every_embedded_series():
             "nino3Data",
             "nino34Data",
             "nino4Data",
-            "talaraData",
             "laLibData",
             "honoluluData",
             "palauData",
@@ -292,6 +297,64 @@ def test_phase_plot_axes_are_derived_from_every_embedded_series():
     assert "cmpComputeDomains(params.norm, preps)" in compare_html
 
 
+DATA_PAGES = [
+    "phase_diagrams.html",
+    "duffing_simulation.html",
+    "familiar_attractor.html",
+    "ensemble.html",
+    "compare.html",
+]
+
+
+def test_talara_is_gone_from_the_site():
+    """The Talara station was retired; no page may still refer to it."""
+    for page in (ROOT / "docs").glob("*.html"):
+        html = page.read_text(encoding="utf-8")
+        assert "talara" not in html.lower(), f"{page.name} still references Talara"
+
+
+def test_data_pages_filter_in_the_browser():
+    """Every data page must ship raw series and run the filter client-side.
+
+    This is what makes the date selector work: nothing pre-filtered is shipped,
+    so a new analysis window is a real re-run of the filter rather than a slice
+    of a fixed result.
+    """
+    for name in DATA_PAGES:
+        html = (ROOT / "docs" / name).read_text(encoding="utf-8")
+        assert "// ENSO_DATA_BEGIN" in html and "// ENSO_DATA_END" in html, name
+        assert "const RAW_SERIES = {" in html, name
+        assert "EnsoFourier.runAll(RAW_SERIES" in html, name
+        assert "EnsoFourierWindow.request()" in html, name
+        # The maths and the selector are loaded before the inline page script.
+        assert 'src="assets/js/fourier-filter.js' in html, name
+        assert 'src="assets/js/fourier-window.js' in html, name
+        assert '<div id="fourier-window"></div>' in html, name
+        # No page may still carry a pre-filtered array.
+        assert not re.search(r"const \w+Data = \{\s*\n\s*x:\s*\[", html), name
+
+
+def test_raw_series_are_continuous_monthly_calendars():
+    """The Fourier modes assume equally spaced samples.
+
+    A missing month would silently shift every frequency, so the embedded raw
+    records must be gap-free calendars — the same invariant
+    pipeline.select_fourier_window enforces on the Python side.
+    """
+    html = (ROOT / "docs" / "phase_diagrams.html").read_text(encoding="utf-8")
+    blocks = re.findall(
+        r"(\w+): \{label:.*?year:\[([^\]]*)\],\s*month:\[([^\]]*)\]\}",
+        html, re.DOTALL,
+    )
+    assert len(blocks) >= 8, "expected every dataset in RAW_SERIES"
+    for name, years, months in blocks:
+        y = [int(v) for v in years.split(",") if v.strip()]
+        m = [int(v) for v in months.split(",") if v.strip()]
+        assert len(y) == len(m) > 24, name
+        serial = [a * 12 + b for a, b in zip(y, m)]
+        assert all(b - a == 1 for a, b in zip(serial, serial[1:])), \
+            f"{name} has a gap in its monthly calendar"
+
 
 def test_update_script_covers_current_data_pages():
     uw = _load_update_website()
@@ -306,8 +369,8 @@ def test_successful_but_old_station_data_is_reported():
     uw = _load_update_website()
     state = {
         "stations": {
-            "talara": {
-                "name": "Talara",
+            "palau": {
+                "name": "Palau",
                 "as_of": "2025-08",
                 "ok": True,
                 "stale": True,
@@ -318,7 +381,7 @@ def test_successful_but_old_station_data_is_reported():
     notes = uw._stale_notes(state)
 
     assert notes == [
-        "Talara sea level data as of August 2025 "
+        "Palau sea level data as of August 2025 "
         "(no later month passes coverage checks)"
     ]
 
@@ -333,8 +396,8 @@ def test_long_reconstructed_station_gap_is_reported():
     uw = _load_update_website()
     state = {
         "stations": {
-            "talara": {
-                "name": "Talara",
+            "palau": {
+                "name": "Palau",
                 "as_of": "2025-08",
                 "ok": True,
                 "stale": True,

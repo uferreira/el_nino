@@ -1,35 +1,53 @@
 """
 scripts/update_website.py
 =========================
-Download fresh ENSO data, re-run the Fourier filter pipeline, and
-re-embed the JS data arrays in all docs/*.html pages.
+Download fresh ENSO data, run the Python Fourier pipeline (which writes the
+reference ``data/output/*.dat`` files), and re-embed the **raw monthly
+input series** in every docs/*.html page.
 
 Run from the project root:
 
     python scripts/update_website.py              # all datasets
-    python scripts/update_website.py --sst-only   # only NINO1+2 SST
+    python scripts/update_website.py --sst-only   # only the SST indices
     python scripts/update_website.py --dry-run    # compute but do not write
     python scripts/update_website.py --no-push    # update HTML but skip git push
+    python scripts/update_website.py --allow-older  # let data move backwards
 
-Each HTML page that contains a JS block of the form:
+Published data only moves forwards
+----------------------------------
+Before writing anything the script compares each dataset's fresh last month
+against the one the page already publishes, and aborts if any would move
+backwards. That is the signature of an unreachable source or a stale
+``data/input/`` cache: the pipeline still succeeds, but on a shorter record,
+and writing it would quietly un-publish real observations. ``--allow-older``
+overrides the check when the older record is genuinely the correct one.
 
-    const <varName> = { x:[...], y:[...], year:[...], month:[...], irest:[...] };
-    const <LEN_VAR> = <varName>.x.length;  // <N>
+What the pages contain
+----------------------
+Between the ``// ENSO_DATA_BEGIN`` and ``// ENSO_DATA_END`` markers each page
+carries a ``RAW_SERIES`` object of unfiltered monthly observations, followed
+by the lines that turn it into the filtered/interpolated arrays the plots
+read.  The filtering itself happens **in the browser**, in
+``docs/assets/js/fourier-filter.js``, so a visitor can change the Fourier
+analysis window (the date selector rendered by
+``docs/assets/js/fourier-window.js``) and have everything recomputed without
+a new pipeline run.
 
-will have that block replaced with fresh data from the corresponding .dat file.
-Pages that do not contain a given block are left unchanged.
+The Python pipeline remains the reference implementation: it runs the same
+maths over the window configured in ``config.yaml`` (``filter.window``) and
+writes the ``.dat`` files.  ``tests/test_fourier_window_parity.py`` asserts
+the two agree.
 
-Dataset → JS variable mapping
-------------------------------
-    sva.2_filter_NINO12_SAIDApy.dat   → observedData  / OBS_N
-    sva.2_filter_NINO3_SAIDApy.dat    → nino3Data     / NINO3_N
-    sva.2_filter_NINO4_SAIDApy.dat    → nino4Data     / NINO4_N
-    sva.2_filter_NINO34_SAIDApy.dat   → nino34Data    / NINO34_N
-    sva.2_filter_Callao_SAIDApy.dat   → callaoData    / CAL_N
-    sva.2_filter_Talara_SAIDApy.dat   → talaraData    / TAL_N
-    sva.2_filter_La Libertad_SAIDApy.dat → laLibData  / LALIB_N
-    sva.2_filter_Honolulu_SAIDApy.dat → honoluluData  / HON_N
-    sva.2_filter_Palau_SAIDApy.dat    → palauData     / PAL_N
+Dataset -> JS name mapping
+--------------------------
+    sva.2_filter_NINO12_SAIDApy.dat      -> observedData  / OBS_N
+    sva.2_filter_NINO3_SAIDApy.dat       -> nino3Data     / NINO3_N
+    sva.2_filter_NINO4_SAIDApy.dat       -> nino4Data     / NINO4_N
+    sva.2_filter_NINO34_SAIDApy.dat      -> nino34Data    / NINO34_N
+    sva.2_filter_Callao_SAIDApy.dat      -> callaoData    / CAL_N
+    sva.2_filter_La Libertad_SAIDApy.dat -> laLibData     / LALIB_N
+    sva.2_filter_Honolulu_SAIDApy.dat    -> honoluluData  / HON_N
+    sva.2_filter_Palau_SAIDApy.dat       -> palauData     / PAL_N
 """
 
 import argparse
@@ -74,18 +92,32 @@ DOCS    = Path("docs")
 # workflow so it survives the ephemeral CI checkout.
 FRESHNESS_FILE = OUT_DIR / "freshness.json"
 
-# All known datasets: var_name → (dat_filename, length_constant_name)
-DATASETS: OrderedDict[str, tuple[str, str]] = OrderedDict([
-    ("observedData", ("sva.2_filter_NINO12_SAIDApy.dat",        "OBS_N")),
-    ("nino3Data",    ("sva.2_filter_NINO3_SAIDApy.dat",         "NINO3_N")),
-    ("nino4Data",    ("sva.2_filter_NINO4_SAIDApy.dat",         "NINO4_N")),
-    ("nino34Data",   ("sva.2_filter_NINO34_SAIDApy.dat",        "NINO34_N")),
-    ("callaoData",   ("sva.2_filter_Callao_SAIDApy.dat",        "CAL_N")),
-    ("talaraData",   ("sva.2_filter_Talara_SAIDApy.dat",        "TAL_N")),
-    ("laLibData",    ("sva.2_filter_La Libertad_SAIDApy.dat",   "LALIB_N")),
-    ("honoluluData", ("sva.2_filter_Honolulu_SAIDApy.dat",      "HON_N")),
-    ("palauData",    ("sva.2_filter_Palau_SAIDApy.dat",         "PAL_N")),
+# All known datasets, in the order they are written into RAW_SERIES.
+#   js_var -> (dat_filename, length_constant, label, unit, group, deseasonalize)
+# "deseasonalize" mirrors the Python pipeline: absolute series have their
+# monthly climatology removed before the filter and added back afterwards;
+# the NOAA NINO3/4/3.4 columns are already anomalies and are filtered as-is.
+DATASETS: OrderedDict[str, dict] = OrderedDict([
+    ("observedData", dict(dat="sva.2_filter_NINO12_SAIDApy.dat",      len="OBS_N",
+                          label="NINO1+2 SST",    unit="\u00b0C", group="sst", deseasonalize=True)),
+    ("nino3Data",    dict(dat="sva.2_filter_NINO3_SAIDApy.dat",       len="NINO3_N",
+                          label="NINO3 anomaly",  unit="\u00b0C", group="sst", deseasonalize=False)),
+    ("nino4Data",    dict(dat="sva.2_filter_NINO4_SAIDApy.dat",       len="NINO4_N",
+                          label="NINO4 anomaly",  unit="\u00b0C", group="sst", deseasonalize=False)),
+    ("nino34Data",   dict(dat="sva.2_filter_NINO34_SAIDApy.dat",      len="NINO34_N",
+                          label="NINO3.4 anomaly", unit="\u00b0C", group="sst", deseasonalize=False)),
+    ("callaoData",   dict(dat="sva.2_filter_Callao_SAIDApy.dat",      len="CAL_N",
+                          label="Callao SL",      unit="mm", group="sl", deseasonalize=True)),
+    ("laLibData",    dict(dat="sva.2_filter_La Libertad_SAIDApy.dat", len="LALIB_N",
+                          label="La Libertad SL", unit="mm", group="sl", deseasonalize=True)),
+    ("honoluluData", dict(dat="sva.2_filter_Honolulu_SAIDApy.dat",    len="HON_N",
+                          label="Honolulu SL",    unit="mm", group="sl", deseasonalize=True)),
+    ("palauData",    dict(dat="sva.2_filter_Palau_SAIDApy.dat",       len="PAL_N",
+                          label="Palau SL",       unit="mm", group="sl", deseasonalize=True)),
 ])
+
+DATA_BEGIN = "// ENSO_DATA_BEGIN"
+DATA_END   = "// ENSO_DATA_END"
 
 # All HTML pages to patch (skipped silently if not found)
 HTML_FILES = [
@@ -137,40 +169,175 @@ def _load_dat(path: str) -> dict:
     return {"x": xs, "y": ys, "year": years, "month": months, "irest": irests}
 
 
-def _build_js_block(var_name: str, len_var: str, data: dict) -> str:
-    """Return the two-line JS const block for a dataset."""
-    x_arr  = _compact_array(data["x"],     ".2f")
-    y_arr  = _compact_array(data["y"],     ".2f")
-    yr_arr = _compact_array(data["year"],  "d")
-    mo_arr = _compact_array(data["month"], "d")
-    ir_arr = _compact_array(data["irest"], "d")
-    n      = len(data["x"])
+def _as_raw(raw_full: dict) -> dict:
+    """Pipeline ``raw_full`` (NumPy) -> plain lists for JS serialisation.
+
+    These are the unfiltered monthly observations over the dataset's whole
+    record, not the analysis window: the browser needs the full record so a
+    visitor can widen the window as well as narrow it.
+    """
+    return {
+        "values": [float(v) for v in raw_full["values"]],
+        "year":   [int(v)   for v in raw_full["IYR"]],
+        "month":  [int(v)   for v in raw_full["MES"]],
+    }
+
+
+def _js_str(text: str) -> str:
+    """Minimal JS string literal (the values here are ASCII labels/units)."""
+    return json.dumps(text, ensure_ascii=False)
+
+
+def _build_raw_entry(var_name: str, meta: dict, raw: dict) -> str:
+    """One RAW_SERIES member: the unfiltered monthly observations."""
     return (
-        f"const {var_name} = {{\n"
-        f"  x:     {x_arr},\n"
-        f"  y:     {y_arr},\n"
-        f"  year:  {yr_arr},\n"
-        f"  month: {mo_arr},\n"
-        f"  irest: {ir_arr}\n"
-        f"}};\n"
-        f"const {len_var} = {var_name}.x.length;  // {n}"
+        f"  {var_name}: {{label:{_js_str(meta['label'])},unit:{_js_str(meta['unit'])},"
+        f"group:{_js_str(meta['group'])},deseasonalize:{'true' if meta['deseasonalize'] else 'false'},\n"
+        f"    values:{_compact_array(raw['values'], '.2f')},\n"
+        f"    year:{_compact_array(raw['year'], 'd')},\n"
+        f"    month:{_compact_array(raw['month'], 'd')}}}"
     )
 
 
-def _patch_dataset(html: str, var_name: str, len_var: str, data: dict) -> tuple[str, bool]:
-    """
-    Replace a single JS dataset block in an HTML string.
+def _last_month(raw: dict) -> tuple[int, int] | None:
+    """Last (year, month) of a raw series, in either shape it comes in.
 
-    Returns (new_html, patched_flag). Returns html unchanged if the pattern
-    is not present (so pages that don't use a dataset are left untouched).
+    Accepts the pipeline shape (``IYR``/``MES``) and the page shape
+    (``year``/``month``), so a freshly computed series and one parsed back
+    out of a published page can be compared directly.
     """
-    new_block = _build_js_block(var_name, len_var, data)
-    pattern = (
-        rf"const {re.escape(var_name)}\s*=\s*\{{.*?\}};\s*\n"
-        rf"const {re.escape(len_var)}\s*=\s*[^\n]+"
+    years = raw.get("year") or raw.get("IYR")
+    months = raw.get("month") or raw.get("MES")
+    if not years or not months:
+        return None
+    return int(years[-1]), int(months[-1])
+
+
+def _check_no_regression(
+    html_name: str,
+    computed: dict[str, dict],
+    published: "OrderedDict[str, dict]",
+) -> list[str]:
+    """Report datasets whose fresh series ends EARLIER than the published one.
+
+    Data must only ever move forwards. A run that produces an older record
+    means the sources were incomplete, or the pipeline fell back to a stale
+    local cache — not that a month disappeared from the ocean. Overwriting
+    the page in that case silently un-publishes real observations, which is
+    exactly the failure this guard exists to catch.
+    """
+    losses: list[str] = []
+    for var_name, raw in computed.items():
+        prev = published.get(var_name)
+        if prev is None:
+            continue
+        new_last, old_last = _last_month(raw), _last_month(prev)
+        if new_last is None or old_last is None:
+            continue
+        if new_last < old_last:
+            losses.append(
+                f"{html_name}: {var_name} would move back from "
+                f"{_month_label(*old_last)} to {_month_label(*new_last)}"
+            )
+    return losses
+
+
+def _build_data_region(raw_series: "OrderedDict[str, dict]",
+                       hn1: float, hn2: float, ndots: int,
+                       base_year: int) -> str:
+    """Build the whole generated block, markers included.
+
+    The block embeds the RAW monthly observations and then hands them to
+    EnsoFourier (docs/assets/js/fourier-filter.js), which reproduces the
+    Python pipeline in the browser. Nothing pre-filtered is shipped, so the
+    date selector can re-run the analysis over any window the visitor picks.
+    """
+    entries = ",\n".join(
+        _build_raw_entry(var_name, DATASETS[var_name], raw)
+        for var_name, raw in raw_series.items()
     )
-    new_html, count = re.subn(pattern, new_block, html, flags=re.DOTALL)
+    derived = "\n".join(
+        f"const {var_name} = FOURIER_RESULTS.{var_name};\n"
+        f"const {DATASETS[var_name]['len']} = {var_name}.x.length;"
+        for var_name in raw_series
+    )
+    return f"""{DATA_BEGIN}
+/* Generated by scripts/update_website.py — do not edit by hand.
+
+   RAW_SERIES holds the UNFILTERED monthly observations. The Fourier
+   low-pass filter, the interpolation onto {ndots} sub-points per month and the
+   derivatives all run in the browser, in assets/js/fourier-filter.js, so
+   the analysis window can be changed from the date selector at the top of
+   the page. The Python reference implementation of the same maths is
+   src/el_nino/filter.py + src/el_nino/pipeline.py, and it is what writes
+   the data/output/*.dat files.                                          */
+const RAW_SERIES = {{
+{entries}
+}};
+/* Filter parameters — config.yaml: filter (HN1, HN2, NDOTS, window.base_year) */
+const FOURIER_PARAMS = {{HN1:{hn1}, HN2:{hn2}, NDOTS:{ndots}, baseYear:{base_year}}};
+/* Requested window: ?from=YYYY-MM&to=YYYY-MM, else this session's choice,
+   else the default (base year, month after the end month, so the record
+   spans whole 12-month cycles). */
+const FOURIER_REQUEST = EnsoFourierWindow.request();
+const FOURIER_RESULTS = EnsoFourier.runAll(RAW_SERIES, FOURIER_PARAMS, FOURIER_REQUEST);
+{derived}
+document.addEventListener('DOMContentLoaded', function () {{
+  EnsoFourierWindow.mount({{
+    rawSeries: RAW_SERIES, params: FOURIER_PARAMS, results: FOURIER_RESULTS,
+    plotSeries: window.FOURIER_PLOT_SERIES || {{}}
+  }});
+}});
+{DATA_END}"""
+
+
+# Legacy layout: a run of `const <var> = {{...}}; const <LEN> = ...` blocks,
+# from the first dataset to the last. Matched once so the first run of this
+# script migrates a page to the marker-delimited region above.
+_LEGACY_REGION = re.compile(
+    # Greedy on purpose: the run of blocks must be consumed to its very last
+    # length constant, whatever order the page listed the datasets in.
+    r"const observedData\s*=\s*\{.*"
+    r"const (?:OBS_N|NINO3_N|NINO4_N|NINO34_N|CAL_N|TAL_N|LALIB_N|HON_N|PAL_N)"
+    r"\s*=\s*\w+\.x\.length;[^\n]*",
+    re.DOTALL,
+)
+
+_MARKED_REGION = re.compile(
+    re.escape(DATA_BEGIN) + r".*?" + re.escape(DATA_END), re.DOTALL
+)
+
+
+def _patch_data_region(html: str, region: str) -> tuple[str, bool]:
+    """Replace the generated data region, migrating a legacy page if needed."""
+    if DATA_BEGIN in html:
+        return _MARKED_REGION.sub(lambda _m: region, html, count=1), True
+    new_html, count = _LEGACY_REGION.subn(lambda _m: region, html, count=1)
     return new_html, count > 0
+
+
+def _extract_raw_series(html: str) -> "OrderedDict[str, dict]":
+    """Read RAW_SERIES back out of a page.
+
+    Needed by --sst-only / --sl-only: the region is rewritten as a whole, so
+    the datasets that were not re-run this time must keep the values already
+    published rather than disappearing from the page.
+    """
+    found: "OrderedDict[str, dict]" = OrderedDict()
+    for var_name in DATASETS:
+        m = re.search(
+            rf"{re.escape(var_name)}:\s*\{{[^{{}}]*?values:\[([^\]]*)\],\s*"
+            rf"year:\[([^\]]*)\],\s*month:\[([^\]]*)\]\}}",
+            html, re.DOTALL,
+        )
+        if not m:
+            continue
+        found[var_name] = {
+            "values": [float(v) for v in m.group(1).split(",") if v.strip()],
+            "year":   [int(v)   for v in m.group(2).split(",") if v.strip()],
+            "month":  [int(v)   for v in m.group(3).split(",") if v.strip()],
+        }
+    return found
 
 
 def _patch_stats_bar(html: str,
@@ -326,7 +493,7 @@ def _patch_freshness(html: str, refreshed_label: str, stale_notes: list[str]) ->
 # ---------------------------------------------------------------------------
 
 def _run_sst_nino12(cfg: dict, hn1: float, hn2: float, ndots: int,
-                    out_dir: Path) -> tuple[Path, dict]:
+                    out_dir: Path, win: dict) -> tuple[Path, dict]:
     """Run NINO1+2 absolute SST pipeline → stable filename."""
     dat = out_dir / "sva.2_filter_NINO12_SAIDApy.dat"
     result = pipeline.run_sst(
@@ -334,13 +501,15 @@ def _run_sst_nino12(cfg: dict, hn1: float, hn2: float, ndots: int,
         ano_inicio=cfg["sst"]["ano_inicio"],
         HN1=hn1, HN2=hn2, NDOTS=ndots,
         output_file=str(dat),
+        window_start=win.get("start"), window_end=win.get("end"),
+        base_year=int(win.get("base_year", 1975)),
     )
     result["output_file"] = str(dat)
     return dat, result
 
 
 def _run_sst_index(cfg: dict, key: str, hn1: float, hn2: float, ndots: int,
-                   out_dir: Path) -> tuple[Path, dict]:
+                   out_dir: Path, win: dict) -> tuple[Path, dict]:
     """Run one SST anomaly index pipeline."""
     dat = out_dir / f"sva.2_filter_{key.upper()}_SAIDApy.dat"
     result = pipeline.run_sst_index(
@@ -349,12 +518,14 @@ def _run_sst_index(cfg: dict, key: str, hn1: float, hn2: float, ndots: int,
         ano_inicio=cfg["sst"]["ano_inicio"],
         HN1=hn1, HN2=hn2, NDOTS=ndots,
         output_file=str(dat),
+        window_start=win.get("start"), window_end=win.get("end"),
+        base_year=int(win.get("base_year", 1975)),
     )
     return dat, result
 
 
 def _run_sl(st: dict, hn1: float, hn2: float, ndots: int,
-            out_dir: Path) -> tuple[Path, dict]:
+            out_dir: Path, win: dict) -> tuple[Path, dict]:
     """Run sea level pipeline for one station."""
     dat = out_dir / f"sva.2_filter_{st['name']}_SAIDApy.dat"
     result = pipeline.run_sea_level(
@@ -364,6 +535,8 @@ def _run_sl(st: dict, hn1: float, hn2: float, ndots: int,
         HN1=hn1, HN2=hn2, NDOTS=ndots,
         output_file=str(dat),
         rqd_url=st.get("rqd_url"),
+        window_start=win.get("start"), window_end=win.get("end"),
+        base_year=int(win.get("base_year", 1975)),
     )
     return dat, result
 
@@ -396,6 +569,13 @@ def main() -> None:
     parser.add_argument(
         "--no-push", action="store_true",
         help="Update HTML files but skip the git add/commit/push step",
+    )
+    parser.add_argument(
+        "--allow-older", action="store_true",
+        help="Write the pages even if a dataset would move back to an earlier "
+             "last month than the one already published (normally an error: it "
+             "usually means a source was incomplete or a stale local cache was "
+             "used, and writing would un-publish real observations)",
     )
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -432,6 +612,11 @@ def main() -> None:
     hn1   = float(cfg["filter"]["HN1"])
     hn2   = float(cfg["filter"]["HN2"])
     ndots = int(cfg["filter"]["NDOTS"])
+    # Fourier analysis window for the reference .dat files — config.yaml
+    # filter.window. The website starts from the same defaults but lets the
+    # visitor change them; see docs/assets/js/fourier-window.js.
+    win   = cfg["filter"].get("window") or {}
+    base_year = int(win.get("base_year", 1975))
 
     t0 = time.time()
     step = 1
@@ -440,19 +625,22 @@ def main() -> None:
 
     freshness = _load_freshness()
     loaded_data: dict[str, dict] = {}
+    # Unfiltered monthly observations, embedded verbatim in the pages.
+    loaded_raw: dict[str, dict] = {}
     # Most recent (year, month) of data seen, for the commit message.
     latest_ym: tuple[int, int] | None = None
 
     # ── SST pipelines ─────────────────────────────────────────────────────────
     # Skipped entirely under --sl-only: the SST/NINO JS blocks are simply left
-    # out of loaded_data, so _patch_dataset leaves their existing blocks intact.
+    # out of loaded_raw, so the region keeps the values already published.
     sst_data = None
     sst_yr0 = sst_m0 = sst_yr1 = sst_m1 = sst_n = 0
 
     if not args.sl_only:
         print(f"[{step}] SST NINO1+2 pipeline (absolute) …"); step += 1
-        sst_dat, sst_result = _run_sst_nino12(cfg, hn1, hn2, ndots, OUT_DIR)
+        sst_dat, sst_result = _run_sst_nino12(cfg, hn1, hn2, ndots, OUT_DIR, win)
         sst_data = _load_dat(str(sst_dat))
+        loaded_raw["observedData"] = _as_raw(sst_result["raw_full"])
         sst_yr0 = int(sst_result["IYR"][0]);  sst_m0 = int(sst_result["MES"][0])
         sst_yr1 = int(sst_result["IYR"][-1]); sst_m1 = int(sst_result["MES"][-1])
         sst_n   = sum(1 for v in sst_data["irest"] if v == 0)
@@ -467,9 +655,10 @@ def main() -> None:
                 continue
             label = sst_idx_map[key]["label"]
             print(f"[{step}] SST {label} pipeline (anomaly) …"); step += 1
-            dat, _ = _run_sst_index(cfg, key, hn1, hn2, ndots, OUT_DIR)
+            dat, idx_result = _run_sst_index(cfg, key, hn1, hn2, ndots, OUT_DIR, win)
             js_var = f"{key}Data"  # nino3Data, nino4Data, nino34Data
             loaded_data[js_var] = _load_dat(str(dat))
+            loaded_raw[js_var] = _as_raw(idx_result["raw_full"])
             n = sum(1 for v in loaded_data[js_var]["irest"] if v == 0)
             print(f"  {label}: {n} months")
     else:
@@ -482,7 +671,6 @@ def main() -> None:
     # Station key → JS variable name
     _sl_var = {
         "callao":       "callaoData",
-        "talara":       "talaraData",
         "la_libertad":  "laLibData",
         "honolulu":     "honoluluData",
         "palau":        "palauData",
@@ -495,8 +683,9 @@ def main() -> None:
             js_var = _sl_var.get(key, f"{key}Data")
             print(f"[{step}] {st['name']} sea level pipeline …"); step += 1
             try:
-                dat, result = _run_sl(st, hn1, hn2, ndots, OUT_DIR)
+                dat, result = _run_sl(st, hn1, hn2, ndots, OUT_DIR, win)
                 loaded_data[js_var] = _load_dat(str(dat))
+                loaded_raw[js_var] = _as_raw(result["raw_full"])
                 n = sum(1 for v in loaded_data[js_var]["irest"] if v == 0)
                 yr0 = int(result["IYR"][0]);  m0 = int(result["MES"][0])
                 yr1 = int(result["IYR"][-1]); m1 = int(result["MES"][-1])
@@ -521,8 +710,8 @@ def main() -> None:
             except RuntimeError as exc:
                 # A single flaky station (e.g. Callao when UHSLC times out) must
                 # not abort the whole update. Skip it: without its entry in
-                # loaded_data, _patch_dataset leaves that station's existing JS
-                # block untouched (stale but not broken), and — for Callao —
+                # loaded_raw, the rebuilt region reuses the values already on
+                # the page (stale but not broken), and — for Callao —
                 # cal_data stays None so _patch_stats_bar is skipped entirely.
                 print(
                     f"  WARNING: {st['name']} sea level pipeline failed; "
@@ -560,14 +749,33 @@ def main() -> None:
     print(f"[{step}] Patching HTML files …"); step += 1
 
     patched_files: list[Path] = []
+    # Pages are rendered first and written only once every one of them has
+    # passed the no-regression check, so a single bad dataset cannot leave
+    # half the site updated and half rolled back.
+    pending: list[tuple[Path, str]] = []
+    regressions: list[str] = []
     for html_path in HTML_FILES:
         if not html_path.exists():
             continue
         html = html_path.read_text(encoding="utf-8")
         original = html
-        for var_name, data in loaded_data.items():
-            _, len_var = DATASETS[var_name]
-            html, _ = _patch_dataset(html, var_name, len_var, data)
+
+        # Rebuild the whole generated region. Datasets that were not re-run
+        # this time (--sst-only / --sl-only, or a station that failed) keep
+        # the values already published on the page.
+        published = _extract_raw_series(html)
+        page_raw: "OrderedDict[str, dict]" = OrderedDict()
+        for var_name in DATASETS:
+            if var_name in loaded_raw:
+                page_raw[var_name] = loaded_raw[var_name]
+            elif var_name in published:
+                page_raw[var_name] = published[var_name]
+        if page_raw:
+            regressions += _check_no_regression(html_path.name, loaded_raw, published)
+            region = _build_data_region(page_raw, hn1, hn2, ndots, base_year)
+            html, patched = _patch_data_region(html, region)
+            if not patched and html_path.name != "index.html":
+                print(f"  WARNING: no data region found in {html_path}", file=sys.stderr)
 
         # Stats bar update (index.html only, only when both SST and Callao present)
         if (html_path.name == "index.html"
@@ -584,7 +792,25 @@ def main() -> None:
         if html == original:
             print(f"  Unchanged: {html_path}")
             continue
+        pending.append((html_path, html))
 
+    # ── Regression guard ──────────────────────────────────────────────────
+    if regressions:
+        for line in regressions:
+            print(f"  {'WARNING' if args.allow_older else 'ERROR'}: {line}",
+                  file=sys.stderr)
+        if not args.allow_older:
+            print(
+                "\nRefusing to write: the new data ends earlier than what is "
+                "already published.\nCheck that every source was reachable "
+                "(data/input/ may hold a stale cache), then re-run.\n"
+                "Pass --allow-older only if the older record is genuinely the "
+                "correct one.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    for html_path, html in pending:
         if not args.dry_run:
             html_path.write_text(html, encoding="utf-8")
             print(f"  Written:   {html_path}")

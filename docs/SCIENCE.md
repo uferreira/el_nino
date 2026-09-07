@@ -87,16 +87,37 @@ phase-space area than a moderate El Niño year.
 
 ## The Fourier Filter
 
-### Calendar-aligned endpoints
+### The analysis window and its endpoints
 
-Before the Fourier calculation, the production pipeline selects the earliest
-observation whose calendar month matches the last observed month. Thus a live
-record ending in July is analysed from its first available July, rather than
-from a fixed January start. This discards only the leading partial seasonal
-cycle, does not fabricate an endpoint, and prevents the annual cycle itself from
-creating a large January-to-July boundary difference. The original Fortran
-input used the same-month pattern (for example February-to-February); the
-Python update must preserve it as the terminal month advances.
+The window analysed by the Fourier stages is an explicit choice, not a
+by-product of whatever the record happens to contain. It is set in
+`config.yaml` (`filter.window`) for the pipeline, and interactively on the
+website, where the filter is re-run in the browser for whatever start and end
+the reader picks.
+
+Its default spans a **whole number of 12-month seasonal cycles**: it starts in
+the base year (1975) in the calendar month *after* the end month, so a record
+ending in August 2026 is analysed from September 1975 — 612 observations, 51
+complete years. Two things follow from that, and both matter:
+
+- The first and last observations sit one month apart in the annual cycle, so
+  the linear detrending that connects them does not have to bridge a large
+  seasonal jump (the failure mode of a fixed January start against a July end).
+- Every calendar month appears the same number of times, so the monthly
+  climatology removed before filtering is estimated from a balanced sample
+  rather than one weighted towards the months at the start of the record.
+
+This supersedes the earlier heuristic, which forced the start into the *same*
+calendar month as the end. That gave 12k + 1 observations and an unbalanced
+climatology; the current rule gives 12k and a balanced one, and it matches the
+same-phase-endpoint property the original Fortran input had.
+
+A window requested explicitly is used exactly as given. If it does not span
+whole cycles the pipeline logs it and the website shows a warning next to the
+date selector — the window is never silently moved. A window that reaches back
+before a given record starts instead at that record's own first whole-cycle
+month, which is how a reader can widen the window to take in the long
+tide-gauge records without breaking the cycle property for the shorter ones.
 
 ### The sine Fourier expansion on [0, NM1]
 

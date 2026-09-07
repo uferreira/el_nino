@@ -4,6 +4,30 @@ filter:
   HN2: 9.0    # half-period parameter: 18-month full-period stop edge
   NDOTS: 5    # interpolation points per month
 
+  # ---------------------------------------------------------------------
+  # Fourier analysis window (inclusive, "YYYY-MM").
+  #
+  # This is the ONLY place the window is configured for the Python
+  # pipeline.  It is resolved by el_nino.pipeline.resolve_fourier_window()
+  # and applied by el_nino.pipeline.select_fourier_window().
+  # The website exposes the same window interactively; the JavaScript
+  # port of this logic lives in docs/assets/js/fourier-filter.js
+  # (EnsoFourier.resolveWindow / EnsoFourier.selectWindow).
+  #
+  #   end   : null -> the latest observation available for each dataset
+  #   start : null -> base_year, in the calendar month that follows the
+  #                   end month, so the window spans a whole number of
+  #                   12-month seasonal cycles (e.g. an end of 2026-08
+  #                   gives 1975-09, i.e. 612 months = 51 complete years).
+  #
+  # Each dataset is clipped to its own record: a window wider than a
+  # station's record simply uses that record's own first/last month.
+  # ---------------------------------------------------------------------
+  window:
+    start: null
+    end: null
+    base_year: 1975
+
 # SST data source
 sst:
   local_file: "assets/data/sst1950_1981.txt"
@@ -36,13 +60,6 @@ stations:
     name: "Callao"
     start_date: "1905-01-01"
     rqd_url: "https://uhslc.soest.hawaii.edu/data/csv/rqds/pacific/hourly/h093a.csv"
-    xlim: [-300, 300]
-    ylim: [-60, 60]
-  talara:
-    id: "092"
-    name: "Talara"
-    start_date: "1942-01-01"
-    rqd_url: "https://uhslc.soest.hawaii.edu/data/csv/rqds/pacific/hourly/h092a.csv"
     xlim: [-300, 300]
     ylim: [-60, 60]
   la_libertad:

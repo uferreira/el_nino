@@ -29,26 +29,221 @@ from el_nino.filter import compute_sigma, deri_fourier, passa_baixa
 
 
 # ---------------------------------------------------------------------------
-# Private helpers shared by run_sst and run_sea_level
+# Fourier analysis window  (shared by run_sst, run_sst_index, run_sea_level)
 # ---------------------------------------------------------------------------
+#
+# THIS is where the start/end of the analysed time series is decided in the
+# Python pipeline.  The website performs the identical selection in
+# JavaScript — see EnsoFourier.resolveWindow / EnsoFourier.selectWindow in
+# docs/assets/js/fourier-filter.js.  Keep the two in step: any change here
+# must be mirrored there, and tests/test_fourier_window_parity.py compares
+# them numerically.
+
+def _ym(year: int, month: int) -> int:
+    """Serial month index, so windows can be compared as plain integers."""
+    return int(year) * 12 + int(month)
+
+
+def parse_month(value) -> int | None:
+    """Parse a ``YYYY-MM`` window bound into a serial month index.
+
+    ``None`` and the empty string mean "not specified" and are passed
+    through as ``None`` so the caller can apply its own default.
+    """
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    parts = text.replace("/", "-").split("-")
+    if len(parts) < 2:
+        raise ValueError(f"window bound must look like 'YYYY-MM', got {value!r}")
+    year, month = int(parts[0]), int(parts[1])
+    if not 1 <= month <= 12:
+        raise ValueError(f"window month must be in 1..12, got {value!r}")
+    return _ym(year, month)
+
+
+def format_month(ym: int) -> str:
+    """Inverse of :func:`parse_month` — a serial month index as ``YYYY-MM``."""
+    year, month = divmod(int(ym) - 1, 12)
+    return f"{year:04d}-{month + 1:02d}"
+
+
+def cycle_start_month(end_ym: int) -> int:
+    """Calendar month a window must start in to span whole 12-month cycles.
+
+    A record running from month ``m`` to month ``m-1`` covers every calendar
+    month the same number of times, which is what the monthly climatology and
+    the endpoint phase of the sine expansion both want.
+    """
+    end_month = (int(end_ym) - 1) % 12 + 1
+    return end_month % 12 + 1
+
+
+def default_start_ym(end_ym: int, base_year: int = 1975) -> int:
+    """First month of the default window for a record ending at ``end_ym``.
+
+    The window starts in ``base_year``, in the calendar month that *follows*
+    the end month, so it spans a whole number of complete 12-month seasonal
+    cycles.  With an end of August 2026 this gives September 1975: 612
+    observations, exactly 51 full years, every calendar month equally
+    represented in the climatology.
+    """
+    return _ym(base_year, cycle_start_month(end_ym))
+
+
+def _first_cycle_start_at_or_after(record_first: int, end_ym: int) -> int:
+    """Earliest whole-cycle start month that the record actually contains."""
+    month = cycle_start_month(end_ym)
+    candidate = _ym((record_first - 1) // 12, month)
+    while candidate < record_first:
+        candidate += 12
+    return candidate
+
+
+def resolve_fourier_window(
+    IYR: np.ndarray,
+    MES: np.ndarray,
+    start=None,
+    end=None,
+    base_year: int = 1975,
+) -> dict:
+    """Turn a requested window into concrete bounds for one dataset.
+
+    ``start`` and ``end`` are ``YYYY-MM`` strings (or ``None``).  Both are
+    honoured exactly as given — nothing is silently moved — and then clipped
+    to the record actually available, so a window wider than a station's
+    record simply falls back to that record's own first and last month.
+
+    Returns a dict with the resolved serial-month bounds, their labels, and
+    a list of human-readable notes: whether the request was clipped, and
+    whether the window spans a whole number of seasonal cycles.  A window
+    whose start month is not ``end month + 1`` joins two different phases of
+    the annual cycle at the endpoints of the sine expansion, which biases
+    the detrending; that is reported, not corrected.
+    """
+    IYR = np.asarray(IYR)
+    MES = np.asarray(MES)
+    if len(IYR) == 0:
+        raise ValueError("cannot resolve a Fourier window for an empty record")
+
+    record_first = _ym(int(IYR[0]), int(MES[0]))
+    record_last = _ym(int(IYR[-1]), int(MES[-1]))
+
+    requested_end = parse_month(end)
+    end_ym = record_last if requested_end is None else requested_end
+
+    requested_start = parse_month(start)
+    if requested_start is None:
+        start_ym = default_start_ym(min(end_ym, record_last), base_year)
+    else:
+        start_ym = requested_start
+
+    notes: list[str] = []
+    clipped_end = min(end_ym, record_last)
+    if start_ym < record_first:
+        # The request reaches back beyond this record. Rather than starting at
+        # whatever calendar month the record happens to open with, start at
+        # the first month that still gives whole 12-month cycles — the same
+        # rule the default start uses, applied to this record's own beginning.
+        clipped_start = _first_cycle_start_at_or_after(record_first, clipped_end)
+        notes.append(
+            f"start moved to {format_month(clipped_start)}: the record begins "
+            f"{format_month(record_first)} and this is its first whole-cycle start"
+        )
+    else:
+        clipped_start = start_ym
+    if clipped_end != end_ym:
+        notes.append(
+            f"end clipped to {format_month(clipped_end)} (record ends then)"
+        )
+    if clipped_end - clipped_start < 11:
+        # One complete seasonal cycle is the hard floor: the monthly
+        # climatology needs every calendar month at least once.
+        raise ValueError(
+            "Fourier window must span at least 12 months; got "
+            f"{format_month(clipped_start)}..{format_month(clipped_end)}"
+        )
+
+    start_month = (clipped_start - 1) % 12 + 1
+    end_month = (clipped_end - 1) % 12 + 1
+    whole_cycles = start_month == end_month % 12 + 1
+    if not whole_cycles:
+        notes.append(
+            "window does not span whole 12-month cycles "
+            f"(starts in month {start_month}, ends in month {end_month}); "
+            "the sine expansion joins different phases of the seasonal cycle "
+            "at its endpoints and the monthly climatology is unbalanced"
+        )
+
+    return {
+        "start_ym": clipped_start,
+        "end_ym": clipped_end,
+        "start": format_month(clipped_start),
+        "end": format_month(clipped_end),
+        "requested_start": None if requested_start is None else format_month(requested_start),
+        "requested_end": None if requested_end is None else format_month(requested_end),
+        "n_months": clipped_end - clipped_start + 1,
+        "whole_cycles": bool(whole_cycles),
+        "notes": notes,
+    }
+
+
+def select_fourier_window(
+    IYR: np.ndarray,
+    MES: np.ndarray,
+    data: np.ndarray,
+    start=None,
+    end=None,
+    base_year: int = 1975,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
+    """Slice a continuous monthly record down to the requested window.
+
+    This replaces the old ``_align_fourier_window`` heuristic, which forced
+    the start into the same calendar month as the end.  The window is now an
+    explicit input (config.yaml ``filter.window`` for the pipeline, the date
+    selector on the website), and the "whole seasonal cycles" property that
+    the old heuristic approximated is delivered by :func:`default_start_ym`
+    when no start is given.
+    """
+    IYR = np.asarray(IYR)
+    MES = np.asarray(MES)
+    data = np.asarray(data)
+
+    if not (len(IYR) == len(MES) == len(data)):
+        raise ValueError("IYR, MES, and data must have the same length")
+    if len(MES) < 2:
+        raise ValueError("at least two monthly observations are required")
+    if np.any((MES < 1) | (MES > 12)):
+        raise ValueError("MES values must be calendar months in 1..12")
+    serial_month = IYR.astype(np.int64) * 12 + MES.astype(np.int64)
+    if np.any(np.diff(serial_month) != 1):
+        raise ValueError(
+            "IYR and MES must form a continuous monthly calendar; "
+            "missing months must be reconstructed before Fourier analysis"
+        )
+
+    window = resolve_fourier_window(IYR, MES, start, end, base_year)
+    keep = (serial_month >= window["start_ym"]) & (serial_month <= window["end_ym"])
+    return IYR[keep], MES[keep], data[keep], window
+
 
 def _align_fourier_window(
     IYR: np.ndarray,
     MES: np.ndarray,
     data: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Start the Fourier window in the same calendar month in which it ends.
+    """Deprecated: start the window in the same calendar month it ends in.
 
-    The sine-series detrending in the translated Fortran algorithm uses the
-    first and last values as its boundary.  Keeping a fixed January start as
-    new observations advance through the year therefore joins different
-    phases of the seasonal cycle (for example January to July).  The original
-    Fortran input avoided that jump by using matching endpoint months.
-
-    Select the earliest observation whose calendar month matches the latest
-    observation and discard only the leading partial seasonal cycle (at most
-    eleven observations for a continuous monthly record).  No synthetic value
-    is introduced and the most recent observation is always retained.
+    Superseded by :func:`select_fourier_window`, which takes the window as an
+    explicit parameter.  Kept because it documents the original endpoint
+    reasoning and is still exercised by the endpoint-alignment tests: the
+    sine-series detrending uses the first and last values as its boundary,
+    so a fixed January start joined different phases of the seasonal cycle
+    as new observations advanced through the year.
     """
     IYR = np.asarray(IYR)
     MES = np.asarray(MES)
@@ -250,6 +445,9 @@ def run_sst(
     HN2: float,
     NDOTS: int,
     output_file: str,
+    window_start: str | None = None,
+    window_end: str | None = None,
+    base_year: int = 1975,
 ) -> dict:
     """
     Full SST pipeline: raw data → Fourier filter → output .dat file.
@@ -300,12 +498,17 @@ def run_sst(
     """
     # --- Load data ---
     raw_data = download.load_sst(local_file=local_file, ano_inicio=ano_inicio)
-    IYR  = raw_data["IYR"]
-    MES  = raw_data["MES"]
-    SST0 = raw_data["SST0"]
-    IYR, MES, SST0 = _align_fourier_window(IYR, MES, SST0)
+    IYR_full = raw_data["IYR"]
+    MES_full = raw_data["MES"]
+    SST_full = raw_data["SST0"]
+    # Window selection — see select_fourier_window above.
+    IYR, MES, SST0, window = select_fourier_window(
+        IYR_full, MES_full, SST_full, window_start, window_end, base_year
+    )
     NT   = len(SST0)
-    print(f"  NT = {NT}")
+    print(f"  window = {window['start']} .. {window['end']}  (NT = {NT})")
+    for note in window["notes"]:
+        print(f"  NOTE: {note}")
 
     # --- Filter pipeline ---
     SST3, SST4, VST, AST, sigma30, sigma04 = _run_pipeline_steps(
@@ -323,6 +526,8 @@ def run_sst(
         "IYR":         IYR,
         "MES":         MES,
         "SST0":        SST0,
+        "window":      window,
+        "raw_full":    {"IYR": IYR_full, "MES": MES_full, "values": SST_full},
         "SST3":        SST3,
         "SST4":        SST4,
         "VST":         VST,
@@ -340,6 +545,9 @@ def run_sst_index(
     HN2: float,
     NDOTS: int,
     output_file: str,
+    window_start: str | None = None,
+    window_end: str | None = None,
+    base_year: int = 1975,
 ) -> dict:
     """
     Pipeline for a single SST anomaly index (NINO12, NINO3, NINO4, NINO34).
@@ -373,12 +581,17 @@ def run_sst_index(
         raise ValueError(f"Unknown SST index key: {index_key!r}")
 
     raw_data = download.load_sst(local_file=local_file, ano_inicio=ano_inicio)
-    IYR  = raw_data["IYR"]
-    MES  = raw_data["MES"]
-    anom = raw_data[anom_key]
-    IYR, MES, anom = _align_fourier_window(IYR, MES, anom)
+    IYR_full = raw_data["IYR"]
+    MES_full = raw_data["MES"]
+    anom_full = raw_data[anom_key]
+    # Window selection — see select_fourier_window above.
+    IYR, MES, anom, window = select_fourier_window(
+        IYR_full, MES_full, anom_full, window_start, window_end, base_year
+    )
     NT   = len(anom)
-    print(f"  NT = {NT}")
+    print(f"  window = {window['start']} .. {window['end']}  (NT = {NT})")
+    for note in window["notes"]:
+        print(f"  NOTE: {note}")
 
     filtered_anom = passa_baixa(HN1, HN2, anom)
     interp, vel, accel = deri_fourier(NDOTS, filtered_anom)
@@ -394,6 +607,8 @@ def run_sst_index(
         "IYR":         IYR,
         "MES":         MES,
         "ANOM":        anom,
+        "window":      window,
+        "raw_full":    {"IYR": IYR_full, "MES": MES_full, "values": anom_full},
         "filtered":    filtered_anom,
         "interp":      interp,
         "vel":         vel,
@@ -412,6 +627,9 @@ def run_sea_level(
     NDOTS: int,
     output_file: str,
     rqd_url: str | None = None,
+    window_start: str | None = None,
+    window_end: str | None = None,
+    base_year: int = 1975,
 ) -> dict:
     """
     Full sea level pipeline: raw data → Fourier filter → output .dat file.
@@ -456,12 +674,17 @@ def run_sea_level(
         start_date=start_date,
         rqd_url=rqd_url,
     )
-    IYR = raw_data["IYR"]
-    MES = raw_data["MES"]
-    SL0 = raw_data["SL0"]
-    IYR, MES, SL0 = _align_fourier_window(IYR, MES, SL0)
+    IYR_full = raw_data["IYR"]
+    MES_full = raw_data["MES"]
+    SL_full  = raw_data["SL0"]
+    # Window selection — see select_fourier_window above.
+    IYR, MES, SL0, window = select_fourier_window(
+        IYR_full, MES_full, SL_full, window_start, window_end, base_year
+    )
     NT  = len(SL0)
-    print(f"  NT = {NT}")
+    print(f"  window = {window['start']} .. {window['end']}  (NT = {NT})")
+    for note in window["notes"]:
+        print(f"  NOTE: {note}")
 
     # --- Filter pipeline (same steps as SST) ---
     SL3, SL4, VST, AST, sigma30, sigma04 = _run_pipeline_steps(
@@ -479,6 +702,8 @@ def run_sea_level(
         "IYR":         IYR,
         "MES":         MES,
         "SL0":         SL0,
+        "window":      window,
+        "raw_full":    {"IYR": IYR_full, "MES": MES_full, "values": SL_full},
         "SL3":         SL3,
         "SL4":         SL4,
         "VST":         VST,
@@ -541,6 +766,11 @@ def run_all(config_path: str = "config.yaml") -> dict:
     HN1     = float(flt["HN1"])
     HN2     = float(flt["HN2"])
     NDOTS   = int(flt["NDOTS"])
+    # Fourier analysis window — config.yaml: filter.window
+    win     = flt.get("window") or {}
+    w_start = win.get("start")
+    w_end   = win.get("end")
+    w_base  = int(win.get("base_year", 1975))
     out_dir = Path("data/output")
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -557,6 +787,9 @@ def run_all(config_path: str = "config.yaml") -> dict:
         HN2=HN2,
         NDOTS=NDOTS,
         output_file=str(nino12_path),
+        window_start=w_start,
+        window_end=w_end,
+        base_year=w_base,
     )
     result["sst_nino12"]["output_file"] = str(nino12_path)
 
@@ -575,6 +808,9 @@ def run_all(config_path: str = "config.yaml") -> dict:
             HN2=HN2,
             NDOTS=NDOTS,
             output_file=str(out_path),
+            window_start=w_start,
+            window_end=w_end,
+            base_year=w_base,
         )
 
     # --- Sea level stations ---
@@ -590,6 +826,9 @@ def run_all(config_path: str = "config.yaml") -> dict:
             NDOTS=NDOTS,
             output_file=str(out_path),
             rqd_url=st.get("rqd_url"),
+            window_start=w_start,
+            window_end=w_end,
+            base_year=w_base,
         )
 
     return result

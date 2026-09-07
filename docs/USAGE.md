@@ -128,9 +128,11 @@ four interpolated sub-points between consecutive monthly observations. For a
 
 ### What `passa_baixa` does step by step
 
-1. **Align the endpoint months** in the production pipeline. The analysis
-   starts at the earliest observation from the same calendar month as the
-   latest observation, discarding only the leading partial seasonal cycle.
+1. **Select the analysis window** (`pipeline.select_fourier_window`). By
+   default it starts in the base year in the calendar month after the end
+   month, so it spans whole 12-month seasonal cycles; `config.yaml`
+   `filter.window` overrides it, and the website's date selector does the same
+   thing in the browser.
 2. **Remove the mean** from the input series ST0 → STA.
 3. **Remove a linear trend** (connect the first and last values with a
    straight line and subtract it). This enforces Dirichlet boundary conditions
@@ -548,7 +550,27 @@ To trigger a manual update from GitHub:
 python scripts/update_website.py --sst-only   # SST only, skip sea level
 python scripts/update_website.py --dry-run    # compute but write nothing
 python scripts/update_website.py --no-push    # update HTML but skip git push
+python scripts/update_website.py --allow-older  # permit data to move backwards
 ```
+
+### Published data only moves forwards
+
+Before writing anything, the script compares each dataset's fresh last month
+against the month the page already publishes, and aborts without touching a
+single file if any of them would move backwards:
+
+```
+ERROR: phase_diagrams.html: callaoData would move back from Aug 2026 to Jul 2026
+Refusing to write: the new data ends earlier than what is already published.
+```
+
+That is what an unreachable source or a stale `data/input/` cache looks like:
+the pipeline still succeeds, but on a shorter record, and writing it would
+quietly un-publish real observations. `data/input/` is gitignored, so a clone
+that has not run the pipeline recently — or a machine that cannot reach NOAA
+CPC and UHSLC — will produce exactly this. Check the sources, then re-run.
+`--allow-older` overrides the guard, and should only be used when the older
+record is genuinely the correct one.
 
 ---
 
