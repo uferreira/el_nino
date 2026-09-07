@@ -311,7 +311,7 @@ def _load_rapid(station_id: str) -> pd.DataFrame:
     _save_raw(f"data/input/rapid_{station_id}_raw.csv", best_text or "")
     print(
         f"  RAPID: {len(best):,} records from {best_url}  "
-        f"({best['time_utc'].iloc[0]} to{best['time_utc'].iloc[-1]})"
+        f"({best['time_utc'].iloc[0]} to {best['time_utc'].iloc[-1]})"
     )
     return best
 
@@ -410,7 +410,7 @@ def _parse_sst_lines(lines: list[str], ano_inicio: int) -> pd.DataFrame:
 # Public API
 # ---------------------------------------------------------------------------
 
-def load_sst(
+def _load_sst_uncached(
     local_file: str = "data/input/sst1950_1981.txt",
     ano_inicio: int = 1975,
 ) -> dict:
@@ -496,7 +496,7 @@ def load_sst(
 
     print(
         f"  SST: {len(df)} months  "
-        f"({df['YR'].iloc[0]}/{df['MON'].iloc[0]:02d} to"
+        f"({df['YR'].iloc[0]}/{df['MON'].iloc[0]:02d} to "
         f"{df['YR'].iloc[-1]}/{df['MON'].iloc[-1]:02d})"
     )
 
@@ -537,6 +537,69 @@ def load_sst(
         "SST34": df["NINO34"].to_numpy(dtype=np.float64),
         "ANOM34": df["ANOM34"].to_numpy(dtype=np.float64),
     }
+
+
+# ---------------------------------------------------------------------------
+# Cached SST access
+# ---------------------------------------------------------------------------
+
+# A full site update runs four SST pipelines (NINO1+2, NINO3, NINO4, NINO3.4)
+# and every one of them needs the same combined record. Downloading
+# sstoi.indices once per index fetches identical bytes four times and
+# multiplies the chance that a transient CPC outage aborts a run halfway
+# through. Cache the parsed record per (local_file, ano_inicio) for the
+# lifetime of the process instead.
+_SST_CACHE: dict[tuple[str, int], dict] = {}
+
+
+def clear_sst_cache() -> None:
+    """Discard the cached SST record so the next load_sst downloads again."""
+    _SST_CACHE.clear()
+
+
+def load_sst(
+    local_file: str = "data/input/sst1950_1981.txt",
+    ano_inicio: int = 1975,
+    *,
+    use_cache: bool = True,
+) -> dict:
+    """
+    Load the combined monthly SST record, reusing an in-process cache.
+
+    Thin wrapper around :func:`_load_sst_uncached`; see that function for the
+    data sources, the file format, and the meaning of every returned key. The
+    first call for a given ``(local_file, ano_inicio)`` downloads from NOAA and
+    writes the raw and combined input files exactly as before. Later calls in
+    the same process reuse that record and skip the network entirely.
+
+    Each caller receives its own array copies, so in-place work by one index
+    pipeline cannot corrupt the record handed to the next.
+
+    Parameters
+    ----------
+    local_file, ano_inicio
+        As in :func:`_load_sst_uncached`.
+    use_cache : bool
+        Set False to force a fresh download; the new record replaces the
+        cached one.
+
+    Returns
+    -------
+    dict
+        The same keys as :func:`_load_sst_uncached`, with copied arrays.
+    """
+    key = (str(local_file), int(ano_inicio))
+    if use_cache and key in _SST_CACHE:
+        cached = _SST_CACHE[key]
+        print(
+            "  SST: reusing the record downloaded earlier in this run "
+            f"({len(cached['MES'])} months)"
+        )
+        return {name: arr.copy() for name, arr in cached.items()}
+
+    record = _load_sst_uncached(local_file=local_file, ano_inicio=ano_inicio)
+    _SST_CACHE[key] = {name: arr.copy() for name, arr in record.items()}
+    return record
 
 
 def _aggregate_monthly_sea_level(
@@ -687,7 +750,7 @@ def _load_sea_level_erddap(
 
     print(
         f"  {station_name}: {len(df):,} hourly obs  "
-        f"({df['time_utc'].iloc[0]} to{df['time_utc'].iloc[-1]})"
+        f"({df['time_utc'].iloc[0]} to {df['time_utc'].iloc[-1]})"
     )
 
     df_rapid = _load_rapid(station_id)
@@ -1036,7 +1099,7 @@ def _self_test() -> None:
 
     # --- 2. Years in ascending order ---
     assert np.all(np.diff(IYR) >= 0), "FAIL: years not in ascending order"
-    print(f"  PASS 2: years ascending  ({IYR[0]} to{IYR[-1]})")
+    print(f"  PASS 2: years ascending  ({IYR[0]} to {IYR[-1]})")
 
     # --- 3. Months all in [1, 12] ---
     assert int(MES.min()) >= 1 and int(MES.max()) <= 12, (
