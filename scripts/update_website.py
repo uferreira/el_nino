@@ -679,6 +679,16 @@ def main() -> None:
     run_date = run_dt.strftime("%Y-%m-%d")
 
     run_stamp = run_dt.isoformat(timespec="seconds")
+    # Optional wall-clock budget (seconds) for the downloads, set by CI. Once
+    # it is spent, the remaining datasets are recorded as failed rather than
+    # attempted, so the job finishes, publishes what it has and says what it
+    # skipped, instead of being killed by the job timeout with nothing saved.
+    budget = float(os.environ.get("ENSO_UPDATE_BUDGET_S") or 0)
+
+    def _budget_spent() -> RuntimeError | None:
+        if budget and time.time() - t0 > budget:
+            return RuntimeError(f"time budget of {budget:.0f}s exhausted; not attempted")
+        return None
     full_run = not (args.sst_only or args.sl_only)
     unmapped = _unmapped_config_datasets(cfg)
     if unmapped:
@@ -742,6 +752,9 @@ def main() -> None:
             rows[js_var] = dict(name=label, source="-", first="-", last="-",
                                 n="-", status="skipped (--sl-only)")
             continue
+        if (spent := _budget_spent()) is not None:
+            _record_failure(js_var, label, "sst", key, spent)
+            continue
         kind = "absolute" if key == "nino12" else "anomaly"
         print(f"[{step}] SST {label} pipeline ({kind}) …"); step += 1
         try:
@@ -768,6 +781,9 @@ def main() -> None:
         if args.sst_only:
             rows[js_var] = dict(name=st["name"], source="-", first="-", last="-",
                                 n="-", status="skipped (--sst-only)")
+            continue
+        if (spent := _budget_spent()) is not None:
+            _record_failure(js_var, st["name"], "stations", key, spent)
             continue
         print(f"[{step}] {st['name']} sea level pipeline …"); step += 1
         try:

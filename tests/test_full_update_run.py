@@ -359,3 +359,23 @@ def test_workflow_flags_by_schedule():
     # No other path sets a flag from the schedule.
     assert script.count("github.event.schedule") == 1
     assert "python scripts/update_website.py --no-push $FLAG" in script
+
+
+def test_exhausted_time_budget_records_failures_instead_of_hanging(
+    tmp_path, monkeypatch, capsys
+):
+    """CI sets ENSO_UPDATE_BUDGET_S: datasets past it are failed, not attempted."""
+    uw = _load_update_website()
+    net, cfg, page, out_dir, fresh = _prepare(uw, tmp_path, monkeypatch)
+    monkeypatch.setenv("ENSO_UPDATE_BUDGET_S", "1e-9")
+
+    uw.main()   # completes: every dataset is accounted for as failed
+
+    assert net.erddap_ids == [] and net.rapid_ids == []
+    state = json.loads(fresh.read_text(encoding="utf-8"))
+    for section in ("sst", "stations"):
+        for key, entry in state[section].items():
+            assert entry["ok"] is False, (section, key)
+            assert entry["last_success"] == _OLD_STAMP
+    out = capsys.readouterr().out
+    assert out.count("FAILED: time budget") == len(state["sst"]) + len(state["stations"])
