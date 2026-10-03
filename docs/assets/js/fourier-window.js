@@ -36,7 +36,20 @@ var EnsoFourierWindow = (function () {
         if (saved) { from = saved.start; to = saved.end; }
       } catch (e) { /* private mode / disabled storage — defaults are fine */ }
     }
-    return { start: from || null, end: to || null };
+    return { start: valid(from), end: valid(to) };
+  }
+
+  /** A bound that does not parse is dropped (default used), not fatal:
+   *  EnsoFourier.parseMonth throws, and mount() would then never render
+   *  the panel whose Reset button is the way out of a bad URL. */
+  function valid(bound) {
+    if (!bound) return null;
+    try {
+      var v = EnsoFourier.parseMonth(bound);
+      return isFinite(v) ? bound : null;
+    } catch (e) {
+      return null;
+    }
   }
 
   function remember(req) {
