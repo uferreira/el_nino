@@ -65,6 +65,13 @@ def _check_sst_file(local_file: str) -> None:
 # Per-dataset pipeline runners (mirror pipeline.run_all internals)
 # ---------------------------------------------------------------------------
 
+def _window_kwargs(cfg: dict) -> dict:
+    """Fourier analysis window from config.yaml filter.window, as pipeline kwargs."""
+    win = cfg["filter"].get("window") or {}
+    return dict(window_start=win.get("start"), window_end=win.get("end"),
+                base_year=int(win.get("base_year", 1975)))
+
+
 def _run_sst(cfg: dict, HN1: float, HN2: float, NDOTS: int,
              out_dir: Path) -> dict:
     """
@@ -82,6 +89,7 @@ def _run_sst(cfg: dict, HN1: float, HN2: float, NDOTS: int,
         ano_inicio=yr0,
         HN1=HN1, HN2=HN2, NDOTS=NDOTS,
         output_file=str(tmp),
+        **_window_kwargs(cfg),
     )
 
     # Rename once we know the actual start/end dates of the downloaded series.
@@ -100,7 +108,7 @@ def _run_sst(cfg: dict, HN1: float, HN2: float, NDOTS: int,
 
 
 def _run_sea_level(st: dict, HN1: float, HN2: float, NDOTS: int,
-                   out_dir: Path) -> dict:
+                   out_dir: Path, cfg: dict) -> dict:
     """Run the sea level pipeline for one station."""
     dat = out_dir / f"sva.2_filter_{st['name']}_SAIDApy.dat"
     return pipeline.run_sea_level(
@@ -110,6 +118,7 @@ def _run_sea_level(st: dict, HN1: float, HN2: float, NDOTS: int,
         HN1=HN1, HN2=HN2, NDOTS=NDOTS,
         output_file=str(dat),
         rqd_url=st.get("rqd_url"),
+        **_window_kwargs(cfg),
     )
 
 
@@ -335,7 +344,7 @@ def main() -> None:
         print(f"\n[{step}/{total}] {name} sea level (UHSLC {st['id']}) …")
         t0 = time.time()
 
-        sl_result = _run_sea_level(st, HN1, HN2, NDOTS, out_dir)
+        sl_result = _run_sea_level(st, HN1, HN2, NDOTS, out_dir, cfg)
 
         print("  Generating plots …")
         sl_files = _make_plots(
