@@ -52,6 +52,7 @@ Dataset -> JS name mapping
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -93,28 +94,76 @@ DOCS    = Path("docs")
 FRESHNESS_FILE = OUT_DIR / "freshness.json"
 
 # All known datasets, in the order they are written into RAW_SERIES.
-#   js_var -> (dat_filename, length_constant, label, unit, group, deseasonalize)
+#   js_var -> (dat_filename, length_constant, label, unit, group, deseasonalize,
+#              cfg_key)
 # "deseasonalize" mirrors the Python pipeline: absolute series have their
 # monthly climatology removed before the filter and added back afterwards;
 # the NOAA NINO3/4/3.4 columns are already anomalies and are filtered as-is.
+# "cfg_key" is the config.yaml key (sst_indices[].key or stations.<key>) the
+# series comes from. main() refuses to run if config.yaml lists a dataset
+# that has no entry here, because the page region is built from this table
+# and such a dataset would otherwise be processed but never published.
 DATASETS: OrderedDict[str, dict] = OrderedDict([
     ("observedData", dict(dat="sva.2_filter_NINO12_SAIDApy.dat",      len="OBS_N",
-                          label="NINO1+2 SST",    unit="\u00b0C", group="sst", deseasonalize=True)),
+                          label="NINO1+2 SST",    unit="\u00b0C", group="sst", deseasonalize=True,
+                          cfg_key="nino12")),
     ("nino3Data",    dict(dat="sva.2_filter_NINO3_SAIDApy.dat",       len="NINO3_N",
-                          label="NINO3 anomaly",  unit="\u00b0C", group="sst", deseasonalize=False)),
+                          label="NINO3 anomaly",  unit="\u00b0C", group="sst", deseasonalize=False,
+                          cfg_key="nino3")),
     ("nino4Data",    dict(dat="sva.2_filter_NINO4_SAIDApy.dat",       len="NINO4_N",
-                          label="NINO4 anomaly",  unit="\u00b0C", group="sst", deseasonalize=False)),
+                          label="NINO4 anomaly",  unit="\u00b0C", group="sst", deseasonalize=False,
+                          cfg_key="nino4")),
     ("nino34Data",   dict(dat="sva.2_filter_NINO34_SAIDApy.dat",      len="NINO34_N",
-                          label="NINO3.4 anomaly", unit="\u00b0C", group="sst", deseasonalize=False)),
+                          label="NINO3.4 anomaly", unit="\u00b0C", group="sst", deseasonalize=False,
+                          cfg_key="nino34")),
     ("callaoData",   dict(dat="sva.2_filter_Callao_SAIDApy.dat",      len="CAL_N",
-                          label="Callao SL",      unit="mm", group="sl", deseasonalize=True)),
+                          label="Callao SL",      unit="mm", group="sl", deseasonalize=True,
+                          cfg_key="callao")),
     ("laLibData",    dict(dat="sva.2_filter_La Libertad_SAIDApy.dat", len="LALIB_N",
-                          label="La Libertad SL", unit="mm", group="sl", deseasonalize=True)),
+                          label="La Libertad SL", unit="mm", group="sl", deseasonalize=True,
+                          cfg_key="la_libertad")),
     ("honoluluData", dict(dat="sva.2_filter_Honolulu_SAIDApy.dat",    len="HON_N",
-                          label="Honolulu SL",    unit="mm", group="sl", deseasonalize=True)),
+                          label="Honolulu SL",    unit="mm", group="sl", deseasonalize=True,
+                          cfg_key="honolulu")),
     ("palauData",    dict(dat="sva.2_filter_Palau_SAIDApy.dat",       len="PAL_N",
-                          label="Palau SL",       unit="mm", group="sl", deseasonalize=True)),
+                          label="Palau SL",       unit="mm", group="sl", deseasonalize=True,
+                          cfg_key="palau")),
 ])
+
+
+def _js_var_for(group: str, cfg_key: str) -> str | None:
+    """RAW_SERIES variable for a config.yaml dataset, or None if unmapped."""
+    for var_name, meta in DATASETS.items():
+        if meta["group"] == group and meta["cfg_key"] == cfg_key:
+            return var_name
+    return None
+
+
+def _sst_indices(cfg: dict) -> list[tuple[str, str]]:
+    """(key, label) of every SST series a run processes, NINO1+2 first.
+
+    NINO1+2 (absolute SST) is the site's primary series and always runs from
+    config.yaml ``sst``; the other indices come from ``sst_indices``.
+    """
+    labels = {idx["key"]: idx.get("label", idx["key"])
+              for idx in cfg.get("sst_indices", [])}
+    out = [("nino12", labels.pop("nino12", "NINO1+2"))]
+    return out + list(labels.items())
+
+
+def _unmapped_config_datasets(cfg: dict) -> list[str]:
+    """config.yaml datasets that DATASETS cannot publish (config drift)."""
+    problems = [
+        f"sst_indices key {idx['key']!r}"
+        for idx in cfg.get("sst_indices", [])
+        if _js_var_for("sst", idx["key"]) is None
+    ]
+    problems += [
+        f"station {key!r}"
+        for key in (cfg.get("stations") or {})
+        if _js_var_for("sl", key) is None
+    ]
+    return problems
 
 DATA_BEGIN = "// ENSO_DATA_BEGIN"
 DATA_END   = "// ENSO_DATA_END"
@@ -142,10 +191,6 @@ STALE_AFTER_MONTHS = 2
 
 def _month_label(year: int, month: int) -> str:
     return f"{MONTH_NAMES[month-1]} {year}"
-
-
-def _pts_label(n: int) -> str:
-    return f"{n:,}"
 
 
 def _compact_array(values, fmt: str) -> str:
@@ -340,53 +385,6 @@ def _extract_raw_series(html: str) -> "OrderedDict[str, dict]":
     return found
 
 
-def _patch_stats_bar(html: str,
-                     sst_yr0: int, sst_m0: int, sst_yr1: int, sst_m1: int,
-                     sst_n: int,
-                     cal_yr0: int, cal_m0: int, cal_yr1: int, cal_m1: int,
-                     cal_n: int) -> str:
-    """Update the human-readable date-range and point-count spans in index.html."""
-    obs_range = f"{_month_label(sst_yr0, sst_m0)} – {_month_label(sst_yr1, sst_m1)}"
-    cal_range = f"{_month_label(cal_yr0, cal_m0)} – {_month_label(cal_yr1, cal_m1)}"
-    obs_pts   = _pts_label(sst_n)
-    cal_pts   = _pts_label(cal_n)
-
-    # First Period/Points occurrences → SST section
-    html = re.sub(
-        r"(Period:\s*<strong>)([^<]+)(</strong>)",
-        lambda m: m.group(1) + obs_range + m.group(3),
-        html, count=1,
-    )
-    html = re.sub(
-        r"(Points:\s*<strong>)([\d,]+)(</strong>)",
-        lambda m: m.group(1) + obs_pts + m.group(3),
-        html, count=1,
-    )
-    # Second Period/Points occurrences → Callao section
-    html = re.sub(
-        r"(Period:\s*<strong>)([^<]+)(</strong>)",
-        lambda m: m.group(1) + cal_range + m.group(3),
-        html, count=1,
-    )
-    html = re.sub(
-        r"(Points:\s*<strong>)([\d,]+)(</strong>)",
-        lambda m: m.group(1) + cal_pts + m.group(3),
-        html, count=1,
-    )
-    # Header subtitle year ranges
-    html = re.sub(
-        r"(NINO1\+2 SST )(\d{4}–\d{4})",
-        lambda m: m.group(1) + f"{sst_yr0}–{sst_yr1}",
-        html,
-    )
-    html = re.sub(
-        r"(Callao SL )(\d{4}–\d{4})",
-        lambda m: m.group(1) + f"{cal_yr0}–{cal_yr1}",
-        html,
-    )
-    return html
-
-
 def _count_monthly(dat_file: Path) -> int:
     """Count irest==0 lines (original monthly points) in a .dat file."""
     n = 0
@@ -408,10 +406,11 @@ def _load_freshness() -> dict:
         state = json.loads(FRESHNESS_FILE.read_text(encoding="utf-8"))
         if isinstance(state, dict):
             state.setdefault("stations", {})
+            state.setdefault("sst", {})
             return state
     except (FileNotFoundError, ValueError, OSError):
         pass
-    return {"last_refreshed": None, "stations": {}}
+    return {"last_refreshed": None, "sst": {}, "stations": {}}
 
 
 def _save_freshness(state: dict) -> None:
@@ -444,6 +443,12 @@ def _fmt_month(ym: str | None) -> str | None:
 def _stale_notes(state: dict) -> list[str]:
     """Build captions for failed fetches and successfully fetched stale data."""
     notes: list[str] = []
+    for entry in state.get("sst", {}).values():
+        if not entry.get("ok", True):
+            month = _fmt_month(entry.get("as_of"))
+            name = entry.get("name", "SST")
+            notes.append(f"{name} data as of {month} (fetch pending)" if month
+                         else f"{name} data (fetch pending)")
     for entry in state.get("stations", {}).values():
         name = entry.get("name", "Station")
         month = _fmt_month(entry.get("as_of"))
@@ -542,6 +547,56 @@ def _run_sl(st: dict, hn1: float, hn2: float, ndots: int,
 
 
 # ---------------------------------------------------------------------------
+# Run summary and silent-skip guard
+# ---------------------------------------------------------------------------
+
+def _gh_annotation(level: str, message: str) -> None:
+    """Surface a problem in the GitHub Actions run summary (no-op locally)."""
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        print(f"::{level}::{message}")
+
+
+def _silently_skipped(cfg: dict, freshness: dict, run_stamp: str,
+                      *, sst: bool, sl: bool) -> list[str]:
+    """Configured datasets this run should have processed but did not record.
+
+    A dataset counts as handled when its freshness.json entry carries this
+    run's ``last_attempt`` stamp, as a success or as a failure. Checking the
+    persisted state, rather than
+    the loop that produced it, is what makes a skipped dataset impossible to
+    miss: whatever path skipped it also failed to record it.
+    """
+    missing: list[str] = []
+    wanted = []
+    if sst:
+        wanted += [("sst", key, label) for key, label in _sst_indices(cfg)]
+    if sl:
+        wanted += [("stations", key, st["name"])
+                   for key, st in (cfg.get("stations") or {}).items()]
+    for section, key, name in wanted:
+        entry = freshness.get(section, {}).get(key) or {}
+        if entry.get("last_attempt") != run_stamp:
+            missing.append(name)
+    return missing
+
+
+def _print_summary(rows: "OrderedDict[str, dict]") -> None:
+    """One row per dataset: source, first/last month, months, status."""
+    headers = ("Dataset", "Source", "First", "Last", "Months", "Status")
+    table = [headers] + [
+        (r["name"], r["source"], r["first"], r["last"], str(r["n"]), r["status"])
+        for r in rows.values()
+    ]
+    widths = [max(len(row[i]) for row in table) for i in range(len(headers) - 1)]
+    print("\nUpdate summary")
+    for i, row in enumerate(table):
+        cells = [c.ljust(w) for c, w in zip(row, widths)] + [row[-1]]
+        print("  " + "  ".join(cells))
+        if i == 0:
+            print("  " + "  ".join("-" * w for w in widths) + "  " + "-" * 6)
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -623,124 +678,162 @@ def main() -> None:
     run_dt   = datetime.now(timezone.utc)
     run_date = run_dt.strftime("%Y-%m-%d")
 
+    run_stamp = run_dt.isoformat(timespec="seconds")
+    full_run = not (args.sst_only or args.sl_only)
+    unmapped = _unmapped_config_datasets(cfg)
+    if unmapped:
+        print(
+            "ERROR: config.yaml lists datasets that update_website.DATASETS cannot "
+            "publish: " + ", ".join(unmapped) + "\nAdd them to DATASETS (and to "
+            "the pages) or remove them from config.yaml.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     freshness = _load_freshness()
-    loaded_data: dict[str, dict] = {}
     # Unfiltered monthly observations, embedded verbatim in the pages.
     loaded_raw: dict[str, dict] = {}
+    # One summary row per configured dataset, filled in as it is processed.
+    rows: "OrderedDict[str, dict]" = OrderedDict()
     # Most recent (year, month) of data seen, for the commit message.
     latest_ym: tuple[int, int] | None = None
 
+    def _record_success(js_var: str, name: str, source: str, raw: dict,
+                        status: str = "updated") -> tuple[int, int]:
+        nonlocal latest_ym
+        y0, m0 = int(raw["year"][0]), int(raw["month"][0])
+        y1, m1 = int(raw["year"][-1]), int(raw["month"][-1])
+        rows[js_var] = dict(name=name, source=source,
+                            first=f"{y0}-{m0:02d}", last=f"{y1}-{m1:02d}",
+                            n=len(raw["values"]), status=status)
+        latest_ym = max(latest_ym or (y1, m1), (y1, m1))
+        print(f"  {_month_label(y0, m0)} – {_month_label(y1, m1)}  "
+              f"({len(raw['values'])} months, {source})")
+        return y1, m1
+
+    def _record_failure(js_var: str, name: str, section: str, key: str,
+                        exc: Exception) -> None:
+        # One flaky source must not abort the whole update. Without an entry
+        # in loaded_raw, the rebuilt region reuses the values already on the
+        # page (stale but not broken). The failure is recorded so the
+        # freshness footnote can say "as of <month> (fetch pending)" and the
+        # summary table shows it.
+        print(f"  WARNING: {name} pipeline failed; leaving its existing data "
+              f"in place.\n  {exc}", file=sys.stderr)
+        prev = freshness[section].get(key, {})
+        entry = dict(prev)
+        entry.update(name=name, last_attempt=run_stamp,
+                     last_success=prev.get("last_success"),
+                     as_of=prev.get("as_of"), ok=False, stale=True)
+        freshness[section][key] = entry
+        reason = str(exc).strip().splitlines()[0] if str(exc).strip() else type(exc).__name__
+        rows[js_var] = dict(name=name, source="-", first="-",
+                            last=prev.get("as_of") or "-", n="-",
+                            status=f"FAILED: {reason[:60]}")
+        _gh_annotation("warning", f"{name}: update failed, previous data kept: {reason}")
+
     # ── SST pipelines ─────────────────────────────────────────────────────────
-    # Skipped entirely under --sl-only: the SST/NINO JS blocks are simply left
-    # out of loaded_raw, so the region keeps the values already published.
-    sst_data = None
-    sst_yr0 = sst_m0 = sst_yr1 = sst_m1 = sst_n = 0
-
-    if not args.sl_only:
-        print(f"[{step}] SST NINO1+2 pipeline (absolute) …"); step += 1
-        sst_dat, sst_result = _run_sst_nino12(cfg, hn1, hn2, ndots, OUT_DIR, win)
-        sst_data = _load_dat(str(sst_dat))
-        loaded_raw["observedData"] = _as_raw(sst_result["raw_full"])
-        sst_yr0 = int(sst_result["IYR"][0]);  sst_m0 = int(sst_result["MES"][0])
-        sst_yr1 = int(sst_result["IYR"][-1]); sst_m1 = int(sst_result["MES"][-1])
-        sst_n   = sum(1 for v in sst_data["irest"] if v == 0)
-        latest_ym = (sst_yr1, sst_m1)
-        print(f"  {_month_label(sst_yr0,sst_m0)} – {_month_label(sst_yr1,sst_m1)}  ({sst_n} months)")
-
-        # Additional SST indices (anomaly)
-        loaded_data["observedData"] = sst_data
-        sst_idx_map = {idx["key"]: idx for idx in cfg.get("sst_indices", [])}
-        for key in ("nino3", "nino4", "nino34"):
-            if key not in sst_idx_map:
-                continue
-            label = sst_idx_map[key]["label"]
-            print(f"[{step}] SST {label} pipeline (anomaly) …"); step += 1
-            dat, idx_result = _run_sst_index(cfg, key, hn1, hn2, ndots, OUT_DIR, win)
-            js_var = f"{key}Data"  # nino3Data, nino4Data, nino34Data
-            loaded_data[js_var] = _load_dat(str(dat))
-            loaded_raw[js_var] = _as_raw(idx_result["raw_full"])
-            n = sum(1 for v in loaded_data[js_var]["irest"] if v == 0)
-            print(f"  {label}: {n} months")
-    else:
-        print(f"[{step}] Skipping SST pipelines (--sl-only); existing blocks kept."); step += 1
+    # NINO1+2 is filtered as absolute SST, every other index in config.yaml
+    # sst_indices as a NOAA anomaly. All four share one NOAA download
+    # (download.load_sst caches it for the life of the process).
+    for key, label in _sst_indices(cfg):
+        js_var = _js_var_for("sst", key)
+        if args.sl_only:
+            rows[js_var] = dict(name=label, source="-", first="-", last="-",
+                                n="-", status="skipped (--sl-only)")
+            continue
+        kind = "absolute" if key == "nino12" else "anomaly"
+        print(f"[{step}] SST {label} pipeline ({kind}) …"); step += 1
+        try:
+            if key == "nino12":
+                _, result = _run_sst_nino12(cfg, hn1, hn2, ndots, OUT_DIR, win)
+            else:
+                _, result = _run_sst_index(cfg, key, hn1, hn2, ndots, OUT_DIR, win)
+        except RuntimeError as exc:
+            _record_failure(js_var, label, "sst", key, exc)
+            continue
+        loaded_raw[js_var] = _as_raw(result["raw_full"])
+        y1, m1 = _record_success(js_var, label, "NOAA CPC", loaded_raw[js_var])
+        freshness["sst"][key] = {
+            "name": label,
+            "last_attempt": run_stamp,
+            "last_success": run_date,
+            "as_of": f"{y1}-{m1:02d}",
+            "ok": True,
+        }
 
     # ── Sea level pipelines ───────────────────────────────────────────────────
-    cal_data = None
-    cal_yr0 = cal_m0 = cal_yr1 = cal_m1 = cal_n = 0
+    for key, st in (cfg.get("stations") or {}).items():
+        js_var = _js_var_for("sl", key)
+        if args.sst_only:
+            rows[js_var] = dict(name=st["name"], source="-", first="-", last="-",
+                                n="-", status="skipped (--sst-only)")
+            continue
+        print(f"[{step}] {st['name']} sea level pipeline …"); step += 1
+        try:
+            _, result = _run_sl(st, hn1, hn2, ndots, OUT_DIR, win)
+        except RuntimeError as exc:
+            _record_failure(js_var, st["name"], "stations", key, exc)
+            continue
+        loaded_raw[js_var] = _as_raw(result["raw_full"])
+        raw = loaded_raw[js_var]
+        y1, m1 = int(raw["year"][-1]), int(raw["month"][-1])
+        status = "updated"
+        # The newest month must not be lost between download and publication:
+        # the source serves observations up to `served_through`, and only the
+        # month after the last published one may legitimately be missing
+        # (it can still be in progress or below the coverage threshold).
+        served = result.get("served_through")
+        if served:
+            sy, sm = (int(v) for v in served.split("-"))
+            behind = (sy * 12 + sm) - (y1 * 12 + m1)
+            if behind > 1:
+                status = f"updated, LAGS source ({served})"
+                print(f"  WARNING: {st['name']} ends {y1}-{m1:02d} but UHSLC "
+                      f"serves observations through {served}", file=sys.stderr)
+                _gh_annotation("warning", f"{st['name']} ends {y1}-{m1:02d}; "
+                               f"UHSLC serves data through {served}")
+        _record_success(js_var, st["name"], result.get("source") or "?", raw,
+                        status=status)
+        lag_months = (run_dt.year * 12 + run_dt.month) - (y1 * 12 + m1)
+        freshness["stations"][key] = {
+            "name": st["name"],
+            "last_attempt": run_stamp,
+            "last_success": run_date,
+            "as_of": f"{y1}-{m1:02d}",
+            "ok": True,
+            "stale": lag_months > STALE_AFTER_MONTHS,
+            "source": result.get("source"),
+            "interpolated_months": result.get("interpolated_months", 0),
+            "low_coverage_months": result.get("low_coverage_months", 0),
+            "longest_gap_months": result.get("longest_gap_months", 0),
+            "preliminary_month": result.get("preliminary_month", False),
+        }
 
-    # Station key → JS variable name
-    _sl_var = {
-        "callao":       "callaoData",
-        "la_libertad":  "laLibData",
-        "honolulu":     "honoluluData",
-        "palau":        "palauData",
-    }
-
-    failed_stations: list[str] = []
-
-    if not args.sst_only:
-        for key, st in cfg["stations"].items():
-            js_var = _sl_var.get(key, f"{key}Data")
-            print(f"[{step}] {st['name']} sea level pipeline …"); step += 1
-            try:
-                dat, result = _run_sl(st, hn1, hn2, ndots, OUT_DIR, win)
-                loaded_data[js_var] = _load_dat(str(dat))
-                loaded_raw[js_var] = _as_raw(result["raw_full"])
-                n = sum(1 for v in loaded_data[js_var]["irest"] if v == 0)
-                yr0 = int(result["IYR"][0]);  m0 = int(result["MES"][0])
-                yr1 = int(result["IYR"][-1]); m1 = int(result["MES"][-1])
-                print(f"  {_month_label(yr0,m0)} – {_month_label(yr1,m1)}  ({n} months)")
-                latest_ym = max(latest_ym or (yr1, m1), (yr1, m1))
-                lag_months = (run_dt.year * 12 + run_dt.month) - (yr1 * 12 + m1)
-                # Record a fresh, successful fetch for this station.
-                freshness["stations"][key] = {
-                    "name": st["name"],
-                    "last_success": run_date,
-                    "as_of": f"{yr1}-{m1:02d}",
-                    "ok": True,
-                    "stale": lag_months > STALE_AFTER_MONTHS,
-                    "interpolated_months": result.get("interpolated_months", 0),
-                    "low_coverage_months": result.get("low_coverage_months", 0),
-                    "longest_gap_months": result.get("longest_gap_months", 0),
-                    "preliminary_month": result.get("preliminary_month", False),
-                }
-                if key == "callao":
-                    cal_data  = loaded_data[js_var]
-                    cal_yr0, cal_m0, cal_yr1, cal_m1, cal_n = yr0, m0, yr1, m1, n
-            except RuntimeError as exc:
-                # A single flaky station (e.g. Callao when UHSLC times out) must
-                # not abort the whole update. Skip it: without its entry in
-                # loaded_raw, the rebuilt region reuses the values already on
-                # the page (stale but not broken), and — for Callao —
-                # cal_data stays None so _patch_stats_bar is skipped entirely.
-                print(
-                    f"  WARNING: {st['name']} sea level pipeline failed; "
-                    f"leaving its existing data in place.\n"
-                    f"  {exc}",
-                    file=sys.stderr,
-                )
-                failed_stations.append(st["name"])
-                # Mark stale but preserve the last-known-good date/month so the
-                # freshness footnote can say "as of <month> (fetch pending)".
-                prev = freshness["stations"].get(key, {})
-                freshness["stations"][key] = {
-                    "name": st["name"],
-                    "last_success": prev.get("last_success"),
-                    "as_of": prev.get("as_of"),
-                    "ok": False,
-                    "stale": True,
-                    "interpolated_months": prev.get("interpolated_months", 0),
-                    "low_coverage_months": prev.get("low_coverage_months", 0),
-                    "longest_gap_months": prev.get("longest_gap_months", 0),
-                    "preliminary_month": prev.get("preliminary_month", False),
-                }
-                continue
+    # ── Silent-skip guard ─────────────────────────────────────────────────────
+    # Every configured dataset this run was asked to process must end up either
+    # refreshed today or recorded as failed. Anything else means a code path
+    # skipped it without saying so, which is how a stale site goes unnoticed.
+    silent = _silently_skipped(cfg, freshness, run_stamp,
+                               sst=not args.sl_only, sl=not args.sst_only)
+    if silent:
+        _print_summary(rows)
+        for name in silent:
+            print(f"ERROR: {name} was neither updated nor recorded as failed.",
+                  file=sys.stderr)
+            _gh_annotation("error", f"{name} was silently skipped")
+        sys.exit(1)
 
     # ── Freshness bookkeeping ─────────────────────────────────────────────────
-    freshness["last_refreshed"] = run_date
+    # "Data last refreshed" on the site means every dataset was attempted, so
+    # only a full run moves it. --sst-only / --sl-only still record each
+    # dataset's own last_success above.
+    if full_run or not freshness.get("last_refreshed"):
+        freshness["last_refreshed"] = run_date
     if not args.dry_run:
         _save_freshness(freshness)
-    refreshed_label = _fmt_run_date(run_dt)
+    refreshed_dt = datetime.strptime(freshness["last_refreshed"], "%Y-%m-%d")
+    refreshed_label = _fmt_run_date(refreshed_dt)
     stale_notes     = _stale_notes(freshness)
     if stale_notes:
         print("  Freshness: " + "; ".join(stale_notes))
@@ -761,30 +854,21 @@ def main() -> None:
         original = html
 
         # Rebuild the whole generated region. Datasets that were not re-run
-        # this time (--sst-only / --sl-only, or a station that failed) keep
+        # this time (--sst-only / --sl-only, or a source that failed) keep
         # the values already published on the page.
-        published = _extract_raw_series(html)
-        page_raw: "OrderedDict[str, dict]" = OrderedDict()
-        for var_name in DATASETS:
-            if var_name in loaded_raw:
-                page_raw[var_name] = loaded_raw[var_name]
-            elif var_name in published:
-                page_raw[var_name] = published[var_name]
-        if page_raw:
+        if DATA_BEGIN in html or _LEGACY_REGION.search(html):
+            published = _extract_raw_series(html)
+            page_raw: "OrderedDict[str, dict]" = OrderedDict()
+            for var_name in DATASETS:
+                if var_name in loaded_raw:
+                    page_raw[var_name] = loaded_raw[var_name]
+                elif var_name in published:
+                    page_raw[var_name] = published[var_name]
             regressions += _check_no_regression(html_path.name, loaded_raw, published)
             region = _build_data_region(page_raw, hn1, hn2, ndots, base_year)
-            html, patched = _patch_data_region(html, region)
-            if not patched and html_path.name != "index.html":
-                print(f"  WARNING: no data region found in {html_path}", file=sys.stderr)
-
-        # Stats bar update (index.html only, only when both SST and Callao present)
-        if (html_path.name == "index.html"
-                and sst_data is not None and cal_data is not None):
-            html = _patch_stats_bar(
-                html,
-                sst_yr0, sst_m0, sst_yr1, sst_m1, sst_n,
-                cal_yr0, cal_m0, cal_yr1, cal_m1, cal_n,
-            )
+            html, _ = _patch_data_region(html, region)
+        elif html_path.name != "index.html":
+            print(f"  WARNING: no data region found in {html_path}", file=sys.stderr)
 
         # Patch every page that opts in with DATA_FRESHNESS markers.
         html, _ = _patch_freshness(html, refreshed_label, stale_notes)
@@ -803,11 +887,12 @@ def main() -> None:
             print(
                 "\nRefusing to write: the new data ends earlier than what is "
                 "already published.\nCheck that every source was reachable "
-                "(data/input/ may hold a stale cache), then re-run.\n"
+                "and up to date, then re-run.\n"
                 "Pass --allow-older only if the older record is genuinely the "
                 "correct one.",
                 file=sys.stderr,
             )
+            _print_summary(rows)
             sys.exit(1)
 
     for html_path, html in pending:
@@ -829,6 +914,9 @@ def main() -> None:
         add_targets = [str(p) for p in patched_files]
         cmds = [
             ["git", "add"] + add_targets,
+            # data/output/ is gitignored, but the freshness state must travel
+            # with the pages or the next checkout starts from an old one.
+            ["git", "add", "-f", str(FRESHNESS_FILE)],
             ["git", "commit", "-m", msg],
             ["git", "push"],
         ]
@@ -840,10 +928,12 @@ def main() -> None:
                 break
             print(f"  OK: {' '.join(cmd[:2])}")
 
-    if failed_stations:
+    _print_summary(rows)
+    failed = [r["name"] for r in rows.values() if r["status"].startswith("FAILED")]
+    if failed:
         print(
-            f"\nWARNING: {len(failed_stations)} sea level station(s) failed "
-            f"and kept their previous data: {', '.join(failed_stations)}",
+            f"\nWARNING: {len(failed)} dataset(s) failed and kept their "
+            f"previous data: {', '.join(failed)}",
             file=sys.stderr,
         )
 
