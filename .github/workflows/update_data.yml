@@ -27,7 +27,10 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The update script stops starting new downloads after ENSO_UPDATE_BUDGET_S
+    # and records the rest as failed, so it finishes (and commits what it has)
+    # well inside this limit even when UHSLC stalls.
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository
@@ -49,6 +52,10 @@ jobs:
           cp assets/data/sst1950_1981.txt data/input/sst1950_1981.txt
 
       - name: Run update script
+        env:
+          # Unbuffered, so the log shows how far a stalled run got.
+          PYTHONUNBUFFERED: '1'
+          ENSO_UPDATE_BUDGET_S: '1500'
         run: |
           FLAG=""
           # Manual dispatch inputs take precedence …
@@ -76,7 +83,25 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes — site data is already up to date."
           else
-            MONTH=$(date -u '+%Y-%m')
+            # Latest month actually published, not the calendar month.
+            MONTH=$(python -c "import json; s=json.load(open('data/output/freshness.json')); print(max(e['as_of'] for g in ('sst','stations') for e in s.get(g,{}).values() if e.get('as_of')))")
             git commit -m "data: update ENSO arrays through ${MONTH} [auto]"
             git push
           fi
+
+      - name: Fail if any dataset could not be refreshed
+        # The pages and freshness.json are committed above either way (a failed
+        # dataset keeps its previous values and a 'fetch pending' note); this
+        # step only makes the run red so the failure is not missed.
+        run: |
+          python - <<'EOF'
+          import json, sys
+          s = json.load(open("data/output/freshness.json"))
+          entries = [e for g in ("sst", "stations") for e in s.get(g, {}).values()]
+          latest = max((e.get("last_attempt") or "") for e in entries)
+          failed = [e["name"] for e in entries
+                    if e.get("last_attempt") == latest and not e.get("ok", True)]
+          if failed:
+              print("::error::Not refreshed this run: " + ", ".join(failed))
+              sys.exit(1)
+          EOF
