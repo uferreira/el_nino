@@ -40,7 +40,10 @@ FILL_VALUE = -32767
 MIN_HISTORICAL_MONTH_COVERAGE = 0.50
 MIN_PRELIMINARY_MONTH_HOURS = 7 * 24
 
-REQUEST_TIMEOUT = 60   # seconds; ERDDAP for long series can be slow
+# (connect, read) seconds. The read timeout is generous because ERDDAP can
+# pause while it assembles a century of hourly data; the connect timeout is
+# short so an unreachable host fails fast instead of eating the CI budget.
+REQUEST_TIMEOUT = (15, 60)
 
 # Retry policy for transient network failures (timeouts, dropped connections).
 # UHSLC's ERDDAP/RQD servers intermittently stall; a couple of backed-off
@@ -56,7 +59,7 @@ RETRY_BACKOFFS = (2, 5, 10)   # seconds to wait before attempts 2, 3, 4
 # too. It is the same Fast Delivery data ERDDAP already returned, 8-18 MB per
 # station, and it never ends later than ERDDAP, so it is not fetched again.)
 _RAPID_URL_TEMPLATES = [
-    "http://uhslc.soest.hawaii.edu/stations/RAPID/{id}_mm_StationZero_GMT.csv",
+    "https://uhslc.soest.hawaii.edu/stations/RAPID/{id}_mm_StationZero_GMT.csv",
 ]
 
 # Column order shared by both the local historical file and the NOAA online file.
