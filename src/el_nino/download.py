@@ -49,10 +49,13 @@ REQUEST_TIMEOUT = 60   # seconds; ERDDAP for long series can be slow
 RETRY_BACKOFFS = (2, 5, 10)   # seconds to wait before attempts 2, 3, 4
 
 # RAPID near-real-time URLs compared by their last valid timestamp.
-# URL 1: FD hourly CSV (same data as ERDDAP FD, different transport).
-# URL 2: Station RAPID stream (StationZero datum, GMT).
+# The station RAPID stream (StationZero datum, GMT) carries roughly the last
+# 60 days of observations; in the FD/RAPID overlap it agrees with ERDDAP FD to
+# within 1 mm, so it extends the FD record without a datum offset.
+# (The FD hourly CSV, data/csv/fast/hourly/h{id}.csv, used to be listed here
+# too. It is the same Fast Delivery data ERDDAP already returned, 8-18 MB per
+# station, and it never ends later than ERDDAP, so it is not fetched again.)
 _RAPID_URL_TEMPLATES = [
-    "https://uhslc.soest.hawaii.edu/data/csv/fast/hourly/h{id}.csv",
     "http://uhslc.soest.hawaii.edu/stations/RAPID/{id}_mm_StationZero_GMT.csv",
 ]
 
@@ -185,8 +188,12 @@ def _parse_rapid_csv(text: str) -> pd.DataFrame | None:
     if no strategy produces usable data.
     """
     # ── Strategy 1: ERDDAP two-row header (column names + units) ─────────────
+    # Only an ERDDAP file has a units row; in any other CSV the second line
+    # is the first observation and must not be thrown away.
+    lines = text.splitlines()
+    has_units_row = len(lines) > 1 and not lines[1].lstrip()[:1].isdigit()
     try:
-        df = pd.read_csv(StringIO(text), skiprows=[1])
+        df = pd.read_csv(StringIO(text), skiprows=[1] if has_units_row else None)
         df.columns = [c.split("(")[0].strip().lower() for c in df.columns]
         t_col  = _find_col(df, ["time", "time_utc"])
         sl_col = _find_col(df, ["sea_level", "obs", "observation", "sl_mm", "sl"])
@@ -275,8 +282,12 @@ def _load_rapid(station_id: str) -> pd.DataFrame:
     for template in _RAPID_URL_TEMPLATES:
         url = template.format(id=station_id)
         try:
-            resp = requests.get(url, timeout=REQUEST_TIMEOUT)
-            if resp.status_code != 200:
+            # Same retry policy as FD: while FD lags, RAPID is the only source
+            # of the newest months, so one stalled request must not drop them.
+            try:
+                resp = _fetch(url, f"UHSLC RAPID station {station_id}")
+            except RuntimeError as exc:
+                print(f"  RAPID: {exc}".splitlines()[0])
                 continue
             if not resp.text.strip():
                 continue
@@ -753,6 +764,7 @@ def _load_sea_level_erddap(
         f"({df['time_utc'].iloc[0]} to {df['time_utc'].iloc[-1]})"
     )
 
+    source = "FD"
     df_rapid = _load_rapid(station_id)
     if not df_rapid.empty:
         fd_last    = df["time_utc"].max()
@@ -760,13 +772,18 @@ def _load_sea_level_erddap(
         if not rapid_tail.empty:
             n_ext = len(rapid_tail)
             df = _merge_fd_rapid(df, rapid_tail)
+            source = "FD+RAPID"
             print(f"  Extended record with RAPID: {n_ext:,} additional hours")
+
+    # Latest month that UHSLC actually served an observation for, so callers
+    # can tell "the source has nothing newer" from "we dropped newer months".
+    served_through = df["time_utc"].max().strftime("%Y-%m")
 
     monthly, quality = _aggregate_monthly_sea_level(df)
 
     print(
         f"  {station_name}: {len(monthly)} monthly means  "
-        f"({monthly['YR'].iloc[0]}/{monthly['MON'].iloc[0]:02d} to"
+        f"({monthly['YR'].iloc[0]}/{monthly['MON'].iloc[0]:02d} to "
         f"{monthly['YR'].iloc[-1]}/{monthly['MON'].iloc[-1]:02d})"
     )
     if quality["interpolated_months"]:
@@ -795,6 +812,8 @@ def _load_sea_level_erddap(
         "IYR": monthly["YR"].to_numpy(dtype=np.int32),
         "MES": monthly["MON"].to_numpy(dtype=np.int32),
         "SL0": monthly["sl_mm"].to_numpy(dtype=np.float64),
+        "source": source,
+        "served_through": served_through,
         **quality,
     }
 
@@ -866,13 +885,15 @@ def load_sea_level_rqd(url: str, station_name: str) -> dict:
 
     print(
         f"  {station_name} (RQD): {len(monthly_mean)} monthly means  "
-        f"({monthly_mean['YR'].iloc[0]}/{monthly_mean['MON'].iloc[0]:02d} to"
+        f"({monthly_mean['YR'].iloc[0]}/{monthly_mean['MON'].iloc[0]:02d} to "
         f"{monthly_mean['YR'].iloc[-1]}/{monthly_mean['MON'].iloc[-1]:02d})"
     )
     return {
         "IYR": monthly_mean["YR"].to_numpy(dtype=np.int32),
         "MES": monthly_mean["MON"].to_numpy(dtype=np.int32),
         "SL0": monthly_mean["sl_mm"].to_numpy(dtype=np.float64),
+        "source": "RQD",
+        "served_through": df["time_utc"].max().strftime("%Y-%m"),
         **quality,
     }
 

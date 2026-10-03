@@ -714,6 +714,8 @@ def run_sea_level(
         "low_coverage_months": raw_data.get("low_coverage_months", 0),
         "longest_gap_months": raw_data.get("longest_gap_months", 0),
         "preliminary_month": raw_data.get("preliminary_month", False),
+        "source": raw_data.get("source"),
+        "served_through": raw_data.get("served_through"),
     }
 
 

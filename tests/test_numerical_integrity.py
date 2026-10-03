@@ -102,6 +102,7 @@ def test_rapid_loader_selects_the_candidate_with_the_latest_observation(
     def response(last_date: str, value: float) -> SimpleNamespace:
         return SimpleNamespace(
             status_code=200,
+            raise_for_status=lambda: None,
             text=(
                 "sea_level,time\n"
                 "mm,UTC\n"
