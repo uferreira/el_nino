@@ -1975,7 +1975,7 @@ function cmpResetExtras(startIndices) {
   for (let i=0; i<CMP_EXTRAS.length; i++) {
     const ex = CMP_EXTRAS[i];
     if (!ex) continue;
-    ex.tail=[]; ex.idx=startIndices[i];
+    ex.tail=[]; ex.idx=ex.startIdx=startIndices[i];
     ex.offCtx.clearRect(0,0,CMP_CW,CMP_CH);
     if (ex.ctx) drawBg(ex.ctx, CMP_CW, CMP_CH, CMP_PLT, ex.cfg.dom, ex.cfg.labels, ex.cfg.ticks);
   }
@@ -1988,14 +1988,28 @@ function safeStartIdx(data, N) {
   return 0;
 }
 function _cmpExtraStarts(cs) {
+  // Each extra panel starts at the comparison's start month (cs), so it is
+  // time-aligned with SST and Callao; a record that begins later starts at
+  // its own first month and catches up.
   return [
-    safeStartIdx(nino3Data,    NINO3_N),
-    safeStartIdx(nino34Data,   NINO34_N),
-    safeStartIdx(nino4Data,    NINO4_N),
-    safeStartIdx(laLibData,    LALIB_N),
-    safeStartIdx(honoluluData, HON_N),
-    safeStartIdx(palauData,    PAL_N),
-  ];
+    [nino3Data,    NINO3_N],
+    [nino34Data,   NINO34_N],
+    [nino4Data,    NINO4_N],
+    [laLibData,    LALIB_N],
+    [honoluluData, HON_N],
+    [palauData,    PAL_N],
+  ].map(([data, N]) => safeStartIdx(data, N) < 0
+    ? -1 : _findStartIdx(data, N, cs.startYear, cs.startMonth));
+}
+
+// Start month of the comparison as configured (common start, or the From
+// date applied with cmpApplyRange), in the shape _cmpCommonStart returns.
+function _cmpAppliedStart() {
+  const o = observedData, c = callaoData;
+  const oi = Math.min(CMP.obsStartIdx, OBS_N - 1), ci = Math.min(CMP.calStartIdx, CAL_N - 1);
+  const ok = o.year[oi] * 12 + o.month[oi], ck = c.year[ci] * 12 + c.month[ci];
+  return ok >= ck ? { startYear:o.year[oi], startMonth:o.month[oi] }
+                  : { startYear:c.year[ci], startMonth:c.month[ci] };
 }
 function _cmpTotalFrames(cs) {
   // The SST panel is the master clock. Panels with shorter records simply
@@ -2050,9 +2064,19 @@ function _populateYearDropdowns(prefix, data) {
   endEl.value = maxY;
 }
 
+function _clampToCommonStart(yr, mo) {
+  // SST and Callao advance one step per frame together, so they must start
+  // in the same calendar month: a From date before either record begins is
+  // moved to the first month both records cover.
+  const cs = _cmpCommonStart();
+  if (yr * 12 + mo < cs.startYear * 12 + cs.startMonth) return [cs.startYear, cs.startMonth];
+  return [yr, mo];
+}
+
 function cmpApplyRange() {
-  const sYr = parseInt(document.getElementById('cmp-yr-start').value);
-  const sMo = parseInt(document.getElementById('cmp-mo-start').value);
+  const [sYr, sMo] = _clampToCommonStart(
+    parseInt(document.getElementById('cmp-yr-start').value),
+    parseInt(document.getElementById('cmp-mo-start').value));
   const eYr = parseInt(document.getElementById('cmp-yr-end').value);
   const eMo = parseInt(document.getElementById('cmp-mo-end').value);
   const obsStart = _findStartIdx(observedData, OBS_N, sYr, sMo);
@@ -2084,6 +2108,7 @@ function cmpInit() {
   CMP.modOffCtx = CMP.modOff.getContext('2d');
 
   const _cs = _cmpCommonStart();
+  CMP.obsStartIdx = _cs.obsStartIdx; CMP.calStartIdx = _cs.calStartIdx;
   CMP.obsEndIdx = OBS_N; CMP.calEndIdx = CAL_N;
   cmpInitExtras(_cmpExtraStarts(_cs));
   _populateYearDropdowns('cmp', observedData);
@@ -2364,9 +2389,9 @@ function cmpStart() {
   CMP.params    = getParams();
   CMP.selectedMonth = parseInt(document.getElementById('sel-month').value);
 
-  // Align both datasets to their common start date
-  const cs = _cmpCommonStart();
-  CMP.startYear   = observedData.year[CMP.obsStartIdx] || cs.startYear;
+  // Start month: the common start, or the From date applied by the user.
+  const cs = _cmpAppliedStart();
+  CMP.startYear   = cs.startYear;
   CMP.obsIdx=CMP.obsStartIdx; CMP.calIdx=CMP.calStartIdx;
   CMP.modStep=0; CMP.modX=0; CMP.modY=0;
   if(CMP.obsEndIdx<0) CMP.obsEndIdx=OBS_N;
@@ -2423,11 +2448,10 @@ function cmpReset() {
   CMP.obsOffCtx.clearRect(0,0,CMP_CW,CMP_CH);
   CMP.calOffCtx.clearRect(0,0,CMP_CW,CMP_CH);
   CMP.modOffCtx.clearRect(0,0,CMP_CW,CMP_CH);
-  const _cs0 = _cmpCommonStart();
-  cmpResetExtras(_cmpExtraStarts(_cs0));
+  const _cs = _cmpAppliedStart();
+  cmpResetExtras(_cmpExtraStarts(_cs));
   cmpDrawBgs();
   poincareReset();
-  const _cs = _cmpCommonStart();
   document.getElementById('cmp-timelabel').textContent = MO_NAMES[_cs.startMonth-1]+' '+_cs.startYear;
   document.getElementById('cmp-time-display').textContent =
     _cs.startYear+' / '+String(_cs.startMonth).padStart(2,'0');

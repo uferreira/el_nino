@@ -937,7 +937,7 @@ function obs1ResetExtras(startIndices) {
   for (let i=0; i<OBS1_EXTRAS.length; i++) {
     const ex = OBS1_EXTRAS[i];
     if (!ex) continue;
-    ex.tail=[]; ex.idx=startIndices[i];
+    ex.tail=[]; ex.idx=ex.startIdx=startIndices[i];
     ex.offCtx.clearRect(0,0,OBS1_CW,OBS1_CH);
     if (ex.ctx) drawBg(ex.ctx, OBS1_CW, OBS1_CH, OBS1_PLT, ex.cfg.dom, ex.cfg.labels, ex.cfg.ticks);
   }
@@ -1084,9 +1084,19 @@ function _findEndIdx(data, N, yr, mo) {
   return 0;
 }
 
+function _clampToCommonStart(yr, mo) {
+  // SST and Callao advance one step per frame together, so they must start
+  // in the same calendar month: a From date before either record begins is
+  // moved to the first month both records cover.
+  const cs = _cmpCommonStart();
+  if (yr * 12 + mo < cs.startYear * 12 + cs.startMonth) return [cs.startYear, cs.startMonth];
+  return [yr, mo];
+}
+
 function obs1ApplyRange() {
-  const sYr = parseInt(document.getElementById('obs1-yr-start').value);
-  const sMo = parseInt(document.getElementById('obs1-mo-start').value);
+  const [sYr, sMo] = _clampToCommonStart(
+    parseInt(document.getElementById('obs1-yr-start').value),
+    parseInt(document.getElementById('obs1-mo-start').value));
   const eYr = parseInt(document.getElementById('obs1-yr-end').value);
   const eMo = parseInt(document.getElementById('obs1-mo-end').value);
   const obsStart = _findStartIdx(observedData, OBS_N, sYr, sMo);
@@ -1102,8 +1112,9 @@ function obs1ApplyRange() {
 }
 
 function clsApplyRange() {
-  const sYr = parseInt(document.getElementById('cls-yr-start').value);
-  const sMo = parseInt(document.getElementById('cls-mo-start').value);
+  const [sYr, sMo] = _clampToCommonStart(
+    parseInt(document.getElementById('cls-yr-start').value),
+    parseInt(document.getElementById('cls-mo-start').value));
   const eYr = parseInt(document.getElementById('cls-yr-end').value);
   const eMo = parseInt(document.getElementById('cls-mo-end').value);
   const obsStart = _findStartIdx(observedData, OBS_N, sYr, sMo);
@@ -1218,7 +1229,8 @@ function obs1Reset() {
   obs1DrawBgs();
   const scrub = document.getElementById('obs1-scrubber');
   if (scrub) scrub.value=0;
-  document.getElementById('obs1-time-display').textContent = 'Jan 1975';
+  document.getElementById('obs1-time-display').textContent =
+    MO_NAMES[callaoData.month[OBS1.calStartIdx]-1]+' '+callaoData.year[OBS1.calStartIdx];
   document.getElementById('obs1-status').innerHTML='<span class="st-ready">Ready</span>';
 }
 
@@ -1386,7 +1398,7 @@ function clsResetExtras(startIndices) {
   for (let i=0; i<CLS_EXTRAS.length; i++) {
     const ex = CLS_EXTRAS[i];
     if (!ex) continue;
-    ex.tail=[]; ex.idx=startIndices[i];
+    ex.tail=[]; ex.idx=ex.startIdx=startIndices[i];
     ex.offCtx.clearRect(0,0,CLS_CW,CLS_CH);
     drawBgWhite(ex.offCtx, CLS_CW, CLS_CH, CLS_PLT, ex.cfg.dom, ex.cfg.labels, ex.cfg.ticks);
     if (ex.ctx) ex.ctx.drawImage(ex.off, 0, 0);
@@ -1658,7 +1670,8 @@ function clsReset(){
   CLS.calCtx.drawImage(CLS.calOff,0,0);
   const scrub=document.getElementById('cls-scrubber');
   if(scrub) scrub.value=0;
-  document.getElementById('cls-time-display').textContent='Jan 1975';
+  document.getElementById('cls-time-display').textContent=
+    MO_NAMES[callaoData.month[CLS.calStartIdx]-1]+' '+callaoData.year[CLS.calStartIdx];
   document.getElementById('cls-status').innerHTML='<span class="st-ready">Ready</span>';
 }
 
