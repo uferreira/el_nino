@@ -100,6 +100,9 @@ def _fetch(url: str, label: str) -> requests.Response:
         except (
             requests.exceptions.Timeout,
             requests.exceptions.ConnectionError,
+            # The connection dropped part-way through the body: a truncated
+            # file, which a retry fixes just like a dropped connection.
+            requests.exceptions.ChunkedEncodingError,
         ) as exc:
             # Transient: retry with backoff unless this was the last attempt.
             if attempt < len(RETRY_BACKOFFS):
