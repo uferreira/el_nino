@@ -52,6 +52,22 @@ var EnsoFourierWindow = (function () {
     }
   }
 
+  /**
+   * Store a bound that equals the default as null, so the window follows the
+   * data: an end at the latest month across all records means "latest" (each
+   * dataset runs to its own last month), and a start at the default start for
+   * that end means "default" (each dataset gets its own whole-cycle start).
+   * start/end are serial month indices.
+   */
+  function normalize(start, end, extent, baseYear) {
+    var endOut = end === extent.lastYM ? null : end;
+    var startOut = start === EnsoFourier.defaultStartYM(end, baseYear) ? null : start;
+    return {
+      start: startOut === null ? null : EnsoFourier.formatMonth(startOut),
+      end: endOut === null ? null : EnsoFourier.formatMonth(endOut)
+    };
+  }
+
   function remember(req) {
     try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(req)); } catch (e) { /* ignore */ }
   }
@@ -137,14 +153,13 @@ var EnsoFourierWindow = (function () {
     var head = results[headName];
     var extent = recordExtent(raw);
 
-    var startYM = head && head.window ? head.window.startYM
-      : EnsoFourier.parseMonth(req.start) || extent.firstYM;
-    var endYM = head && head.window ? head.window.endYM
-      : EnsoFourier.parseMonth(req.end) || extent.lastYM;
-    // When the user asked for a wider window than SST covers, the controls
-    // must show what was ASKED, not the SST clipping.
-    if (req.start) startYM = EnsoFourier.parseMonth(req.start);
-    if (req.end) endYM = EnsoFourier.parseMonth(req.end);
+    var baseYear = opts.params && opts.params.baseYear;
+    // The controls show what was ASKED, not any one dataset's clipping. With
+    // no request the end is the latest month across all records, not the SST
+    // end, so pressing Recalculate unchanged does not clip the longer records.
+    var endYM = req.end ? EnsoFourier.parseMonth(req.end) : extent.lastYM;
+    var startYM = req.start ? EnsoFourier.parseMonth(req.start)
+      : EnsoFourier.defaultStartYM(endYM, baseYear);
 
     if (host) {
       var years = yearValues(extent), yl = years.map(String);
@@ -164,11 +179,21 @@ var EnsoFourierWindow = (function () {
         + '<button id="fw-apply">Recalculate</button>'
         + '<button id="fw-reset" class="fw-secondary">Reset to default</button>'
         + '</div>'
+        + '<div class="fw-note" id="fw-custom" hidden></div>'
         + '<div class="fw-summary" id="fw-summary"></div>'
         + '<div class="fw-table" id="fw-table"></div>'
         + '<div class="fw-note" id="fw-note" hidden></div>'
         + '<div class="fw-err" id="fw-err" hidden></div>'
         + '</div>';
+
+      if (req.start || req.end) {
+        var customEl = document.getElementById('fw-custom');
+        customEl.hidden = false;
+        customEl.textContent = 'Custom window active: '
+          + (req.start ? EnsoFourier.labelMonth(startYM) : 'default start') + ' – '
+          + (req.end ? EnsoFourier.labelMonth(endYM) : 'latest')
+          + '. Reset to default to use the latest data.';
+      }
 
       var summary = document.getElementById('fw-summary');
       if (head && head.window) {
@@ -219,9 +244,15 @@ var EnsoFourierWindow = (function () {
             + 'monthly climatology needs every calendar month.');
           return;
         }
-        remember({ start: s, end: e });
+        var norm = normalize(EnsoFourier.parseMonth(s), EnsoFourier.parseMonth(e), extent, baseYear);
         var q = new URLSearchParams(window.location.search);
-        q.set('from', s); q.set('to', e);
+        if (norm.start || norm.end) {
+          remember(norm);
+        } else {
+          try { sessionStorage.removeItem(STORAGE_KEY); } catch (err) { /* ignore */ }
+        }
+        if (norm.start) q.set('from', norm.start); else q.delete('from');
+        if (norm.end) q.set('to', norm.end); else q.delete('to');
         window.location.search = q.toString();
       });
 
@@ -285,7 +316,7 @@ var EnsoFourierWindow = (function () {
     });
   }
 
-  return { request: request, mount: mount, captionPlots: captionPlots };
+  return { request: request, normalize: normalize, mount: mount, captionPlots: captionPlots };
 })();
 
 if (typeof window !== 'undefined') window.EnsoFourierWindow = EnsoFourierWindow;

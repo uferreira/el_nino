@@ -142,6 +142,34 @@ def test_default_window_spans_whole_seasonal_cycles():
     assert win["notes"] == []
 
 
+def test_window_panel_stores_default_bounds_as_latest():
+    """Recalculate with the default controls must not pin the window.
+
+    An end equal to the latest month across all records is stored as null
+    ("latest"), so each dataset still runs to its own last month; a start equal
+    to the default start for that end is stored as null too. An explicit
+    earlier end is kept.
+    """
+    js_window = REPO / "docs" / "assets" / "js" / "fourier-window.js"
+    out = _run_node(
+        f"""
+        global.EnsoFourier = F;
+        require('vm').runInThisContext(require('fs').readFileSync({str(js_window)!r}, 'utf8'));
+        const ext = {{firstYM: F.ym(1950, 1), lastYM: F.ym(2026, 9)}};
+        const n = (s, e) => EnsoFourierWindow.normalize(F.parseMonth(s), F.parseMonth(e), ext, 1975);
+        console.log(JSON.stringify([n('1975-10', '2026-09'), n('1980-01', '2026-09'),
+                                    n('1975-01', '2020-12'), n('1980-01', '2020-12')]));
+        """,
+        {},
+    )
+    assert out == [
+        {"start": None, "end": None},
+        {"start": "1980-01", "end": None},
+        {"start": None, "end": "2020-12"},
+        {"start": "1980-01", "end": "2020-12"},
+    ]
+
+
 # ---------------------------------------------------------------------------
 # The filter itself
 # ---------------------------------------------------------------------------
