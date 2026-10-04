@@ -44,13 +44,6 @@ jobs:
       - name: Install package
         run: pip install -e .
 
-      - name: Make data/input directory and copy historical SST file
-        # assets/data/sst1950_1981.txt is tracked in the repo;
-        # pipeline.run_sst reads from data/input/ (gitignored).
-        run: |
-          mkdir -p data/input
-          cp assets/data/sst1950_1981.txt data/input/sst1950_1981.txt
-
       - name: Run update script
         env:
           # Unbuffered, so the log shows how far a stalled run got.
