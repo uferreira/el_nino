@@ -1,31 +1,31 @@
 {
-  "last_refreshed": "2026-10-03",
+  "last_refreshed": "2026-10-05",
   "sst": {
     "nino12": {
       "as_of": "2026-08",
-      "last_attempt": "2026-10-03T12:52:57+00:00",
-      "last_success": "2026-10-03",
+      "last_attempt": "2026-10-05T13:40:13+00:00",
+      "last_success": "2026-10-05",
       "name": "NINO1+2",
       "ok": true
     },
     "nino3": {
       "as_of": "2026-08",
-      "last_attempt": "2026-10-03T12:52:57+00:00",
-      "last_success": "2026-10-03",
+      "last_attempt": "2026-10-05T13:40:13+00:00",
+      "last_success": "2026-10-05",
       "name": "NINO3",
       "ok": true
     },
     "nino34": {
       "as_of": "2026-08",
-      "last_attempt": "2026-10-03T12:52:57+00:00",
-      "last_success": "2026-10-03",
+      "last_attempt": "2026-10-05T13:40:13+00:00",
+      "last_success": "2026-10-05",
       "name": "NINO3.4",
       "ok": true
     },
     "nino4": {
       "as_of": "2026-08",
-      "last_attempt": "2026-10-03T12:52:57+00:00",
-      "last_success": "2026-10-03",
+      "last_attempt": "2026-10-05T13:40:13+00:00",
+      "last_success": "2026-10-05",
       "name": "NINO4",
       "ok": true
     }
@@ -34,54 +34,54 @@
     "callao": {
       "as_of": "2026-09",
       "interpolated_months": 10,
-      "last_attempt": "2026-10-03T12:52:57+00:00",
+      "last_attempt": "2026-10-05T13:40:13+00:00",
       "last_success": "2026-10-03",
       "longest_gap_months": 4,
       "low_coverage_months": 8,
       "name": "Callao",
-      "ok": true,
+      "ok": false,
       "preliminary_month": false,
       "source": "FD+RAPID",
-      "stale": false
+      "stale": true
     },
     "honolulu": {
       "as_of": "2026-09",
       "interpolated_months": 17,
-      "last_attempt": "2026-10-03T12:52:57+00:00",
+      "last_attempt": "2026-10-05T13:40:13+00:00",
       "last_success": "2026-10-03",
       "longest_gap_months": 4,
       "low_coverage_months": 10,
       "name": "Honolulu",
-      "ok": true,
+      "ok": false,
       "preliminary_month": false,
       "source": "FD+RAPID",
-      "stale": false
+      "stale": true
     },
     "la_libertad": {
       "as_of": "2026-09",
       "interpolated_months": 25,
-      "last_attempt": "2026-10-03T12:52:57+00:00",
+      "last_attempt": "2026-10-05T13:40:13+00:00",
       "last_success": "2026-10-03",
       "longest_gap_months": 3,
       "low_coverage_months": 15,
       "name": "La Libertad",
-      "ok": true,
+      "ok": false,
       "preliminary_month": false,
       "source": "FD+RAPID",
-      "stale": false
+      "stale": true
     },
     "palau": {
       "as_of": "2026-09",
       "interpolated_months": 18,
-      "last_attempt": "2026-10-03T12:52:57+00:00",
+      "last_attempt": "2026-10-05T13:40:13+00:00",
       "last_success": "2026-10-03",
       "longest_gap_months": 5,
       "low_coverage_months": 11,
       "name": "Palau",
-      "ok": true,
+      "ok": false,
       "preliminary_month": false,
       "source": "FD+RAPID",
-      "stale": false
+      "stale": true
     }
   }
 }
