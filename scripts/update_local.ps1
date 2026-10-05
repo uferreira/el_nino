@@ -1,17 +1,20 @@
-# Refresh the sea level stations from this PC and push the result.
+# Refresh all ENSO data (SST and sea level) from this PC and push the result.
 #
-# UHSLC drops connections from GitHub runner IPs, so the sea level half of the
-# update runs here (Windows Task Scheduler) while CI keeps doing SST.
+# UHSLC drops connections from GitHub runner IPs, so the full update runs here
+# (Windows Task Scheduler); CI on the 5th refreshes SST only, as a backup.
 #
-#   powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\update_sl_local.ps1
+#   powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\update_local.ps1
 #
-# Everything is appended to %LOCALAPPDATA%\el_nino\update_sl.log. Exits non-zero
-# on any failure, and never pushes after a failed pull or a failed update.
+# Everything is appended to %LOCALAPPDATA%\el_nino\update_local.log. Exits
+# non-zero on any failure. If only some datasets fail, the rest are still
+# committed and pushed (failed ones keep their old data and a "fetch pending"
+# note). Nothing is pushed after a failed pull, a script error, or when every
+# dataset failed.
 
 $Repo   = Split-Path -Parent $PSScriptRoot
 $Python = 'C:\Users\a47575\projects\venv313\Scripts\python.exe'
 $LogDir = Join-Path $env:LOCALAPPDATA 'el_nino'
-$Log    = Join-Path $LogDir 'update_sl.log'
+$Log    = Join-Path $LogDir 'update_local.log'
 $Fresh  = 'data/output/freshness.json'
 
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
@@ -44,7 +47,7 @@ function Restore {
     Run 'git' @('checkout', '--', 'docs', $Fresh) | Out-Null
 }
 
-Log '=== update_sl_local start ==='
+Log '=== update_local start ==='
 Set-Location $Repo
 
 $dirty = git status --porcelain --untracked-files=no
@@ -55,28 +58,30 @@ if ((Run 'git' @('pull', '--rebase')) -ne 0) {
     Fail 'git pull --rebase failed'
 }
 
-if ((Run $Python @('scripts/update_website.py', '--sl-only', '--no-push')) -ne 0) {
+if ((Run $Python @('scripts/update_website.py', '--no-push')) -ne 0) {
     Restore
     Fail 'update_website.py exited non-zero'
 }
 
-# update_website.py exits 0 when a station fails (it keeps the old data and
-# notes "fetch pending"). Treat that as a failed update here: do not push.
+# update_website.py exits 0 when a dataset fails (it keeps the old data and
+# notes "fetch pending"). Publish the datasets that did update; revert only
+# if none did.
 $state = Get-Content $Fresh -Raw | ConvertFrom-Json
-$stations = @($state.stations.PSObject.Properties | ForEach-Object { $_.Value })
-$stamp = ($stations | ForEach-Object { $_.last_attempt } | Sort-Object | Select-Object -Last 1)
-$failed = @($stations | Where-Object { $_.last_attempt -eq $stamp -and -not $_.ok } | ForEach-Object { $_.name })
-if ($failed.Count -gt 0) {
+$entries = @(foreach ($g in 'sst', 'stations') { $state.$g.PSObject.Properties | ForEach-Object { $_.Value } })
+$stamp = ($entries | ForEach-Object { $_.last_attempt } | Sort-Object | Select-Object -Last 1)
+$thisRun = @($entries | Where-Object { $_.last_attempt -eq $stamp })
+$failed = @($thisRun | Where-Object { -not $_.ok } | ForEach-Object { $_.name })
+if ($failed.Count -gt 0 -and $failed.Count -eq $thisRun.Count) {
     Restore
-    Fail ('not refreshed: ' + ($failed -join ', '))
+    Fail ('every dataset failed: ' + ($failed -join ', '))
 }
 
 Run 'git' @('add', 'docs') | Out-Null
 Run 'git' @('add', '-f', $Fresh) | Out-Null
 git diff --cached --quiet
 if ($LASTEXITCODE -ne 0) {
-    $month = ($stations | ForEach-Object { $_.as_of } | Sort-Object | Select-Object -Last 1)
-    if ((Run 'git' @('commit', '-m', "data: update sea level through $month [local]")) -ne 0) { Fail 'git commit failed' }
+    $month = ($entries | ForEach-Object { $_.as_of } | Sort-Object | Select-Object -Last 1)
+    if ((Run 'git' @('commit', '-m', "data: update ENSO data through $month [local]")) -ne 0) { Fail 'git commit failed' }
 } else {
     Log 'No new data; site already up to date.'
 }
@@ -87,5 +92,6 @@ if ([int]$ahead -gt 0) {
     if ((Run 'git' @('push')) -ne 0) { Fail 'git push failed (commit kept locally; the next run pushes it)' }
 }
 
+if ($failed.Count -gt 0) { Fail ('published the rest, but not refreshed: ' + ($failed -join ', ')) }
 Log '=== end (ok) ==='
 exit 0

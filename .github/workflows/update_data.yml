@@ -2,10 +2,10 @@ name: Update ENSO data
 
 on:
   schedule:
-    # SST only. UHSLC drops connections from GitHub runner IPs, so the sea
-    # level stations are refreshed from a local PC instead
-    # (scripts/update_sl_local.ps1). 5th of the month, 06:00 UTC: NOAA CPC
-    # updates the SST indices around the 3rd-4th.
+    # SST only, as a backup. UHSLC drops connections from GitHub runner IPs,
+    # so the full update (SST and sea level) runs from a local PC on the 6th
+    # and 20th (scripts/update_local.ps1). 5th of the month, 06:00 UTC: NOAA
+    # CPC updates the SST indices around the 3rd-4th.
     - cron: '0 6 5 * *'
   workflow_dispatch:
 
@@ -67,7 +67,7 @@ jobs:
           python - <<'EOF'
           import json, sys
           s = json.load(open("data/output/freshness.json"))
-          # SST only: the stations are not attempted here (see update_sl_local.ps1).
+          # SST only: the stations are not attempted here (see update_local.ps1).
           entries = list(s.get("sst", {}).values())
           latest = max((e.get("last_attempt") or "") for e in entries)
           failed = [e["name"] for e in entries
