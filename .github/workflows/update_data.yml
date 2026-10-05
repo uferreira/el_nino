@@ -2,24 +2,12 @@ name: Update ENSO data
 
 on:
   schedule:
-    # Full run — SST + all sea level stations.
-    # 5th of the month, 06:00 UTC (NOAA CPC updates the SST indices around the
-    # 3rd–4th, so the 5th leaves a safety buffer).
+    # SST only. UHSLC drops connections from GitHub runner IPs, so the sea
+    # level stations are refreshed from a local PC instead
+    # (scripts/update_sl_local.ps1). 5th of the month, 06:00 UTC: NOAA CPC
+    # updates the SST indices around the 3rd-4th.
     - cron: '0 6 5 * *'
-    # Sea level refresh only — skip the SST/NINO pipelines (they would just
-    # re-produce identical deterministic output from the same NOAA file).
-    # 18th of the month, 06:00 UTC.
-    - cron: '0 6 18 * *'
   workflow_dispatch:
-    inputs:
-      sst_only:
-        description: 'Update SST only (skip all sea level stations)'
-        type: boolean
-        default: false
-      sl_only:
-        description: 'Update sea level only (skip SST/NINO pipelines)'
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -29,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     # The update script stops starting new downloads after ENSO_UPDATE_BUDGET_S
     # and records the rest as failed, so it finishes (and commits what it has)
-    # well inside this limit even when UHSLC stalls.
+    # well inside this limit even when a source stalls.
     timeout-minutes: 45
 
     steps:
@@ -49,20 +37,9 @@ jobs:
           # Unbuffered, so the log shows how far a stalled run got.
           PYTHONUNBUFFERED: '1'
           ENSO_UPDATE_BUDGET_S: '1500'
-        run: |
-          FLAG=""
-          # Manual dispatch inputs take precedence …
-          if [ "${{ github.event.inputs.sst_only }}" = "true" ]; then
-            FLAG="--sst-only"
-          elif [ "${{ github.event.inputs.sl_only }}" = "true" ]; then
-            FLAG="--sl-only"
-          # … otherwise pick the mode from which cron schedule fired.
-          # The 18th schedule is the sea-level-only refresh.
-          elif [ "${{ github.event.schedule }}" = "0 6 18 * *" ]; then
-            FLAG="--sl-only"
-          fi
-          echo "Running: python scripts/update_website.py --no-push $FLAG"
-          python scripts/update_website.py --no-push $FLAG
+        # --sst-only leaves the station entries in freshness.json untouched,
+        # so they are neither marked failed nor stale by this run.
+        run: python scripts/update_website.py --no-push --sst-only
 
       - name: Commit and push if data changed
         run: |
@@ -76,9 +53,9 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes — site data is already up to date."
           else
-            # Latest month actually published, not the calendar month.
-            MONTH=$(python -c "import json; s=json.load(open('data/output/freshness.json')); print(max(e['as_of'] for g in ('sst','stations') for e in s.get(g,{}).values() if e.get('as_of')))")
-            git commit -m "data: update ENSO arrays through ${MONTH} [auto]"
+            # Latest SST month actually published, not the calendar month.
+            MONTH=$(python -c "import json; s=json.load(open('data/output/freshness.json')); print(max(e['as_of'] for e in s['sst'].values() if e.get('as_of')))")
+            git commit -m "data: update SST through ${MONTH} [auto]"
             git push
           fi
 
@@ -90,7 +67,8 @@ jobs:
           python - <<'EOF'
           import json, sys
           s = json.load(open("data/output/freshness.json"))
-          entries = [e for g in ("sst", "stations") for e in s.get(g, {}).values()]
+          # SST only: the stations are not attempted here (see update_sl_local.ps1).
+          entries = list(s.get("sst", {}).values())
           latest = max((e.get("last_attempt") or "") for e in entries)
           failed = [e["name"] for e in entries
                     if e.get("last_attempt") == latest and not e.get("ok", True)]

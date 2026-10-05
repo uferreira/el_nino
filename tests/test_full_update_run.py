@@ -343,22 +343,29 @@ def test_config_station_missing_from_datasets_is_refused(tmp_path, monkeypatch, 
     assert "station 'nowhere'" in capsys.readouterr().err
 
 
-def test_workflow_flags_by_schedule():
-    """The 5th runs everything (no flag); only the 18th passes --sl-only."""
+def test_workflow_runs_sst_only():
+    """CI cannot reach UHSLC: one monthly schedule, always --sst-only."""
     wf = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
     crons = [s["cron"] for s in wf[True]["schedule"]]   # YAML 1.1: on -> True
-    assert crons == ["0 6 5 * *", "0 6 18 * *"]
+    assert crons == ["0 6 5 * *"]
+    assert not (wf[True].get("workflow_dispatch") or {}).get("inputs")
 
     script = next(step["run"] for step in wf["jobs"]["update"]["steps"]
                   if "update_website.py" in step.get("run", ""))
-    assert 'FLAG=""' in script
-    sl_branch = re.search(
-        r'elif \[ "\$\{\{ github\.event\.schedule \}\}" = "([^"]+)" \]; then\s*'
-        r'FLAG="([^"]+)"', script)
-    assert sl_branch and sl_branch.groups() == ("0 6 18 * *", "--sl-only")
-    # No other path sets a flag from the schedule.
-    assert script.count("github.event.schedule") == 1
-    assert "python scripts/update_website.py --no-push $FLAG" in script
+    assert script.strip() == "python scripts/update_website.py --no-push --sst-only"
+
+
+def test_sst_only_run_does_not_mark_stations_failed_or_stale(tmp_path, monkeypatch):
+    uw = _load_update_website()
+    net, cfg, page, out_dir, fresh = _prepare(uw, tmp_path, monkeypatch,
+                                              argv_extra=["--sst-only"])
+    before = json.loads(fresh.read_text(encoding="utf-8"))["stations"]
+    uw.main()
+
+    state = json.loads(fresh.read_text(encoding="utf-8"))
+    assert state["stations"] == before
+    html = page.read_text(encoding="utf-8")
+    assert "fetch pending" not in html and "coverage checks" not in html
 
 
 def test_exhausted_time_budget_records_failures_instead_of_hanging(
