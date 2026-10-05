@@ -169,7 +169,6 @@ def _prepare(uw, tmp_path, monkeypatch, argv_extra=()):
     out_dir = tmp_path / "out"
     fresh = tmp_path / "freshness.json"
     prior = {
-        "last_refreshed": _OLD_STAMP,
         "sst": {key: {"name": key, "last_success": _OLD_STAMP, "as_of": "2001-12",
                       "ok": True} for key, _ in uw._sst_indices(cfg)},
         "stations": {key: {"name": st["name"], "last_success": _OLD_STAMP,
@@ -199,6 +198,11 @@ def _fresh_sst_cache():
 # Tests
 # ---------------------------------------------------------------------------
 
+def _fmt(ymd: str) -> str:
+    d = datetime.strptime(ymd, "%Y-%m-%d")
+    return f"{d.day} {d.strftime('%B')} {d.year}"
+
+
 def test_plain_run_processes_every_configured_dataset(tmp_path, monkeypatch, capsys):
     uw = _load_update_website()
     net, cfg, page, out_dir, fresh = _prepare(uw, tmp_path, monkeypatch)
@@ -227,7 +231,7 @@ def test_plain_run_processes_every_configured_dataset(tmp_path, monkeypatch, cap
         assert entry["ok"] is True, key
         assert entry["as_of"] == expected_last, (key, entry)
         assert entry["source"] == "FD+RAPID", key
-    assert state["last_refreshed"] == today
+    assert "last_refreshed" not in state
 
     # Every dataset has a .dat file and a RAW_SERIES entry ending last month.
     html = page.read_text(encoding="utf-8")
@@ -262,8 +266,9 @@ def test_sl_only_refreshes_stations_but_not_sst(tmp_path, monkeypatch):
         assert state["stations"][key]["last_success"] == today
     for key, _ in uw._sst_indices(cfg):
         assert state["sst"][key]["last_success"] == _OLD_STAMP
-    # A partial run does not claim the whole site was refreshed.
-    assert state["last_refreshed"] == _OLD_STAMP
+    # The footer moves the sea level date only.
+    html = page.read_text(encoding="utf-8")
+    assert f"SST {_fmt(_OLD_STAMP)}, sea level {_fmt(today)} (UTC)" in html
 
 
 def test_sst_only_refreshes_sst_but_not_stations(tmp_path, monkeypatch):
@@ -279,7 +284,8 @@ def test_sst_only_refreshes_sst_but_not_stations(tmp_path, monkeypatch):
         assert state["sst"][key]["last_success"] == today
     for key in cfg["stations"]:
         assert state["stations"][key]["last_success"] == _OLD_STAMP
-    assert state["last_refreshed"] == _OLD_STAMP
+    html = page.read_text(encoding="utf-8")
+    assert f"SST {_fmt(today)}, sea level {_fmt(_OLD_STAMP)} (UTC)" in html
 
 
 def test_silent_skip_exits_nonzero_without_writing(tmp_path, monkeypatch, capsys):

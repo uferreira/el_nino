@@ -266,7 +266,6 @@ def test_one_station_fails_others_patched(tmp_path, monkeypatch, capsys):
 def test_failed_station_marked_stale_in_freshness(tmp_path, monkeypatch):
     uw = _load_update_website()
     prior = {
-        "last_refreshed": "2026-06-05",
         "stations": {
             "callao": {"name": "Callao", "last_success": "2026-06-05",
                        "as_of": "2026-05", "ok": True},
@@ -283,7 +282,6 @@ def test_failed_station_marked_stale_in_freshness(tmp_path, monkeypatch):
     assert state["stations"]["callao"]["as_of"] == "2026-05"
     # A healthy station recorded a fresh success.
     assert state["stations"]["honolulu"]["ok"] is True
-    assert state["last_refreshed"] is not None
 
     # The index.html footnote surfaces the stale station subtly.
     final = idx.read_text(encoding="utf-8")

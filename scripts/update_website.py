@@ -410,7 +410,7 @@ def _load_freshness() -> dict:
             return state
     except (FileNotFoundError, ValueError, OSError):
         pass
-    return {"last_refreshed": None, "sst": {}, "stations": {}}
+    return {"sst": {}, "stations": {}}
 
 
 def _save_freshness(state: dict) -> None:
@@ -438,6 +438,24 @@ def _fmt_month(ym: str | None) -> str | None:
         return f"{MONTH_FULL[int(m) - 1]} {int(y)}"
     except (ValueError, IndexError):
         return None
+
+
+def _refreshed_label(state: dict) -> str:
+    """
+    Footer line with the newest successful refresh of each part, e.g.
+    'Data last refreshed: SST 5 October 2026, sea level 6 October 2026 (UTC)'.
+
+    SST (CI) and sea level (local script) are updated separately, so each part
+    carries its own date.
+    """
+    parts = []
+    for section, label in (("sst", "SST"), ("stations", "sea level")):
+        dates = [e["last_success"] for e in state.get(section, {}).values()
+                 if e.get("last_success")]
+        if dates:
+            dt = datetime.strptime(max(dates), "%Y-%m-%d")
+            parts.append(f"{label} {_fmt_run_date(dt)}")
+    return "Data last refreshed: " + (", ".join(parts) + " (UTC)" if parts else "never")
 
 
 def _stale_notes(state: dict) -> list[str]:
@@ -483,7 +501,7 @@ def _patch_freshness(html: str, refreshed_label: str, stale_notes: list[str]) ->
     Returns (new_html, patched_flag). Pages without the marker (any page but
     index.html) are left untouched.
     """
-    inner = f"Data last refreshed: {refreshed_label} UTC"
+    inner = refreshed_label
     for note in stale_notes:
         inner += f'<br><span class="stale">{note}</span>'
     pattern = r"(<!--DATA_FRESHNESS-->).*?(<!--/DATA_FRESHNESS-->)"
@@ -689,7 +707,6 @@ def main() -> None:
         if budget and time.time() - t0 > budget:
             return RuntimeError(f"time budget of {budget:.0f}s exhausted; not attempted")
         return None
-    full_run = not (args.sst_only or args.sl_only)
     unmapped = _unmapped_config_datasets(cfg)
     if unmapped:
         print(
@@ -841,15 +858,12 @@ def main() -> None:
         sys.exit(1)
 
     # ── Freshness bookkeeping ─────────────────────────────────────────────────
-    # "Data last refreshed" on the site means every dataset was attempted, so
-    # only a full run moves it. --sst-only / --sl-only still record each
-    # dataset's own last_success above.
-    if full_run or not freshness.get("last_refreshed"):
-        freshness["last_refreshed"] = run_date
+    # The footer date comes from each dataset's own last_success, so an
+    # --sst-only or --sl-only run moves the date of the part it refreshed.
+    freshness.pop("last_refreshed", None)   # superseded by per-part dates
     if not args.dry_run:
         _save_freshness(freshness)
-    refreshed_dt = datetime.strptime(freshness["last_refreshed"], "%Y-%m-%d")
-    refreshed_label = _fmt_run_date(refreshed_dt)
+    refreshed_label = _refreshed_label(freshness)
     stale_notes     = _stale_notes(freshness)
     if stale_notes:
         print("  Freshness: " + "; ".join(stale_notes))
