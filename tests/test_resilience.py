@@ -403,6 +403,22 @@ def test_older_data_is_refused(tmp_path, monkeypatch, capsys):
     assert "--allow-older" in err
 
 
+def test_refused_run_leaves_freshness_untouched(tmp_path, monkeypatch):
+    """freshness.json must not claim a refresh that was never published."""
+    uw = _load_update_website()
+    prior = {"sst": {"nino12": {"name": "NINO1+2", "last_success": "2026-06-05",
+                                "as_of": "2026-05", "ok": True}},
+             "stations": {}}
+    idx, fresh = _setup(uw, tmp_path, monkeypatch, callao_fails=False,
+                        drop_last=3, prior_freshness=prior)
+    before = fresh.read_text(encoding="utf-8")
+
+    with pytest.raises(SystemExit):
+        uw.main()
+
+    assert fresh.read_text(encoding="utf-8") == before
+
+
 def test_allow_older_overrides_the_guard(tmp_path, monkeypatch, capsys):
     """The escape hatch writes the older data, but says so on stderr."""
     uw = _load_update_website()

@@ -861,8 +861,8 @@ def main() -> None:
     # The footer date comes from each dataset's own last_success, so an
     # --sst-only or --sl-only run moves the date of the part it refreshed.
     freshness.pop("last_refreshed", None)   # superseded by per-part dates
-    if not args.dry_run:
-        _save_freshness(freshness)
+    # Saved only after the regression guard below, so a refused run does not
+    # record a refresh that was never published.
     refreshed_label = _refreshed_label(freshness)
     stale_notes     = _stale_notes(freshness)
     if stale_notes:
@@ -924,6 +924,9 @@ def main() -> None:
             )
             _print_summary(rows)
             sys.exit(1)
+
+    if not args.dry_run:
+        _save_freshness(freshness)
 
     for html_path, html in pending:
         if not args.dry_run:
