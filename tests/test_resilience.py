@@ -104,6 +104,31 @@ def test_fetch_http_error_not_retried(monkeypatch):
     assert sleeps == []
 
 
+def test_rqd_fallback_parses_the_comma_separated_uhslc_file(monkeypatch):
+    """The RQD fallback must read the format UHSLC actually serves.
+
+    data/csv/rqds/.../h093a.csv is comma separated with no header:
+    ``1950,1,1,5,1643`` (year, month, day, hour, sea level in mm), with
+    -32767 for a missing hour.
+    """
+    lines = [f"2000,{m},{d},{h},{1500 + m}"
+             for m in range(1, 13) for d in range(1, 29) for h in range(24)]
+    lines[5] = "2000,1,1,5,-32767"
+    resp = MagicMock(text="\n".join(lines) + "\n")
+    monkeypatch.setattr(download, "_fetch", lambda url, label: resp)
+    monkeypatch.setattr(download, "_save_raw", lambda path, content: None)
+
+    out = download.load_sea_level_rqd(
+        "https://uhslc.soest.hawaii.edu/data/csv/rqds/pacific/hourly/h093a.csv",
+        "Callao",
+    )
+
+    assert list(out["IYR"]) == [2000] * 12
+    assert list(out["MES"]) == list(range(1, 13))
+    assert list(out["SL0"]) == [1500.0 + m for m in range(1, 13)]
+    assert out["source"] == "RQD"
+
+
 # ---------------------------------------------------------------------------
 # update_website.main: one station fails, others still patched
 # ---------------------------------------------------------------------------

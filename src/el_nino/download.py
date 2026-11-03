@@ -828,8 +828,9 @@ def load_sea_level_rqd(url: str, station_name: str) -> dict:
     """
     Download UHSLC Research Quality Data (RQD) hourly CSV and aggregate to monthly means.
 
-    The RQD CSV format is whitespace-separated with five columns:
-        year  month  day  hour  sea_level_mm
+    The RQD CSV is comma-separated with no header and five columns
+    (whitespace-separated lines are accepted too):
+        year,month,day,hour,sea_level_mm
     Missing values are encoded as -32767 or -32768.
 
     Parameters
@@ -853,13 +854,13 @@ def load_sea_level_rqd(url: str, station_name: str) -> dict:
     _sid = url.rstrip("/").split("/")[-1].split(".")[0].lstrip("h")
     _save_raw(f"data/input/rqd_{_sid}_raw.csv", resp.text)
 
-    # Parse: whitespace-separated, 5 columns, no header.
+    # Parse: comma-separated, 5 columns, no header.
     rows = []
     for line in resp.text.splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        parts = line.split()
+        parts = line.replace(",", " ").split()
         if len(parts) < 5:
             continue
         try:
