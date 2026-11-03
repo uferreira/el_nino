@@ -6,7 +6,7 @@ All examples use real data from NOAA CPC and UHSLC.
 
 ## 1. Installation and Setup
 
-**Requirements:** Python ≥ 3.9. gfortran is optional and only needed if you
+**Requirements:** Python ≥ 3.10. gfortran is optional and only needed if you
 want to run the Fortran validation test.
 
 ```bash

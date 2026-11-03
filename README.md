@@ -172,7 +172,7 @@ stopband mode is suppressed to amplitude ratio < 10⁻⁶.
 
 ## Installation
 
-**Requirements:** Python ≥ 3.9, gfortran (optional, for Fortran validation test)
+**Requirements:** Python ≥ 3.10, gfortran (optional, for Fortran validation test)
 
 ```bash
 # 1. Clone the repository
