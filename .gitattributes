@@ -1,0 +1,21 @@
+# Store text files with LF line endings. On Windows, core.autocrlf still
+# checks them out as CRLF; WSL and Linux see LF.
+* text=auto
+
+# These files are stored with CRLF or mixed endings (legacy data and Java
+# sources): keep them byte for byte.
+assets/data/sst1950_1981.txt -text
+docs/java/double-well/test.txt -text
+docs/java/observations-2013/sva.2_filter_10_9_1950.1_2013.01.dat -text
+docs/java/observations-2013/sva.2_filter_10_9_1950.1_2026.06.dat -text
+legacy-java/double-well/DoubleWell.java -text
+legacy-java/double-well/DoubleWellApplet.java -text
+legacy-java/double-well/DoubleWellCanvas.java -text
+legacy-java/double-well/NL3System.java -text
+legacy-java/double-well/dwsimulate.html -text
+legacy-java/double-well/test.txt -text
+legacy-java/observations-2013/DoubleWellApplet.java -text
+legacy-java/observations-2013/DoubleWellCanvas.java -text
+legacy-java/observations-2013/NL3System.java -text
+legacy-java/observations-2013/index1.html -text
+legacy-java/observations-2013/sva.2_filter_10_9_1950.1_2013.01.dat -text
