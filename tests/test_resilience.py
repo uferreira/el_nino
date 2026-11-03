@@ -314,6 +314,35 @@ def test_failed_station_marked_stale_in_freshness(tmp_path, monkeypatch):
     assert "Callao sea level data as of May 2026 (fetch pending)" in final
 
 
+def test_non_runtime_error_fails_only_that_dataset(tmp_path, monkeypatch):
+    """Any exception from one dataset must be contained, not just RuntimeError.
+
+    A NOAA file with a missing month makes select_fourier_window raise
+    ValueError, and an odd ERDDAP timestamp makes pandas raise a ValueError
+    subclass. Either used to crash the whole run with nothing published.
+    """
+    uw = _load_update_website()
+    idx, fresh = _setup(uw, tmp_path, monkeypatch, callao_fails=False)
+    good_index = uw._run_sst_index
+
+    def flaky_index(cfg, key, *a, **k):
+        if key == "nino3":
+            raise ValueError("IYR and MES must form a continuous monthly calendar")
+        return good_index(cfg, key, *a, **k)
+
+    monkeypatch.setattr(uw, "_run_sst_index", flaky_index)
+
+    uw.main()   # must not raise
+
+    final = idx.read_text(encoding="utf-8")
+    assert _published_values(final, "nino3Data")[0] == _OLD_VALUE
+    assert _published_values(final, "nino4Data")[0] == _NEW_VALUE
+    assert _published_values(final, "callaoData")[0] == _NEW_VALUE
+    state = json.loads(fresh.read_text(encoding="utf-8"))
+    assert state["sst"]["nino3"]["ok"] is False
+    assert state["sst"]["nino4"]["ok"] is True
+
+
 def test_sl_only_leaves_sst_series_untouched(tmp_path, monkeypatch):
     uw = _load_update_website()
 

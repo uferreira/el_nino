@@ -779,7 +779,7 @@ def main() -> None:
                 _, result = _run_sst_nino12(cfg, hn1, hn2, ndots, OUT_DIR, win)
             else:
                 _, result = _run_sst_index(cfg, key, hn1, hn2, ndots, OUT_DIR, win)
-        except RuntimeError as exc:
+        except Exception as exc:   # any error fails this dataset, not the run
             _record_failure(js_var, label, "sst", key, exc)
             continue
         loaded_raw[js_var] = _as_raw(result["raw_full"])
@@ -805,7 +805,7 @@ def main() -> None:
         print(f"[{step}] {st['name']} sea level pipeline …"); step += 1
         try:
             _, result = _run_sl(st, hn1, hn2, ndots, OUT_DIR, win)
-        except RuntimeError as exc:
+        except Exception as exc:   # any error fails this dataset, not the run
             _record_failure(js_var, st["name"], "stations", key, exc)
             continue
         loaded_raw[js_var] = _as_raw(result["raw_full"])
