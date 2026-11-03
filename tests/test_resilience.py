@@ -379,44 +379,64 @@ def test_sst_only_and_sl_only_mutually_exclusive(tmp_path, monkeypatch):
 # Regression guard: published data must only ever move forwards
 # ---------------------------------------------------------------------------
 
-def test_older_data_is_refused(tmp_path, monkeypatch, capsys):
-    """A run whose data ends earlier than the page must abort before writing.
+def test_dataset_that_moves_back_keeps_its_published_data(
+        tmp_path, monkeypatch, capsys):
+    """Only the dataset that would move backwards is held; the rest publish.
 
     This is the failure mode of an unreachable source or a stale local cache:
     the pipeline succeeds, produces a shorter record, and would quietly
-    un-publish real observations.
+    un-publish real observations. It used to abort the whole run, so one
+    station that lost a month also blocked SST and every other station.
     """
     uw = _load_update_website()
-    idx, _ = _setup(uw, tmp_path, monkeypatch, callao_fails=False, drop_last=3)
-    before = idx.read_text(encoding="utf-8")
+    prior = {"sst": {},
+             "stations": {"callao": {"name": "Callao", "last_success": "2026-06-05",
+                                     "as_of": "2001-12", "ok": True}}}
+    idx, fresh = _setup(uw, tmp_path, monkeypatch, callao_fails=False,
+                        prior_freshness=prior)
+    good_sl = uw._run_sl
 
-    with pytest.raises(SystemExit) as exc:
-        uw.main()
-    assert exc.value.code == 1
+    def short_callao(st, *a, **k):
+        if st["name"] == "Callao":
+            return Path("x.dat"), {"IYR": [2000], "MES": [1],
+                                   "raw_full": _raw_full(_NEW_VALUE, drop_last=3)}
+        return good_sl(st, *a, **k)
 
-    # Nothing was written: the page still carries the newer published data.
-    assert idx.read_text(encoding="utf-8") == before
-    assert _published_values(before, "observedData")[0] == _OLD_VALUE
+    monkeypatch.setattr(uw, "_run_sl", short_callao)
+
+    uw.main()   # must not raise
+
+    final = idx.read_text(encoding="utf-8")
+    assert _published_values(final, "callaoData")[0] == _OLD_VALUE
+    assert len(_published_values(final, "callaoData")) == 24
+    assert _published_values(final, "honoluluData")[0] == _NEW_VALUE
+    assert _published_values(final, "observedData")[0] == _NEW_VALUE
+
+    state = json.loads(fresh.read_text(encoding="utf-8"))
+    callao = state["stations"]["callao"]
+    assert callao["ok"] is False
+    assert callao["as_of"] == "2001-12"
+    assert callao["last_success"] == "2026-06-05"
+    assert state["stations"]["honolulu"]["ok"] is True
+    assert "Callao sea level data as of December 2001 (fetch pending)" in final
 
     err = capsys.readouterr().err
     assert "would move back from Dec 2001 to Sep 2001" in err
-    assert "--allow-older" in err
 
 
-def test_refused_run_leaves_freshness_untouched(tmp_path, monkeypatch):
-    """freshness.json must not claim a refresh that was never published."""
+def test_every_dataset_moving_back_publishes_nothing_new(tmp_path, monkeypatch):
+    """If every dataset is held, every page keeps its published values."""
     uw = _load_update_website()
-    prior = {"sst": {"nino12": {"name": "NINO1+2", "last_success": "2026-06-05",
-                                "as_of": "2026-05", "ok": True}},
-             "stations": {}}
-    idx, fresh = _setup(uw, tmp_path, monkeypatch, callao_fails=False,
-                        drop_last=3, prior_freshness=prior)
-    before = fresh.read_text(encoding="utf-8")
+    idx, fresh = _setup(uw, tmp_path, monkeypatch, callao_fails=False, drop_last=3)
 
-    with pytest.raises(SystemExit):
-        uw.main()
+    uw.main()
 
-    assert fresh.read_text(encoding="utf-8") == before
+    final = idx.read_text(encoding="utf-8")
+    for var in uw.DATASETS:
+        assert _published_values(final, var)[0] == _OLD_VALUE
+    state = json.loads(fresh.read_text(encoding="utf-8"))
+    entries = list(state["sst"].values()) + list(state["stations"].values())
+    assert entries and all(e["ok"] is False for e in entries)
 
 
 def test_allow_older_overrides_the_guard(tmp_path, monkeypatch, capsys):

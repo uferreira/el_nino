@@ -16,11 +16,13 @@ Run from the project root:
 Published data only moves forwards
 ----------------------------------
 Before writing anything the script compares each dataset's fresh last month
-against the one the page already publishes, and aborts if any would move
-backwards. That is the signature of an unreachable source or a stale
-``data/input/`` cache: the pipeline still succeeds, but on a shorter record,
-and writing it would quietly un-publish real observations. ``--allow-older``
-overrides the check when the older record is genuinely the correct one.
+against the one the page already publishes. A dataset that would move
+backwards keeps its published values and is recorded as failed ("fetch
+pending"); every other dataset is still published. That is the signature of
+an unreachable source or a stale ``data/input/`` cache: the pipeline still
+succeeds, but on a shorter record, and writing it would quietly un-publish
+real observations. ``--allow-older`` writes the older record instead, when it
+is genuinely the correct one.
 
 What the pages contain
 ----------------------
@@ -262,16 +264,17 @@ def _check_no_regression(
     html_name: str,
     computed: dict[str, dict],
     published: "OrderedDict[str, dict]",
-) -> list[str]:
+) -> list[tuple[str, str]]:
     """Report datasets whose fresh series ends EARLIER than the published one.
 
-    Data must only ever move forwards. A run that produces an older record
-    means the sources were incomplete, or the pipeline fell back to a stale
-    local cache — not that a month disappeared from the ocean. Overwriting
-    the page in that case silently un-publishes real observations, which is
-    exactly the failure this guard exists to catch.
+    Returns ``(var_name, message)`` pairs. Data must only ever move forwards.
+    A run that produces an older record means the sources were incomplete, or
+    the pipeline fell back to a stale local cache, not that a month
+    disappeared from the ocean. Overwriting the page in that case silently
+    un-publishes real observations, which is exactly the failure this guard
+    exists to catch.
     """
-    losses: list[str] = []
+    losses: list[tuple[str, str]] = []
     for var_name, raw in computed.items():
         prev = published.get(var_name)
         if prev is None:
@@ -280,10 +283,11 @@ def _check_no_regression(
         if new_last is None or old_last is None:
             continue
         if new_last < old_last:
-            losses.append(
+            losses.append((
+                var_name,
                 f"{html_name}: {var_name} would move back from "
-                f"{_month_label(*old_last)} to {_month_label(*new_last)}"
-            )
+                f"{_month_label(*old_last)} to {_month_label(*new_last)}",
+            ))
     return losses
 
 
@@ -645,10 +649,10 @@ def main() -> None:
     )
     parser.add_argument(
         "--allow-older", action="store_true",
-        help="Write the pages even if a dataset would move back to an earlier "
-             "last month than the one already published (normally an error: it "
-             "usually means a source was incomplete or a stale local cache was "
-             "used, and writing would un-publish real observations)",
+        help="Publish a dataset even if it would move back to an earlier last "
+             "month than the one already published (normally that dataset keeps "
+             "its published data and is recorded as failed: it usually means a "
+             "source was incomplete or a stale local cache was used)",
     )
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -718,6 +722,9 @@ def main() -> None:
         sys.exit(1)
 
     freshness = _load_freshness()
+    # The state as this run found it, so a dataset held back by the regression
+    # guard can return to its last good entry.
+    freshness_before = json.loads(json.dumps(freshness))
     # Unfiltered monthly observations, embedded verbatim in the pages.
     loaded_raw: dict[str, dict] = {}
     # One summary row per configured dataset, filled in as it is processed.
@@ -857,12 +864,41 @@ def main() -> None:
             _gh_annotation("error", f"{name} was silently skipped")
         sys.exit(1)
 
+    # ── Regression guard ──────────────────────────────────────────────────────
+    # Published data only moves forwards. A dataset whose fresh record ends
+    # earlier than what a page already publishes keeps its published values and
+    # is recorded as failed; every other dataset is still published.
+    moved_back: "OrderedDict[str, str]" = OrderedDict()
+    for html_path in HTML_FILES:
+        if not html_path.exists():
+            continue
+        html = html_path.read_text(encoding="utf-8")
+        if DATA_BEGIN in html or _LEGACY_REGION.search(html):
+            for var_name, line in _check_no_regression(
+                    html_path.name, loaded_raw, _extract_raw_series(html)):
+                moved_back.setdefault(var_name, line)
+    for var_name, line in moved_back.items():
+        if args.allow_older:
+            print(f"  WARNING: {line} (written anyway: --allow-older)",
+                  file=sys.stderr)
+            continue
+        meta = DATASETS[var_name]
+        section = "sst" if meta["group"] == "sst" else "stations"
+        key = meta["cfg_key"]
+        # Undo this run's success entry so the failure keeps the last good one.
+        if key in freshness_before.get(section, {}):
+            freshness[section][key] = dict(freshness_before[section][key])
+        else:
+            freshness[section].pop(key, None)
+        del loaded_raw[var_name]
+        detail = line.split(f"{var_name} ", 1)[-1]
+        _record_failure(var_name, rows[var_name]["name"], section, key,
+                        RuntimeError(f"{detail}; published data kept"))
+
     # ── Freshness bookkeeping ─────────────────────────────────────────────────
     # The footer date comes from each dataset's own last_success, so an
     # --sst-only or --sl-only run moves the date of the part it refreshed.
     freshness.pop("last_refreshed", None)   # superseded by per-part dates
-    # Saved only after the regression guard below, so a refused run does not
-    # record a refresh that was never published.
     refreshed_label = _refreshed_label(freshness)
     stale_notes     = _stale_notes(freshness)
     if stale_notes:
@@ -872,11 +908,8 @@ def main() -> None:
     print(f"[{step}] Patching HTML files …"); step += 1
 
     patched_files: list[Path] = []
-    # Pages are rendered first and written only once every one of them has
-    # passed the no-regression check, so a single bad dataset cannot leave
-    # half the site updated and half rolled back.
+    # Every page is rendered before any is written.
     pending: list[tuple[Path, str]] = []
-    regressions: list[str] = []
     for html_path in HTML_FILES:
         if not html_path.exists():
             continue
@@ -894,7 +927,6 @@ def main() -> None:
                     page_raw[var_name] = loaded_raw[var_name]
                 elif var_name in published:
                     page_raw[var_name] = published[var_name]
-            regressions += _check_no_regression(html_path.name, loaded_raw, published)
             region = _build_data_region(page_raw, hn1, hn2, ndots, base_year)
             html, _ = _patch_data_region(html, region)
         elif html_path.name != "index.html":
@@ -907,23 +939,6 @@ def main() -> None:
             print(f"  Unchanged: {html_path}")
             continue
         pending.append((html_path, html))
-
-    # ── Regression guard ──────────────────────────────────────────────────
-    if regressions:
-        for line in regressions:
-            print(f"  {'WARNING' if args.allow_older else 'ERROR'}: {line}",
-                  file=sys.stderr)
-        if not args.allow_older:
-            print(
-                "\nRefusing to write: the new data ends earlier than what is "
-                "already published.\nCheck that every source was reachable "
-                "and up to date, then re-run.\n"
-                "Pass --allow-older only if the older record is genuinely the "
-                "correct one.",
-                file=sys.stderr,
-            )
-            _print_summary(rows)
-            sys.exit(1)
 
     if not args.dry_run:
         _save_freshness(freshness)

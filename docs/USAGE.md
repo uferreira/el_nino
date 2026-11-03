@@ -556,21 +556,22 @@ python scripts/update_website.py --allow-older  # permit data to move backwards
 ### Published data only moves forwards
 
 Before writing anything, the script compares each dataset's fresh last month
-against the month the page already publishes, and aborts without touching a
-single file if any of them would move backwards:
+against the month the page already publishes. A dataset that would move
+backwards keeps its published values and is recorded as failed, so the footer
+shows "fetch pending" for it; every other dataset is still published:
 
 ```
-ERROR: phase_diagrams.html: callaoData would move back from Aug 2026 to Jul 2026
-Refusing to write: the new data ends earlier than what is already published.
+WARNING: Callao pipeline failed; leaving its existing data in place.
+  would move back from Aug 2026 to Jul 2026; published data kept
 ```
 
 That is what an unreachable source or a stale `data/input/` cache looks like:
 the pipeline still succeeds, but on a shorter record, and writing it would
 quietly un-publish real observations. `data/input/` is gitignored, so a clone
 that has not run the pipeline recently — or a machine that cannot reach NOAA
-CPC and UHSLC — will produce exactly this. Check the sources, then re-run.
-`--allow-older` overrides the guard, and should only be used when the older
-record is genuinely the correct one.
+CPC and UHSLC, will produce exactly this. Check the sources, then re-run.
+`--allow-older` publishes the older record instead, and should only be used
+when the older record is genuinely the correct one.
 
 ---
 
