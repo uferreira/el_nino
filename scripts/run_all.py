@@ -101,7 +101,7 @@ def _run_sst(cfg: dict, HN1: float, HN2: float, NDOTS: int,
         / f"sva.2_filter_{int(HN1)}_{int(HN2)}"
           f"_{yr0}.{m0}_{yr1}.{m1}_SAIDApy.dat"
     )
-    tmp.rename(final)
+    tmp.replace(final)   # rename() cannot overwrite on Windows
     result["output_file"] = str(final)
     print(f"  Renamed → {final.name}")
     return result
