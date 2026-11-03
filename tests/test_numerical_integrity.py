@@ -74,6 +74,50 @@ def test_erddap_monthly_means_preserve_calendar_and_reject_sparse_month(
     assert result["interpolated_months"] == 2
     assert result["low_coverage_months"] == 1
 
+
+def _aggregate_at(monkeypatch, now, observations):
+    """Run the monthly aggregation as if the clock read ``now`` (UTC)."""
+    import datetime as dt
+
+    class _Clock(dt.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now
+
+    monkeypatch.setattr(download, "datetime", _Clock)
+    return download._aggregate_monthly_sea_level(observations)
+
+
+def test_current_month_needs_the_same_coverage_as_any_other(monkeypatch):
+    """A short current month must not become the series endpoint.
+
+    passa_baixa's trend correction is anchored on the last value, so a
+    7-day mean as the endpoint biases the whole filtered record. And a month
+    published that way is dropped on the next run once it is judged as a
+    historical month, which used to trip the regression guard.
+    """
+    import datetime as dt
+
+    utc = dt.timezone.utc
+    # Hourly data from Jan 2024; the gauge goes silent after 10 October 2026.
+    times = pd.date_range("2024-01-01", "2026-10-10 23:00", freq="h", tz="UTC")
+    silent = pd.DataFrame({"time_utc": times, "sl_mm": 1500.0})
+
+    for now in (dt.datetime(2026, 10, 20, tzinfo=utc),
+                dt.datetime(2026, 11, 6, tzinfo=utc)):
+        monthly, quality = _aggregate_at(monkeypatch, now, silent)
+        last = (int(monthly["YR"].iloc[-1]), int(monthly["MON"].iloc[-1]))
+        assert last == (2026, 9), f"run at {now:%Y-%m-%d} ended at {last}"
+        assert quality["preliminary_month"] is False
+
+    # A current month that already has half its hours is used, and flagged.
+    times = pd.date_range("2024-01-01", "2026-10-20 23:00", freq="h", tz="UTC")
+    live = pd.DataFrame({"time_utc": times, "sl_mm": 1500.0})
+    monthly, quality = _aggregate_at(
+        monkeypatch, dt.datetime(2026, 10, 21, tzinfo=utc), live)
+    assert (int(monthly["YR"].iloc[-1]), int(monthly["MON"].iloc[-1])) == (2026, 10)
+    assert quality["preliminary_month"] is True
+
 def test_filter_accepts_integer_input_without_changing_scientific_type():
     result = passa_baixa(10.0, 9.0, np.arange(24))
 

@@ -89,8 +89,8 @@ absolute physical units.
 
 ### Sea-level monthly quality control
 
-Historical SSH months require at least 50% of their possible hourly values. The
-current UTC month may be included as preliminary after seven valid days. The
+Every SSH month requires at least 50% of its possible hourly values. The
+current UTC month follows the same rule and is flagged preliminary when used. The
 pipeline keeps a complete monthly calendar: internal missing or rejected months
 are reconstructed by interpolating anomalies about the station's monthly
 climatology, while leading and trailing gaps are never extrapolated. Combined

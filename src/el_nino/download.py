@@ -34,11 +34,10 @@ ERDDAP_BASE = (
 
 # UHSLC encodes missing observations as -32767 (short int sentinel, not NaN).
 FILL_VALUE = -32767
-# A historical monthly mean must represent at least half of its hourly slots.
-# The current month is explicitly preliminary and may be used after one week;
-# this keeps the monitoring product timely without admitting one-hour means.
+# Every monthly mean, the current month included, must represent at least half
+# of its hourly slots. A shorter mean as the last point would bias the endpoint
+# trend correction in passa_baixa, and would be dropped again on the next run.
 MIN_HISTORICAL_MONTH_COVERAGE = 0.50
-MIN_PRELIMINARY_MONTH_HOURS = 7 * 24
 
 # (connect, read) seconds. The read timeout is generous because ERDDAP can
 # pause while it assembles a century of hourly data; the connect timeout is
@@ -629,8 +628,8 @@ def _aggregate_monthly_sea_level(
     and date. This helper therefore keeps the true monthly calendar, rejects
     unrepresentative monthly means, and reconstructs internal gaps.
 
-    Historical months require at least 50% of their possible hourly values.
-    The current UTC month is allowed after seven valid days and is labelled
+    Every month requires at least 50% of its possible hourly values. The
+    current UTC month follows the same rule and, when it passes, is labelled
     preliminary. Leading/trailing gaps are trimmed, never extrapolated.
     Internal gaps are filled by linearly interpolating anomalies about the
     observed monthly climatology; direct linear interpolation is used only
@@ -660,11 +659,7 @@ def _aggregate_monthly_sea_level(
     now_month = pd.Period(datetime.now(timezone.utc).strftime("%Y-%m"), freq="M")
     periods = monthly_mean.index.tz_localize(None).to_period("M")
     current = periods == now_month
-    preliminary_exemption = current & ~accepted & (
-        monthly_count.to_numpy() >= MIN_PRELIMINARY_MONTH_HOURS
-    )
-    accepted = accepted | preliminary_exemption
-    current_month_included = current & accepted
+    current_month_included = current & accepted.to_numpy()
 
     observed = monthly_mean.where(accepted)
     valid_positions = np.flatnonzero(observed.notna().to_numpy())
